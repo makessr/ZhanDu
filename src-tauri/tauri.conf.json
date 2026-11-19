@@ -43,9 +43,9 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdEOEFEMUZEQzgyNjc5REUKUldUZWVTYkkvZEdLZlZRd2h5S3g5VGtMei91ZDIxT3RiYW5Ua1Nabmg2Q0xnUnVlVklDUWt2djQK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE1QTEzOURBNEUxMzNGMkYKUldRdlB4Tk8yam1oRmJWNGJHai9WdWNWNUt3K2hONkNzWG14UWl5STluUys3Rmxvb0NFbUNKN2EK",
       "endpoints": [
-        "https://github.com/makessr/FineShell/releases/latest/download/latest.json"
+        "https://github.com/makessr/ZhanDu/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"
