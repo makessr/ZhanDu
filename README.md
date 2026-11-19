@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/makessr/FineShell/releases"><img src="https://img.shields.io/github/v/release/makessr/FineShell?display_name=tag&sort=semver" alt="FineShell 已发布版本" /></a>
+  <a href="https://github.com/makessr/ZhanDu/releases/latest"><img src="https://img.shields.io/github/v/release/makessr/ZhanDu?display_name=tag&sort=semver" alt="栈渡已发布版本" /></a>
   <img src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white" alt="Tauri 2" />
   <img src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=111827" alt="React 18" />
   <img src="https://img.shields.io/badge/Rust-stable-000000?logo=rust" alt="Rust stable" />
@@ -40,7 +40,7 @@
 
 SSH 工作区可保存当前窗口的已保存主机会话及分屏布局，之后从终端工具栏一键重新连接。OpenSSH 导入支持顶层 `Include`、通配符和嵌套文件。相对路径从所选配置的目录解析。将 `Host` 段中的条件 `Include` 展开后再导入。
 
-待发布的 SFTP 文件名筛选可从文件管理工具栏的搜索按钮打开，只筛选当前目录，支持文件名和目录名的部分匹配。
+SFTP 文件名筛选可从文件管理工具栏的搜索按钮打开，只筛选当前目录，支持文件名和目录名的部分匹配。
 
 ## 界面预览
 
@@ -121,9 +121,9 @@ SSH 工作区可保存当前窗口的已保存主机会话及分屏布局，之�
 
 新版客户端使用「栈渡」名称和海军蓝终端图标。为衔接旧版升级，过渡安装包沿用 FineShell 的安装器名称、更新渠道和应用标识。
 
-栈渡源码在独立仓库维护。现有 FineShell 客户端的安装包与应用内更新仍由原发行仓库提供。 [栈渡源码](https://github.com/makessr/ZhanDu) · [已发布安装包](https://github.com/makessr/FineShell/releases)
+栈渡在独立仓库维护和发布。首次安装可直接下载栈渡 v0.6.2。 [栈渡安装包](https://github.com/makessr/ZhanDu/releases/latest) · [旧渠道 v0.6.1 切换版](https://github.com/makessr/FineShell/releases/tag/v0.6.1)
 
-已安装的 v0.6.0 仍从原发行渠道更新。独立仓库的首发版本为 v0.6.2，原渠道交付的 v0.6.1 负责切换更新地址和验签公钥。已公开的版本以 Releases 页面为准。 [更新渠道迁移说明](docs/release-pipeline.md#从-fineshell-过渡到栈渡)
+已安装的 FineShell 或栈渡 v0.6.0 客户端先从旧渠道升级到 v0.6.1。重启后再检查更新，从栈渡独立渠道安装 v0.6.2。应用标识和本地凭据存储在两次升级中保持兼容。 [更新渠道迁移说明](docs/release-pipeline.md#从-fineshell-过渡到栈渡)
 
 | 发布目标 | 安装包 |
 | --- | --- |
@@ -142,7 +142,7 @@ macOS 发布包使用临时签名，Apple Developer ID 签名和公证状态以�
 
 ```bash
 sudo apt update
-sudo apt install ./FineShell_0.6.0_linux_arm64.deb
+sudo apt install ./FineShell_0.6.2_linux_arm64.deb
 ```
 
 请根据实际下载的文件名调整命令。不要直接使用 `dpkg -i`，因为 `dpkg` 不会自动下载缺失的依赖。
@@ -256,7 +256,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --lib \
 
 从 v0.5.1 起，Windows 版支持只启用现代椭圆曲线密钥交换的 SSH 服务器。桌面验收使用 Curve25519 握手覆盖该场景。
 
-待发布的 SFTP 大目录预览会分批显示最先读取的项目，最多预览 1,024 项。读取完成后显示完整目录，可全选、拖拽和执行文件操作。
+SFTP 大目录预览会分批显示最先读取的项目，最多预览 1,024 项。读取完成后显示完整目录，可全选、拖拽和执行文件操作。
 
 `scripts/windows-smoke/` 提供两个 PowerShell 入口。同步验收从两套空白 WebView2 配置和独立的 Windows 凭据库命名空间开始。它启动本机的同步和 SSH/SFTP 测试服务，验证登录后自动同步，并以同步得到的 SSH 密码和私钥打开终端、读取 SFTP 目录。OTA 验收从已验签的上一个 Windows x64 NSIS 安装包出发，使用应用内更新并检查本地配置是否保留。运行方法见 [发布流水线](docs/release-pipeline.md#windows-桌面验收)。
 
