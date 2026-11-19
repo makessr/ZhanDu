@@ -123,7 +123,7 @@ SSH 工作区可保存当前窗口的已保存主机会话及分屏布局，之�
 
 栈渡源码在独立仓库维护。现有 FineShell 客户端的安装包与应用内更新仍由原发行仓库提供。 [栈渡源码](https://github.com/makessr/ZhanDu) · [已发布安装包](https://github.com/makessr/FineShell/releases)
 
-v0.6.0 是首个采用栈渡品牌的签名过渡版本。正式发布后，FineShell v0.5.1 可从原发行渠道检查并安装更新。请以 Releases 页面显示的版本为准。 [更新渠道迁移说明](docs/release-pipeline.md#从-fineshell-过渡到栈渡)
+已安装的 v0.6.0 仍从原发行渠道更新。本仓库源码为下一版配置了栈渡独立更新地址和验签公钥。原渠道会先交付切换版，安装后客户端才会使用新渠道和新公钥。 [更新渠道迁移说明](docs/release-pipeline.md#从-fineshell-过渡到栈渡)
 
 | 发布目标 | 安装包 |
 | --- | --- |
