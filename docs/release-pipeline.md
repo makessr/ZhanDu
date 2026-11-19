@@ -10,6 +10,16 @@ FineShell 将版本准备与跨平台构建拆成两个 GitHub Actions 工作流
 
 客户端通过 GitHub Releases 的 `latest.json` 检查更新，并由 Tauri Updater 校验安装包签名。
 
+## 从 FineShell 过渡到栈渡
+
+FineShell v0.5.1 从 `makessr/FineShell` 下载更新清单，只接受该仓库的 Release 安装包，并使用已内置的公钥验签。栈渡目前仍配置这个渠道。
+
+1. 首个栈渡签名过渡版从 `makessr/FineShell` 发布，使用与已安装客户端公钥匹配的签名。保留安装标识、凭据存储和更新地址。
+2. 从公开的 FineShell v0.5.1 安装包开始，验证应用内更新能自动下载、验签并安装过渡版，以及已有主机连接、密码和私钥仍可使用。
+3. 将更新渠道迁移到 `makessr/ZhanDu` 作为独立变更处理。先验证旧渠道交付的客户端可以读取新渠道，再验证该客户端能从新渠道安装下一版。切换签名时，分别核对每一跳的安装包和前一版客户端所信任的公钥。
+
+常规 `Release` 会在创建草稿前检查应用更新地址是否属于发布仓库，并在公开前检查 `latest.json` 中每个安装包下载地址。迁移渠道时，须先设计和验收从旧渠道交付切换版的路径，再启用新仓库的常规发布。
+
 ## GitHub 配置
 
 GitHub Actions 需要配置仓库密钥 `TAURI_SIGNING_PRIVATE_KEY`，用于生成可由客户端验证的更新签名。工作流使用仓库提供的 `GITHUB_TOKEN` 创建发布 PR、Release 和构建产物，无需额外访问令牌。

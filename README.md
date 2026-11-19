@@ -117,13 +117,15 @@ SSH 工作区可保存当前窗口的已保存主机会话及分屏布局，之�
 
 ## 下载与安装
 
-**仓库版本** v0.5.1。各版本变动见 [更新日志](CHANGELOG.md)。
+**仓库版本** v0.6.0。各版本变动见 [更新日志](CHANGELOG.md)。
 
 新版客户端使用「栈渡」名称和海军蓝终端图标。为衔接旧版升级，过渡安装包沿用 FineShell 的安装器名称、更新渠道和应用标识。
 
-栈渡源码在本仓库维护。现有 FineShell 客户端的安装包与应用内更新仍由原发行仓库提供。 [FineShell 已发布安装包](https://github.com/makessr/FineShell/releases)
+栈渡源码在独立仓库维护。现有 FineShell 客户端的安装包与应用内更新仍由原发行仓库提供。 [栈渡源码](https://github.com/makessr/ZhanDu) · [已发布安装包](https://github.com/makessr/FineShell/releases)
 
-| v0.5.0 发布目标 | 安装包 |
+v0.6.0 是首个采用栈渡品牌的签名过渡版本。正式发布后，FineShell v0.5.1 可从原发行渠道检查并安装更新。请以 Releases 页面显示的版本为准。 [更新渠道迁移说明](docs/release-pipeline.md#从-fineshell-过渡到栈渡)
+
+| 发布目标 | 安装包 |
 | --- | --- |
 | Windows x64 | `.exe`（NSIS）、`.msi` |
 | Windows ARM64 | `.exe`（NSIS） |
@@ -132,7 +134,7 @@ SSH 工作区可保存当前窗口的已保存主机会话及分屏布局，之�
 
 从 v0.2.0 升级到 v0.3.0 时，请退出 FineShell，下载与当前架构和安装方式一致的安装包，再覆盖安装。v0.2.0 和 v0.3.0 的应用内更新会拒绝本仓库的下载地址。
 
-v0.5.0 公开前，macOS 和 Linux 可从本仓库源码构建。macOS 下载包的签名和公证状态以发布说明为准。
+macOS 发布包使用临时签名，Apple Developer ID 签名和公证状态以发布说明为准。
 
 ### Linux 安装
 
@@ -140,7 +142,7 @@ v0.5.0 公开前，macOS 和 Linux 可从本仓库源码构建。macOS 下载包
 
 ```bash
 sudo apt update
-sudo apt install ./FineShell_0.5.0_linux_arm64.deb
+sudo apt install ./FineShell_0.6.0_linux_arm64.deb
 ```
 
 请根据实际下载的文件名调整命令。不要直接使用 `dpkg -i`，因为 `dpkg` 不会自动下载缺失的依赖。

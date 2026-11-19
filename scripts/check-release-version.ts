@@ -50,14 +50,33 @@ export function validateReleaseVersion(
   return version;
 }
 
-function readReleaseVersions(): ReleaseVersions {
+export function validateReleaseRepository(
+  endpoints: unknown,
+  repository: string,
+) {
+  const expected = `https://github.com/${repository}/releases/latest/download/latest.json`;
+  const endpoint = Array.isArray(endpoints) ? endpoints[0] : undefined;
+  const match = typeof endpoint === "string"
+    ? endpoint.match(/^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/releases\/latest\/download\/latest\.json$/)
+    : null;
+  if (
+    !match ||
+    match[1].toLowerCase() !== repository.toLowerCase()
+  ) {
+    throw new Error(
+      `应用更新渠道与发布仓库不一致：当前地址为 ${String(endpoint)}，${repository} 的更新地址应为 ${expected}`,
+    );
+  }
+}
+
+function readReleaseVersions(repository?: string): ReleaseVersions {
   const projectRoot = resolve(import.meta.dir, "..");
   const packageJson = JSON.parse(
     readFileSync(resolve(projectRoot, "package.json"), "utf8"),
   ) as { version?: string };
   const tauriConfig = JSON.parse(
     readFileSync(resolve(projectRoot, "src-tauri/tauri.conf.json"), "utf8"),
-  ) as { version?: string };
+  ) as { version?: string; plugins?: { updater?: { endpoints?: unknown } } };
   const cargoToml = readFileSync(
     resolve(projectRoot, "src-tauri/Cargo.toml"),
     "utf8",
@@ -65,6 +84,9 @@ function readReleaseVersions(): ReleaseVersions {
 
   if (!packageJson.version || !tauriConfig.version) {
     throw new Error("package.json 或 tauri.conf.json 缺少 version");
+  }
+  if (repository !== undefined) {
+    validateReleaseRepository(tauriConfig.plugins?.updater?.endpoints, repository);
   }
 
   return {
@@ -77,7 +99,8 @@ function readReleaseVersions(): ReleaseVersions {
 if (import.meta.main) {
   try {
     const releaseTag = process.argv[2] ?? "";
-    const version = validateReleaseVersion(releaseTag, readReleaseVersions());
+    const repository = process.argv[3];
+    const version = validateReleaseVersion(releaseTag, readReleaseVersions(repository));
     console.log(`FineShell ${version} 版本校验通过（${releaseTag}）`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));

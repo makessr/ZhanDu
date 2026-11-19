@@ -5,6 +5,7 @@ const platform = {
   signature: "signed-update",
   url: "https://github.com/example/app/releases/download/v1.2.3/app.tar.gz",
 };
+const repository = "example/app";
 
 function manifest(platforms: Record<string, unknown>) {
   return { platforms, version: "1.2.3" };
@@ -16,11 +17,11 @@ describe("updater manifest validation", () => {
       "windows-x86_64-nsis": platform,
       "windows-aarch64-nsis": platform,
     });
-    expect(validateUpdaterManifest(windows, "v1.2.3", "windows")).toEqual([
+    expect(validateUpdaterManifest(windows, "v1.2.3", repository, "windows")).toEqual([
       "windows-x86_64-nsis", "windows-aarch64-nsis",
     ]);
     expect(() => validateUpdaterManifest(
-      manifest({ "windows-x86_64-nsis": platform }), "v1.2.3", "windows",
+      manifest({ "windows-x86_64-nsis": platform }), "v1.2.3", repository, "windows",
     )).toThrow("缺少 Windows ARM64");
   });
 
@@ -36,6 +37,7 @@ describe("updater manifest validation", () => {
           "windows-aarch64-nsis": platform,
         }),
         "v1.2.3",
+        repository,
       ),
     ).toEqual([
       "darwin-aarch64-app",
@@ -57,6 +59,7 @@ describe("updater manifest validation", () => {
           "windows-x86_64-nsis": platform,
         }),
         "v1.2.3",
+        repository,
       ),
     ).toThrow("缺少 Linux ARM64");
   });
@@ -73,6 +76,7 @@ describe("updater manifest validation", () => {
           "windows-aarch64-nsis": platform,
         }),
         "v1.2.3",
+        repository,
       ),
     ).toThrow("缺少 Linux x64");
   });
@@ -88,6 +92,7 @@ describe("updater manifest validation", () => {
           "windows-x86_64-nsis": platform,
         }),
         "v1.2.3",
+        repository,
       ),
     ).toThrow("缺少 Windows ARM64");
   });
@@ -100,6 +105,7 @@ describe("updater manifest validation", () => {
           "windows-x86_64": platform,
         }),
         "v1.2.3",
+        repository,
       ),
     ).toThrow("缺少 macOS Apple Silicon");
   });
@@ -111,11 +117,12 @@ describe("updater manifest validation", () => {
           "darwin-aarch64": { ...platform, signature: "" },
         }),
         "v1.2.3",
+        repository,
       ),
     ).toThrow("缺少签名");
 
     expect(() =>
-      validateUpdaterManifest(manifest({}), "v1.2.4"),
+      validateUpdaterManifest(manifest({}), "v1.2.4", repository),
     ).toThrow("版本不一致");
   });
 
@@ -126,6 +133,7 @@ describe("updater manifest validation", () => {
           "darwin-aarch64": { ...platform, url: "http://example.com/app" },
         }),
         "v1.2.3",
+        repository,
       ),
     ).toThrow("必须使用 HTTPS");
   });
@@ -140,6 +148,7 @@ describe("updater manifest validation", () => {
           },
         }),
         "v1.2.3",
+        repository,
       ),
     ).toThrow("必须使用当前版本的 GitHub Release 公开下载地址");
   });
@@ -154,7 +163,22 @@ describe("updater manifest validation", () => {
           },
         }),
         "v1.2.3",
+        repository,
       ),
     ).toThrow("必须使用当前版本的 GitHub Release 公开下载地址");
+  });
+
+  test("rejects another owner or repository in any platform download URL", () => {
+    for (const otherRepository of ["another/app", "example/app-other"]) {
+      const windows = manifest({
+        "windows-x86_64-nsis": platform,
+        "windows-aarch64-nsis": {
+          ...platform,
+          url: platform.url.replace(repository, otherRepository),
+        },
+      });
+      expect(() => validateUpdaterManifest(windows, "v1.2.3", repository, "windows"))
+        .toThrow(`下载地址必须属于发布仓库 ${repository}`);
+    }
   });
 });

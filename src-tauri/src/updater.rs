@@ -14,8 +14,6 @@ use crate::protocol::{CommandError, CommandResult};
 
 const CHECK_TIMEOUT: Duration = Duration::from_secs(10);
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(180);
-const FINESHELL_LATEST_RELEASE_URL: &str =
-    "https://github.com/makessr/FineShell/releases/latest/download/latest.json";
 const BUILTIN_MIRRORS: [(&str, &str); 2] = [
     ("gh-proxy.com", "https://gh-proxy.com/"),
     ("ghproxy.net", "https://ghproxy.net/"),
@@ -84,6 +82,18 @@ pub(crate) enum ApplicationUpdateDownloadEvent {
 
 fn command_error(operation: &'static str, error: impl std::fmt::Display) -> CommandError {
     CommandError::from_message(operation, error.to_string())
+}
+
+fn updater_source(app: &AppHandle, operation: &'static str) -> CommandResult<Url> {
+    let endpoint = app
+        .config()
+        .plugins
+        .0
+        .get("updater")
+        .and_then(|config| config.pointer("/endpoints/0"))
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| command_error(operation, "缺少应用更新地址"))?;
+    Url::parse(endpoint).map_err(|error| command_error(operation, error))
 }
 
 fn normalized_mirror_prefix(value: &str) -> Result<Url, String> {
@@ -194,8 +204,7 @@ pub(crate) async fn application_update_check(
 ) -> CommandResult<Option<ApplicationUpdateMetadata>> {
     const OPERATION: &str = "application_update_check";
     let routes = update_routes(&request).map_err(|error| command_error(OPERATION, error))?;
-    let source = Url::parse(FINESHELL_LATEST_RELEASE_URL)
-        .map_err(|error| command_error(OPERATION, error))?;
+    let source = updater_source(&app, OPERATION)?;
     *lock_pending(&manager).map_err(|error| command_error(OPERATION, error))? = None;
 
     let mut last_error = None;
@@ -361,12 +370,12 @@ pub(crate) fn application_update_close(
 
 #[tauri::command]
 pub(crate) async fn application_update_test_route(
+    app: AppHandle,
     request: ApplicationUpdateRequest,
 ) -> CommandResult<ApplicationUpdateRouteTestResult> {
     const OPERATION: &str = "application_update_test_route";
     let routes = update_routes(&request).map_err(|error| command_error(OPERATION, error))?;
-    let source = Url::parse(FINESHELL_LATEST_RELEASE_URL)
-        .map_err(|error| command_error(OPERATION, error))?;
+    let source = updater_source(&app, OPERATION)?;
     let client = reqwest::Client::builder()
         .timeout(CHECK_TIMEOUT)
         .user_agent("FineShell updater route test")
@@ -418,7 +427,7 @@ pub(crate) async fn application_update_test_route(
 mod tests {
     use super::{
         mirrored_url, normalized_mirror_prefix, update_routes, validate_fineshell_download_url,
-        ApplicationUpdateRequest, BUILTIN_MIRRORS, FINESHELL_LATEST_RELEASE_URL,
+        ApplicationUpdateRequest, BUILTIN_MIRRORS,
     };
     use tauri::Url;
 
@@ -431,15 +440,21 @@ mod tests {
 
     #[test]
     fn accepts_only_release_downloads_from_the_manifest_repository() {
-        let source = Url::parse(FINESHELL_LATEST_RELEASE_URL).unwrap();
+        let source =
+            Url::parse("https://github.com/makessr/FineShell/releases/latest/download/latest.json")
+                .unwrap();
         let download = |owner, repository| {
             Url::parse(&format!(
                 "https://github.com/{owner}/{repository}/releases/download/v0.3.0/setup.exe"
             ))
             .unwrap()
         };
-        assert!(validate_fineshell_download_url(&source, &download("makessr", "FineShell")).is_ok());
-        assert!(validate_fineshell_download_url(&source, &download("Max0897", "FineShell")).is_err());
+        assert!(
+            validate_fineshell_download_url(&source, &download("makessr", "FineShell")).is_ok()
+        );
+        assert!(
+            validate_fineshell_download_url(&source, &download("Max0897", "FineShell")).is_err()
+        );
         let other_repository = download("makessr", "FineShell-other");
         assert!(validate_fineshell_download_url(&source, &other_repository).is_err());
         let mut insecure = download("makessr", "FineShell");

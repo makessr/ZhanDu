@@ -52,7 +52,12 @@ function expectedVersionFromTag(releaseTag: string) {
   return releaseTag.slice(1);
 }
 
-function validatePlatform(key: string, value: unknown, releaseTag: string) {
+function validatePlatform(
+  key: string,
+  value: unknown,
+  releaseTag: string,
+  repository: string,
+) {
   if (!isRecord(value)) {
     throw new Error(`更新清单平台 ${key} 格式无效`);
   }
@@ -75,18 +80,22 @@ function validatePlatform(key: string, value: unknown, releaseTag: string) {
     throw new Error(`更新清单平台 ${key} 的下载地址必须使用 HTTPS`);
   }
   const match = url.pathname.match(
-    /^\/[^/]+\/[^/]+\/releases\/download\/([^/]+)\/[^/]+$/,
+    /^\/([\w.-]+\/[\w.-]+)\/releases\/download\/([^/]+)\/[^/]+$/,
   );
-  if (url.hostname !== "github.com" || !match || match[1] !== releaseTag) {
+  if (url.origin !== "https://github.com" || !match || match[2] !== releaseTag) {
     throw new Error(
       `更新清单平台 ${key} 必须使用当前版本的 GitHub Release 公开下载地址`,
     );
+  }
+  if (match[1].toLowerCase() !== repository.toLowerCase()) {
+    throw new Error(`更新清单平台 ${key} 的下载地址必须属于发布仓库 ${repository}`);
   }
 }
 
 export function validateUpdaterManifest(
   value: unknown,
   releaseTag: string,
+  repository: string,
   platformSet: "all" | "windows" = "all",
 ) {
   if (!isRecord(value)) throw new Error("更新清单格式无效");
@@ -103,7 +112,7 @@ export function validateUpdaterManifest(
   }
 
   Object.entries(manifest.platforms).forEach(([key, platform]) => {
-    validatePlatform(key, platform, releaseTag);
+    validatePlatform(key, platform, releaseTag, repository);
   });
 
   const required = platformSet === "windows"
@@ -126,12 +135,14 @@ if (import.meta.main) {
   try {
     const manifestPath = process.argv[2];
     const releaseTag = process.argv[3] ?? "";
-    const platformSet = process.argv[4] ?? "all";
+    const repository = process.argv[4];
+    const platformSet = process.argv[5] ?? "all";
     if (!manifestPath) throw new Error("缺少 latest.json 路径");
+    if (!repository) throw new Error("缺少发布仓库（owner/repo）");
     if (platformSet !== "all" && platformSet !== "windows") throw new Error("发布平台范围无效");
 
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-    const platforms = validateUpdaterManifest(manifest, releaseTag, platformSet);
+    const platforms = validateUpdaterManifest(manifest, releaseTag, repository, platformSet);
     console.log(`更新清单校验通过：${platforms.join(", ")}`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));

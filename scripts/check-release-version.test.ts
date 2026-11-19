@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   cargoPackageVersion,
+  validateReleaseRepository,
   validateReleaseVersion,
 } from "./check-release-version";
 
@@ -41,5 +42,23 @@ version = "1.2.3"
 library = { version = "9.9.9" }
 `),
     ).toBe("1.2.3");
+  });
+});
+
+describe("release update channel", () => {
+  const endpoints = [
+    "https://github.com/makessr/FineShell/releases/latest/download/latest.json",
+  ];
+
+  test("allows the repository configured in the app", () => {
+    expect(() => validateReleaseRepository(endpoints, "makessr/fineshell"))
+      .not.toThrow();
+  });
+
+  test("rejects publishing from the independent repo before the channel cutover", () => {
+    expect(() => validateReleaseRepository(endpoints, "makessr/ZhanDu"))
+      .toThrow("应用更新渠道与发布仓库不一致");
+    expect(() => validateReleaseRepository([], "makessr/ZhanDu"))
+      .toThrow("应用更新渠道与发布仓库不一致");
   });
 });
