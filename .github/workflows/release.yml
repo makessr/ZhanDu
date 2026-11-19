@@ -7,6 +7,10 @@ on:
         description: "版本标签，例如 v0.1.0（必须与应用版本一致）"
         required: true
         type: string
+      draft_only:
+        description: "构建、验签并保留发布草稿"
+        type: boolean
+        default: false
   push:
     branches:
       - main
@@ -300,6 +304,7 @@ jobs:
           curl --fail --silent --show-error --max-time 15 "$SYNC_HEALTH_URL" |
             jq -e '.service == "fineshell-sync" and .status == "ok"'
       - name: Publish completed release
+        if: github.event_name != 'workflow_dispatch' || !inputs.draft_only
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.validate.outputs.release_tag }}
