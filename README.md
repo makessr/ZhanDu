@@ -293,7 +293,7 @@ SFTP 大目录预览会分批显示最先读取的项目，最多预览 1,024 �
 
 ## 版本发布
 
-开发过程中将变更记录到 `CHANGELOG.md` 顶部的 `Unreleased` 区域。发布时在 GitHub Actions 中运行 `Prepare Release` 并选择版本级别，工作流会统一升级版本、整理更新日志并创建发布 PR。发布工作流启用时，合并发布 PR 会按仓库变量 `FINESHELL_RELEASE_PLATFORMS` 构建安装包并校验 OTA 更新清单。工作流将产物保存在 GitHub Release 草稿中，由维护者验收后手动公开。
+开发过程中将变更记录到 `CHANGELOG.md` 顶部的 `Unreleased` 区域。发布时在 GitHub Actions 中运行 `Prepare Release` 并选择版本级别，工作流会统一升级版本、整理更新日志并创建发布 PR。发布工作流启用时，合并发布 PR 会按仓库变量 `FINESHELL_RELEASE_PLATFORMS` 构建安装包并校验 OTA 更新清单。工作流保存产物和发布说明，核对草稿的版本标签与目标提交，由维护者验收后手动公开。
 
 GitHub 仓库需要配置 Tauri 更新签名私钥 `TAURI_SIGNING_PRIVATE_KEY`。完整架构与失败重试方式见 [发布流水线文档](docs/release-pipeline.md)。
 

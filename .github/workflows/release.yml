@@ -304,13 +304,17 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.validate.outputs.release_tag }}
           RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+        shell: bash
         run: |
           endpoint="repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID"
-          gh api "$endpoint" --jq '.draft' | grep -Fxq true
+          metadata='.draft and .tag_name == $tag and .target_commitish == $commit'
+          jq_args=(--arg tag "$RELEASE_TAG" --arg commit "$GITHUB_SHA")
+          gh api "$endpoint" | jq -e "${jq_args[@]}" "$metadata" >/dev/null
           draft_url="$(
-            gh api --method PATCH "$endpoint" -F "body=@$RUNNER_TEMP/release-notes.md" \
-              --jq 'select(.draft) | .html_url'
+            gh api --method PATCH "$endpoint" \
+              -f "tag_name=$RELEASE_TAG" -f "target_commitish=$GITHUB_SHA" \
+              -F "body=@$RUNNER_TEMP/release-notes.md" |
+              jq -er "${jq_args[@]}" "select($metadata) | .html_url"
           )"
-          test -n "$draft_url"
           printf 'Release draft [%s](%s) is ready for acceptance.\n' \
             "$RELEASE_TAG" "$draft_url" >> "$GITHUB_STEP_SUMMARY"
