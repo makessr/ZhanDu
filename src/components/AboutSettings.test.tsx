@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { Modal } from "@arco-design/web-react";
 import { StrictMode } from "react";
 import {
@@ -44,6 +44,23 @@ function updaterService(
 }
 
 describe("AboutSettings", () => {
+  test("opens the ZhanDu repository and its license", () => {
+    const open = spyOn(window, "open").mockReturnValue(null);
+    try {
+      render(<AboutSettings updater={updaterService()} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "GitHub" }));
+      fireEvent.click(screen.getByRole("button", { name: "开源许可" }));
+
+      expect(open.mock.calls.map(([url]) => url)).toEqual([
+        "https://github.com/makessr/ZhanDu",
+        "https://github.com/makessr/ZhanDu/blob/main/LICENSE",
+      ]);
+    } finally {
+      open.mockRestore();
+    }
+  });
+
   test("tests the configured update route", async () => {
     const testRoute = mock(async () => ({
       latencyMs: 126,
