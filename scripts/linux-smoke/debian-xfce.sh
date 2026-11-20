@@ -20,7 +20,7 @@ if [[ "${1:-}" != '--session' ]]; then
     test -f "$desktop_file"
 
     apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
-        at-spi2-core dbus-x11 desktop-file-utils fonts-dejavu-core libgtk-3-bin python3-pyatspi sudo thunar \
+        at-spi2-core ca-certificates curl dbus-x11 desktop-file-utils fonts-dejavu-core libgtk-3-bin python3-pyatspi sudo thunar \
         xfce4-panel xfce4-session xfce4-settings xfdesktop4 xfwm4 \
         x11-utils xauth xdotool xvfb
     desktop-file-validate "$desktop_file"
@@ -90,6 +90,11 @@ window_pid() {
     return 1
 }
 
+for repo in FineShell ZhanDu; do
+    curl -fsSL --retry 2 --max-time 20 \
+        "https://github.com/makessr/$repo/releases/latest/download/latest.json" >/dev/null
+    printf 'Public %s manifest passed HTTPS validation from the XFCE session.\n' "$repo"
+done
 gtk-launch "$desktop_id"
 app_pid="$(window_pid '')"
 mkdir -p "$profile"
