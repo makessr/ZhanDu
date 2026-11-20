@@ -7,6 +7,7 @@
   <a href="https://github.com/makessr/ZhanDu/releases/latest"><strong>下载栈渡</strong></a> ·
   <a href="#界面预览">界面预览</a> ·
   <a href="#主机账号同步">主机同步</a> ·
+  <a href="#ai-运维助手">AI 助手</a> ·
   <a href="#从源码运行">从源码运行</a>
 </p>
 
@@ -58,13 +59,54 @@ sudo apt --fix-broken install
 
 ## 界面预览
 
-截图来自栈渡 v0.6.2 Windows 客户端。SSH、SFTP 和监控数据来自本机演示服务。
+所有截图均来自栈渡 v0.6.2 Windows 正式客户端。主机、文件、同步账号和诊断数据均为本地演示数据，AI 回复来自本地演示接口。
 
-### 主机管理
+### 主机同步
 
-按环境分组管理主机，支持搜索、连接历史和 OpenSSH 配置导入。
+登录后可查看最近同步时间和已登录设备，并管理恢复密钥。[同步操作和服务部署](#主机账号同步)
+
+![栈渡主机同步登录后的最近同步时间和已登录设备](docs/screenshots/zhandu-sync-device.png)
+
+### AI 运维助手
+
+在 SSH 工作区侧栏查看巡检摘要，并为会话选择审批模式。[AI 配置与使用](#ai-运维助手)
+
+![栈渡 AI 助手根据演示数据展示服务器巡检摘要](docs/screenshots/zhandu-ai.png)
+
+<details>
+<summary>主机管理与 SSH 分屏</summary>
+
+主机可按环境分组，支持搜索、连接历史和 OpenSSH 配置导入。
 
 ![栈渡主机列表，按环境分组](docs/screenshots/zhandu-hosts.png)
+
+同一个工作区支持并排或上下显示两个 SSH 会话。
+
+![栈渡并排显示两个 SSH 终端](docs/screenshots/zhandu-split-terminal.png)
+
+</details>
+
+<details>
+<summary>SFTP 文件传输与传输记录</summary>
+
+文件列表与终端同屏，可在传输记录中查看进度、结果和保存位置。
+
+![栈渡传输记录显示演示文件下载完成](docs/screenshots/zhandu-transfers.png)
+
+</details>
+
+<details>
+<summary>服务器监控、进程管理与网络诊断</summary>
+
+从工作区监控栏打开进程列表，查看 CPU、内存、用户和运行时间。
+
+![栈渡进程管理列表](docs/screenshots/zhandu-processes.png)
+
+网络诊断支持 Ping、路由追踪和端口监听查询。
+
+![栈渡网络诊断展示 Ping 结果和监听端口](docs/screenshots/zhandu-network.png)
+
+</details>
 
 <details>
 <summary>查看栈渡关于页面</summary>
@@ -97,7 +139,12 @@ SFTP 文件名筛选可从文件管理工具栏的搜索按钮打开，只筛选
 
 在「设置 → 主机同步」中创建账号或登录，默认使用 `https://auto.itfans.fun`，也可以填写自建同步服务地址。
 
-![栈渡设置中的主机同步登录页](docs/screenshots/zhandu-host-sync.png)
+<details>
+<summary>查看主机同步登录页</summary>
+
+![栈渡主机同步登录页，包含服务地址、邮箱和恢复密钥输入框](docs/screenshots/zhandu-host-sync.png)
+
+</details>
 
 1. 在第一台设备创建账号，妥善保存生成的恢复密钥。
 2. 在另一台设备登录同一账号并输入恢复密钥。应用自动同步已保存的主机、分组和相关 SSH 凭据。
