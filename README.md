@@ -15,9 +15,9 @@
 
 ## 下载与安装
 
-**仓库版本** v0.6.4。各版本变动见 [更新日志](CHANGELOG.md)。
+**仓库版本** v0.7.0。各版本变动见 [更新日志](CHANGELOG.md)。
 
-栈渡在独立仓库维护和发布。首次安装请从正式发布页下载 v0.6.3。已安装栈渡 v0.6.2 的用户可直接在应用内检查更新。 [栈渡安装包](https://github.com/makessr/ZhanDu/releases/latest) · [旧渠道 v0.6.1 切换版](https://github.com/makessr/FineShell/releases/tag/v0.6.1)
+栈渡在独立仓库维护和发布。首次安装请从正式发布页下载最新版。已安装栈渡 v0.6.2 或更新版本的用户可直接在应用内检查更新。 [栈渡安装包](https://github.com/makessr/ZhanDu/releases/latest) · [旧渠道 v0.6.1 切换版](https://github.com/makessr/FineShell/releases/tag/v0.6.1)
 
 如果你还在使用 FineShell v0.5.1 或栈渡 v0.6.0，可以在应用内直接升级到 v0.6.1。重启后再次检查更新，后续版本由栈渡独立渠道提供。 [更新渠道迁移说明](docs/release-pipeline.md#从-fineshell-过渡到栈渡)
 
@@ -34,9 +34,9 @@
 
 Apple Silicon 下载文件名带 `darwin_aarch64` 的 DMG，Intel 下载带 `darwin_x64` 的 DMG。打开映像后，把 `FineShell.app` 拖到「应用程序」，再打开应用。客户端内显示为「栈渡」。
 
-v0.6.3 的 macOS 包使用临时签名，尚未通过 Apple 公证，首次打开可能被 Gatekeeper 阻止。如果确认安装包来自项目的正式发布页且完整性已校验，可以在第一次尝试打开后，到「系统设置 → 隐私与安全性」检查是否有针对此应用的「仍要打开」按钮。[Apple 的首次打开说明](https://support.apple.com/zh-cn/102445)
+当前 macOS 包使用临时签名，尚未通过 Apple 公证，首次打开可能被 Gatekeeper 阻止。如果确认安装包来自项目的正式发布页且完整性已校验，可以在第一次尝试打开后，到「系统设置 → 隐私与安全性」检查是否有针对此应用的「仍要打开」按钮。[Apple 的首次打开说明](https://support.apple.com/zh-cn/102445)
 
-可在终端运行 `shasum -a 256 文件名.dmg`，将结果与 [v0.6.3 正式发布页](https://github.com/makessr/ZhanDu/releases/tag/v0.6.3) 对应 DMG 的 SHA-256 比对。[首次安装验收记录](docs/release-pipeline.md#macos-首次安装验收)
+可在终端运行 `shasum -a 256 文件名.dmg`，将结果与 [对应版本的正式发布页](https://github.com/makessr/ZhanDu/releases) 对应 DMG 的 SHA-256 比对。[首次安装验收记录](docs/release-pipeline.md#macos-首次安装验收)
 
 ### Linux 安装
 
