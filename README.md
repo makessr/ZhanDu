@@ -324,7 +324,7 @@ GitHub 仓库需要配置 Tauri 更新签名私钥 `TAURI_SIGNING_PRIVATE_KEY`�
 
 发布构建在 Actions 保存各架构的 Cargo 计时报告，便于查找 Rust 编译瓶颈。
 macOS Intel 安装包在 Apple Silicon 运行器上交叉编译，安装与应用内升级在 Intel 运行器上验收。
-Windows ARM64 发版可单独复用内置 OpenSSL 静态库。公开发布后，可用 [Verify public OTA](docs/release-pipeline.md#公开渠道升级验收) 批量验证 Windows、macOS 和 Debian XFCE。
+Windows ARM64 发版可单独复用内置 OpenSSL 静态库。公开发布后，可用 [Verify public OTA](docs/release-pipeline.md#公开渠道升级验收) 批量验证 Windows、macOS 和 Debian XFCE。 工作流先核对最新公开版本的更新清单和旧安装包校验值，再由客户端执行应用内升级。
 
 公开草稿前，在 Actions 运行 `Audit release assets`。它用当前公开版的验签公钥核验各平台更新包，同时核对发布提交、产物 SHA-256 和更新清单。[草稿验收步骤](docs/release-pipeline.md#草稿产物验收)
 
