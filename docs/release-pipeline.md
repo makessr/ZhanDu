@@ -7,7 +7,7 @@ FineShell 将版本准备与跨平台构建拆成两个 GitHub Actions 工作流
 3. 发布 PR 合并到 `main` 后，`Release` 自动校验版本和发布说明并创建 Draft Release。
 4. 工作流并行构建 macOS、Linux 和 Windows 安装包及更新签名。
 5. 工作流规范化并校验 `latest.json`，保存发布说明，并在运行摘要中提供草稿链接。
-6. 维护者验收草稿后，从 GitHub Releases 手动公开版本。
+6. 维护者运行 `Audit release assets` 并完成客户端验收后，从 GitHub Releases 手动公开版本。
 
 客户端通过 GitHub Releases 的 `latest.json` 检查更新，并由 Tauri Updater 校验安装包签名。
 
@@ -44,7 +44,7 @@ GitHub Actions 需要配置仓库密钥 `TAURI_SIGNING_PRIVATE_KEY`，用于生�
 2. 选择 `patch`、`minor` 或 `major`。
 3. 检查工作流创建的发布 PR，确认版本和更新日志后合并。
 4. `Release` 工作流启用时，版本变更合入 `main` 会触发构建。所有平台构建和清单检查通过后，打开运行摘要中的草稿链接。
-5. 核对草稿对应的提交、安装包、签名和更新清单，完成适用的升级验收。在 GitHub Releases 打开草稿，确认正式版本或预发行版本的设置，再选择 `Publish release`。
+5. 运行下文的草稿产物验收，完成适用的安装或升级测试。在 GitHub Releases 打开草稿，确认正式版本或预发行版本的设置，再选择 `Publish release`。
 
 发布 PR 会同步更新：
 
@@ -56,6 +56,22 @@ GitHub Actions 需要配置仓库密钥 `TAURI_SIGNING_PRIVATE_KEY`，用于生�
 - `README.md`
 
 本地可以使用 `bun run release:prepare -- patch` 验证版本准备脚本。该命令会直接修改当前工作区，因此只能在干净的非 `main` 分支执行。
+
+## 草稿产物验收
+
+在 GitHub Actions 打开 `Audit release assets`，选择 `main` 分支运行。
+
+| 输入 | 填写方式 |
+| --- | --- |
+| `release_tag` | 草稿版本标签，例如 `v0.6.3` |
+| `release_commit` | 对应该草稿的 Release 构建运行所使用的完整 Git 提交 SHA |
+| `signer_tag` | 构建时线上客户端使用的正式版本标签。验收草稿时填写当前最新正式版 |
+| `platforms` | 与构建时的 `FINESHELL_RELEASE_PLATFORMS` 一致，完整平台选 `all`，仅 Windows 选 `windows` |
+| `visibility` | 草稿选 `draft`。复核已公开版本时选 `public`，并填该版本升级来源的正式版标签 |
+
+流程核对发布提交及客户端公钥，逐件计算 SHA-256，验证更新包的 Tauri 签名和 `latest.json` 的平台、下载地址及签名，并检查 Debian 包的架构、版本与 CA 证书依赖。macOS 的 DMG 参与哈希核对，Tauri 签名验收使用实际 OTA 下载的 `.app.tar.gz`。
+
+验收仅访问现有发布数据。草稿的说明、产物或目标提交在验收后有改动时，公开前重新运行。签名轮换需要单独验证过渡路径。发布仍由维护者手动操作。
 
 ## macOS 首次安装验收
 

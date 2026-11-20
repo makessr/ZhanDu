@@ -1,0 +1,113 @@
+name: Audit release assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "待验收的版本标签，例如 v0.6.3"
+        required: true
+        type: string
+      release_commit:
+        description: "发布构建摘要中的完整提交 SHA"
+        required: true
+        type: string
+      signer_tag:
+        description: "用于读取客户端验签公钥的已发布版本标签"
+        required: true
+        type: string
+      platforms:
+        description: "与该版本构建时使用的平台范围一致"
+        type: choice
+        options: [all, windows]
+        default: all
+      visibility:
+        description: "草稿验收或已公开版本复核"
+        type: choice
+        options: [draft, public]
+        default: draft
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    # GitHub requires Contents write access to read draft releases.
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      RELEASE_COMMIT: ${{ inputs.release_commit }}
+      SIGNER_TAG: ${{ inputs.signer_tag }}
+      RELEASE_PLATFORMS: ${{ inputs.platforms }}
+      RELEASE_VISIBILITY: ${{ inputs.visibility }}
+    steps:
+      - name: Check the execution branch
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" != refs/heads/main ]]; then
+            printf '%s\n' 'Run the audit from main.' >&2
+            exit 1
+          fi
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '26'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build the signature verifier
+        run: cargo build --locked --manifest-path scripts/verify-release-signature/Cargo.toml --target-dir "$RUNNER_TEMP/verifier"
+      - name: Download and verify release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+
+          tag_format='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+          if [[ ! "$RELEASE_TAG" =~ $tag_format || ! "$SIGNER_TAG" =~ $tag_format ||
+                ! "$RELEASE_COMMIT" =~ ^[a-f0-9]{40}$ ]]; then
+            printf '%s\n' 'Expected version tags and a full lowercase release commit SHA.' >&2
+            exit 1
+          fi
+          git merge-base --is-ancestor "$RELEASE_COMMIT" "$GITHUB_SHA"
+
+          signer_release="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$SIGNER_TAG" \
+            --jq 'select(.draft == false and .prerelease == false) | .tag_name')"
+          test "$signer_release" = "$SIGNER_TAG"
+          if [[ "$RELEASE_VISIBILITY" == draft ]]; then
+            test "$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)" = "$SIGNER_TAG"
+          else
+            test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$RELEASE_COMMIT"
+          fi
+          git show "refs/tags/$SIGNER_TAG:src-tauri/tauri.conf.json" > "$RUNNER_TEMP/signer.json"
+          public_key="$(jq -er '.plugins.updater.pubkey | select(type == "string" and length > 0)' "$RUNNER_TEMP/signer.json")"
+          git show "$RELEASE_COMMIT:src-tauri/tauri.conf.json" |
+            jq -e --arg key "$public_key" --arg version "${RELEASE_TAG#v}" \
+              '.version == $version and .plugins.updater.pubkey == $key' >/dev/null
+
+          release_id="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json databaseId --jq .databaseId)"
+          endpoint="repos/$GITHUB_REPOSITORY/releases/$release_id"
+          gh api "$endpoint" > "$RUNNER_TEMP/release.json"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/assets"
+          node scripts/verify-release-assets.mjs "$RUNNER_TEMP/assets" "$RUNNER_TEMP/release.json" \
+            "$RUNNER_TEMP/signer.json" "$RUNNER_TEMP/verifier/debug/verify-release-signature" \
+            "$GITHUB_REPOSITORY" "$RELEASE_TAG" "$RELEASE_COMMIT" "$RELEASE_PLATFORMS" "$RELEASE_VISIBILITY"
+
+          if [[ "$RELEASE_PLATFORMS" == all ]]; then
+            for arch in amd64 arm64; do
+              package="$RUNNER_TEMP/assets/FineShell_${RELEASE_TAG#v}_linux_$arch.deb"
+              test "$(dpkg-deb -f "$package" Architecture)" = "$arch"
+              test "$(dpkg-deb -f "$package" Version)" = "${RELEASE_TAG#v}"
+              dpkg-deb -f "$package" Depends | tr ',' '\n' | grep -E '^ *ca-certificates *$'
+            done
+          fi
+
+          snapshot='{id, tag_name, target_commitish, draft, prerelease, body, assets: (.assets | sort_by(.id) | map({id, name, digest, state, updated_at}))}'
+          jq -S "$snapshot" "$RUNNER_TEMP/release.json" > "$RUNNER_TEMP/audited.json"
+          gh api "$endpoint" | jq -S "$snapshot" | diff -u "$RUNNER_TEMP/audited.json" -
+          printf 'Release %s (%s) passed asset audit for commit %s.\n' \
+            "$RELEASE_TAG" "$RELEASE_VISIBILITY" "$RELEASE_COMMIT" >> "$GITHUB_STEP_SUMMARY"

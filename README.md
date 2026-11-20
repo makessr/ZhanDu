@@ -297,6 +297,8 @@ SFTP 大目录预览会分批显示最先读取的项目，最多预览 1,024 �
 
 GitHub 仓库需要配置 Tauri 更新签名私钥 `TAURI_SIGNING_PRIVATE_KEY`。完整架构与失败重试方式见 [发布流水线文档](docs/release-pipeline.md)。
 
+公开草稿前，在 Actions 运行 `Audit release assets`。它用当前公开版的验签公钥核验各平台更新包，同时核对发布提交、产物 SHA-256 和更新清单。[草稿验收步骤](docs/release-pipeline.md#草稿产物验收)
+
 ## 开源许可
 
 栈渡由 makessr 独立维护，源自 Max0897 开发的 FineShell，沿用 Apache-2.0 许可证。[原作者 Max0897](https://github.com/Max0897) · [原项目 FineShell](https://github.com/Max0897/FineShell) · [许可证](LICENSE)
