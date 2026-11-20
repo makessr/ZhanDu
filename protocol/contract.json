@@ -1,5 +1,5 @@
 {
-  "version": 42,
+  "version": 43,
   "commands": {
     "protocol_version": true,
     "host_sync_account": true,
@@ -64,6 +64,8 @@
     "ai_task_action_execute": true,
     "managed_ssh_key_import": true,
     "managed_ssh_key_delete": true,
+    "managed_ssh_key_generate": true,
+    "managed_ssh_key_public": true,
     "diagnostic_set_level": true,
     "diagnostic_record": true,
     "diagnostic_open_log": true,

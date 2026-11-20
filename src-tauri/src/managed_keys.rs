@@ -7,6 +7,7 @@ use std::{
 };
 
 use serde::Serialize;
+use ssh_key::{Algorithm, LineEnding, PrivateKey};
 use tauri::{AppHandle, Manager};
 
 use crate::protocol::{CommandError, CommandResult};
@@ -22,6 +23,56 @@ static MANAGED_KEY_ROOT: OnceLock<PathBuf> = OnceLock::new();
 pub(crate) struct ManagedSshKeyImportResult {
     reference: String,
     key_type: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct GeneratedSshKey {
+    reference: String,
+    public_key: String,
+}
+
+#[tauri::command]
+pub(crate) fn managed_ssh_key_generate(key_id: String) -> CommandResult<GeneratedSshKey> {
+    managed_key_root()
+        .and_then(|root| generate_key(root, &key_id))
+        .map_err(|error| CommandError::from_message("managed_ssh_key_generate", error))
+}
+
+#[tauri::command]
+pub(crate) fn managed_ssh_key_public(reference: String) -> CommandResult<String> {
+    let read = || {
+        let path = resolve_reference(&reference)?
+            .ok_or_else(|| "只支持读取栈渡托管密钥的公钥".to_string())?;
+        let contents = read_key_file(&path)?;
+        let private_key = PrivateKey::from_openssh(contents.as_bytes())
+            .map_err(|_| "仅支持读取托管 OpenSSH 私钥的公钥".to_string())?;
+        encode_public_key(&private_key)
+    };
+    read().map_err(|error| CommandError::from_message("managed_ssh_key_public", error))
+}
+
+fn generate_key(root: &Path, key_id: &str) -> Result<GeneratedSshKey, String> {
+    validate_key_id(key_id)?;
+    let private_key = PrivateKey::random(&mut rand::rngs::OsRng, Algorithm::Ed25519)
+        .map_err(|_| "无法生成 Ed25519 密钥".to_string())?;
+    let public_key = encode_public_key(&private_key)?;
+    let contents = private_key
+        .to_openssh(LineEnding::LF)
+        .map_err(|_| "无法编码 OpenSSH 私钥".to_string())?;
+    import_private_key(root, key_id, &contents)?;
+    Ok(GeneratedSshKey {
+        reference: format!("{MANAGED_KEY_PREFIX}{key_id}"),
+        public_key,
+    })
+}
+
+fn encode_public_key(private_key: &PrivateKey) -> Result<String, String> {
+    let mut public_key = private_key.public_key().clone();
+    public_key.set_comment("zhandu");
+    public_key
+        .to_openssh()
+        .map_err(|_| "无法编码 OpenSSH 公钥".to_string())
 }
 
 pub(crate) fn initialize(app: &AppHandle) -> Result<(), String> {
@@ -74,17 +125,20 @@ pub(crate) fn resolve_reference(reference: &str) -> Result<Option<PathBuf>, Stri
 }
 
 pub(crate) fn read_sync_key(reference: &str) -> Result<String, String> {
+    read_key_file(&resolve_private_key_path(reference)?)
+}
+
+fn read_key_file(path: &Path) -> Result<String, String> {
     use std::io::Read;
 
-    let path = resolve_private_key_path(reference)?;
-    let file = fs::File::open(path).map_err(|_| "无法读取待同步的 SSH 私钥".to_string())?;
+    let file = fs::File::open(path).map_err(|_| "无法读取 SSH 私钥".to_string())?;
     if !file.metadata().map_err(|_| "无法检查 SSH 私钥")?.is_file() {
         return Err("SSH 私钥必须是普通文件".to_string());
     }
     let mut contents = String::new();
     file.take(MAX_PRIVATE_KEY_BYTES as u64 + 1)
         .read_to_string(&mut contents)
-        .map_err(|_| "无法读取待同步的 SSH 私钥".to_string())?;
+        .map_err(|_| "无法读取 SSH 私钥".to_string())?;
     validate_private_key(&contents).map(|(normalized, _)| normalized)
 }
 
@@ -290,7 +344,8 @@ mod tests {
     use std::{fs, time::SystemTime};
 
     use super::{
-        delete_private_key, import_private_key, key_path, validate_key_id, validate_private_key,
+        delete_private_key, encode_public_key, generate_key, import_private_key, key_path,
+        read_key_file, validate_key_id, validate_private_key,
     };
 
     const OPENSSH_KEY: &str = concat!(
@@ -365,6 +420,20 @@ mod tests {
         delete_private_key(&root, key_id).unwrap();
         delete_private_key(&root, key_id).unwrap();
         assert!(!path.exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn generates_matching_ed25519_keys_without_overwriting() {
+        let root = temporary_directory("generate");
+        let generated = generate_key(&root, "example").unwrap();
+        let contents = read_key_file(&key_path(&root, "example")).unwrap();
+        let private = ssh_key::PrivateKey::from_openssh(contents.as_bytes()).unwrap();
+        assert_eq!(private.algorithm(), ssh_key::Algorithm::Ed25519);
+        assert_eq!(generated.reference, "managed://example");
+        assert_eq!(generated.public_key, encode_public_key(&private).unwrap());
+        assert!(generate_key(&root, "example").is_err());
+        assert_eq!(read_key_file(&key_path(&root, "example")).unwrap(), contents);
         fs::remove_dir_all(root).unwrap();
     }
 }
