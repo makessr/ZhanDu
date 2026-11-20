@@ -79,6 +79,10 @@ Windows ARM64 的实测比较了三套独立运行器。恢复 Bun 软件包缓�
 
 ## macOS 首次安装验收
 
+发布流水线使用 Apple Silicon 运行器分别编译 `aarch64-apple-darwin` 和 `x86_64-apple-darwin`。Intel 目标使用专用 Rust 缓存。每次打包后验证二进制架构和动态库路径，实际启动与升级在对应架构的运行器上验证。
+
+用栈渡 v0.8.0 的同一提交对照，在未恢复 Rust 构建缓存的情况下，Intel 目标的编译和打包从 Intel 运行器的约 19 分 16 秒降到 Apple Silicon 运行器的约 14 分 03 秒。实际发布时间还受排队和缓存影响。[冷构建对照](https://github.com/makessr/ZhanDu/actions/runs/44758159145)
+
 v0.6.2 的公开 DMG 已在 Apple Silicon（macOS 26.7.2）和 Intel（macOS 15.7.9）的 GitHub 托管运行器上验证。两份 DMG 的 SHA-256、应用版本、CPU 架构和临时签名均通过检查。在没有旧版 WebKit 配置的运行器上，从 DMG 复制出的应用成功打开桌面窗口。
 
 Gatekeeper 处于启用状态。两台运行器都拒绝了手动赋予下载标记的单独应用副本，评估命令是 `spctl --assess --type execute`。从浏览器下载后的提示、是否显示「仍要打开」以及手动确认后的启动仍需在个人 Mac 上验收。[首次安装工作流](https://github.com/makessr/ZhanDu/actions/runs/44650481203)
