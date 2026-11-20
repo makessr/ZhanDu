@@ -32,9 +32,8 @@ const latest = JSON.parse(gh("api", "repos/" + repository + "/releases/latest", 
 assert.equal(latest.tag_name, "v" + target, "The requested target must be the latest stable release");
 assert.ok(!latest.draft && !latest.prerelease);
 const base = "https://github.com/" + repository + "/releases/";
-const response = await fetch(base + "latest/download/latest.json", { signal: AbortSignal.timeout(30_000) });
-assert.ok(response.ok, "Could not get the public update manifest");
-const feed = await response.json();
+const feed = JSON.parse(gh("release", "download", "v" + target, "-R", repository,
+  "--pattern", "latest.json", "--output", "-"));
 assert.equal(feed.version, target, "The public update feed does not serve the requested version");
 const entries = Object.values(feed.platforms);
 assert.ok(entries.length > 0 && entries.every(({ url, signature }) =>
