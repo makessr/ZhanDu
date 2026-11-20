@@ -42,30 +42,7 @@ jobs:
         timeout-minutes: 8
         shell: bash
         run: |
-          sources="$RUNNER_TEMP/tauri-ubuntu.sources"
-          cat > "$sources" <<'EOF'
-          Types: deb
-          URIs: https://archive.ubuntu.com/ubuntu/
-          Suites: noble noble-updates noble-backports
-          Components: main restricted universe multiverse
-          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-
-          Types: deb
-          URIs: https://security.ubuntu.com/ubuntu/
-          Suites: noble-security
-          Components: main restricted universe multiverse
-          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-          EOF
-
-          apt_options=(
-            -o "Dir::Etc::sourcelist=$sources"
-            -o Dir::Etc::sourceparts=-
-            -o Acquire::Retries=2
-            -o Acquire::https::Timeout=20
-            -o APT::Update::Error-Mode=any
-          )
-          sudo apt-get "${apt_options[@]}" update
-          sudo apt-get "${apt_options[@]}" install -y \
+          bash scripts/install-tauri-linux-dependencies.sh \
             build-essential \
             curl \
             file \
