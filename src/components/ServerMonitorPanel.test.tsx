@@ -1,6 +1,7 @@
 import { describe, expect, mock, test } from "bun:test";
-import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { emit, TauriEvent } from "@tauri-apps/api/event";
+import { clearMocks, mockIPC, mockWindows } from "@tauri-apps/api/mocks";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { HostRecord, TerminalSession } from "../models";
 
 mock.module("@visactor/react-vchart", () => ({
@@ -81,6 +82,46 @@ describe("ServerMonitorPanel", () => {
       view.unmount();
       if (originalHidden) Object.defineProperty(document, "hidden", originalHidden);
       else Reflect.deleteProperty(document, "hidden");
+      clearMocks();
+    }
+  });
+
+  test("waits for native window restore even when the webview is visible", async () => {
+    let minimized = true;
+    const checkMinimized = mock(() => minimized);
+    const collect = mock(() => new Promise(() => {}));
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, "isTauri");
+    Object.defineProperty(globalThis, "isTauri", {
+      configurable: true,
+      value: true,
+    });
+    mockWindows("main");
+    mockIPC((command) => {
+      if (command === "plugin:window|is_minimized") return checkMinimized();
+      if (command === "ssh_monitor_snapshot") return collect();
+    }, { shouldMockEvents: true });
+    const view = render(
+      <ServerMonitorPanel
+        visible
+        onPortForwardStatusChange={() => undefined}
+        onReconnect={() => undefined}
+        onSendToAi={() => undefined}
+        onSnapshotChange={() => undefined}
+        refreshIntervalSeconds={30}
+        session={session("connected")}
+      />,
+    );
+    try {
+      expect(document.hidden).toBe(false);
+      await waitFor(() => expect(checkMinimized).toHaveBeenCalledTimes(1));
+      expect(collect).toHaveBeenCalledTimes(0);
+      minimized = false;
+      await act(() => emit(TauriEvent.WINDOW_FOCUS));
+      await waitFor(() => expect(collect).toHaveBeenCalledTimes(1));
+    } finally {
+      view.unmount();
+      if (descriptor) Object.defineProperty(globalThis, "isTauri", descriptor);
+      else Reflect.deleteProperty(globalThis, "isTauri");
       clearMocks();
     }
   });
