@@ -27,7 +27,10 @@ test("SMTP 465 uses authenticated TLS and sends verification to one recipient", 
   assert.equal(options.secure, true);
   assert.equal(options.port, 465);
   assert.equal(options.tls.minVersion, "TLSv1.2");
+  assert.deepEqual(message.from, { name: "栈渡", address: "sync@example.com" });
+  assert.equal(message.subject, "栈渡邮箱验证");
   assert.equal(message.to.address, "user@example.com");
+  assert.match(message.text, /栈渡注册窗口/);
   assert.match(message.text, /example-code/);
 });
 
@@ -190,7 +193,7 @@ test("sync isolates accounts and accepts only the current revision", async () =>
     let origin = await start();
     const health = await fetch(new URL("/healthz", origin));
     assert.equal(health.status, 200);
-    assert.deepEqual(await health.json(), { service: "fineshell-sync", status: "ok" });
+    assert.deepEqual(await health.json(), { service: "zhandu", status: "ok" });
     async function call(path, { method = "GET", token, body } = {}) {
       const response = await fetch(`${origin}/${path}`, {
         method,

@@ -204,7 +204,7 @@ fn load_device() -> Result<Option<Device>, String> {
 fn require_device(account_id: &str) -> Result<Device, String> {
     load_device()?
         .filter(|device| device.account_id == account_id)
-        .ok_or_else(|| "请先登录 FineShell 账号".to_string())
+        .ok_or_else(|| "请先登录栈渡账号".to_string())
 }
 
 fn server_url(input: &str) -> Result<String, String> {
@@ -678,7 +678,7 @@ pub(crate) async fn host_sync_login(
             return Err("请输入完整的 64 位十六进制恢复密钥".into());
         }
         if register && bound_account.is_some() {
-            return Err("此 FineShell 配置已绑定同步账号".into());
+            return Err("此栈渡配置已绑定同步账号".into());
         }
         let path = if register { "register" } else { "login" };
         let mut body = json!({ "email": email, "password": password, "deviceName": device_name });
@@ -714,7 +714,7 @@ async fn complete_login(
     server: &str, email: String, login: &Login, recovery_key: &str, bound_account: Option<String>,
 ) -> Result<Account, String> {
     if bound_account.as_ref().is_some_and(|id| id != &login.account_id) {
-        return Err("此 FineShell 配置已绑定另一个同步账号".into());
+        return Err("此栈渡配置已绑定另一个同步账号".into());
     }
     let remote: RemoteVault = request(server, Method::GET, "vault", Some(&login.token), None).await?;
     let (key, wrapped_key) = if let Some(vault) = &remote.vault {

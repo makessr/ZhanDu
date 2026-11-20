@@ -101,8 +101,10 @@ export function createOnboarding(db, { registration = "open", sendVerification }
 }
 
 function verificationText(code) {
-  return "请在 FineShell 注册窗口粘贴以下验证码，15 分钟内有效。\n\n" + code;
+  return "请在栈渡注册窗口输入以下验证码，15 分钟内有效。\n\n" + code;
 }
+
+const verificationSubject = "栈渡邮箱验证";
 
 export function createVerificationMailer(env, createTransport = nodemailer.createTransport) {
   const provider = env.FINESHELL_SYNC_MAIL_PROVIDER || "resend";
@@ -126,8 +128,8 @@ export function createVerificationMailer(env, createTransport = nodemailer.creat
   });
   return async (email, code) => {
     const result = await transport.sendMail({
-      from, to: { address: email, name: "" },
-      subject: "FineShell 邮箱验证", text: verificationText(code),
+      from: { name: "栈渡", address: from }, to: { address: email, name: "" },
+      subject: verificationSubject, text: verificationText(code),
     });
     if (!result.accepted.length) throw new Error("No accepted recipient");
   };
@@ -135,16 +137,17 @@ export function createVerificationMailer(env, createTransport = nodemailer.creat
 
 function createMailSender(from, apiKey) {
   if (!from || !apiKey) throw new Error("Set FINESHELL_SYNC_MAIL_FROM and FINESHELL_SYNC_RESEND_API_KEY");
+  const sender = normalizedEmail(from) ? `栈渡 <${from}>` : from;
   return async (email, code) => {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         authorization: "Bearer " + apiKey,
         "content-type": "application/json",
-        "user-agent": "FineShell Sync",
+        "user-agent": "ZhanDu Sync",
       },
       body: JSON.stringify({
-        from, to: [email], subject: "FineShell 邮箱验证",
+        from: sender, to: [email], subject: verificationSubject,
         text: verificationText(code),
       }),
       redirect: "error",

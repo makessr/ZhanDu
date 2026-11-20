@@ -1,5 +1,5 @@
 {
-  "name": "fineshell-sync",
+  "name": "zhandu",
   "private": true,
   "dependencies": {
     "nodemailer": "10.6.0"
