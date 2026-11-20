@@ -1,6 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
 import { appendFile, link, mkdtemp, open, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { DatabaseSync } from "node:sqlite";
@@ -60,23 +61,35 @@ async function decrypt(encrypted, key, temporary) {
   return snapshot;
 }
 
-const [operation, source, destination, keyPath, ...extra] = process.argv.slice(2);
-if (!["backup", "restore"].includes(operation) || !source || !destination || !keyPath || extra.length) {
-  throw new Error("Usage: node portable-backup.mjs <backup|restore> <source> <destination> <key-file>");
+const [operation, source, ...paths] = process.argv.slice(2);
+const verifyOnly = operation === "verify";
+if (!["backup", "restore", "verify"].includes(operation) || !source ||
+    paths.length !== (verifyOnly ? 1 : 2) || paths.some((path) => !path)) {
+  throw new Error([
+    "Usage: node portable-backup.mjs <backup|restore> <source> <destination> <key-file>",
+    "       node portable-backup.mjs verify <backup-file> <key-file>",
+  ].join("\n"));
 }
 process.umask(0o077);
-const key = await readFile(keyPath);
-if (key.length !== 32) throw new Error("Use a dedicated 32-byte random backup key file");
-const target = resolve(destination);
-const temporary = await mkdtemp(join(dirname(target), ".fineshell-portable-"));
+const target = verifyOnly ? undefined : resolve(paths[0]);
+const temporary = await mkdtemp(join(target ? dirname(target) : tmpdir(), ".fineshell-portable-"));
 try {
-  const result = operation === "backup"
-    ? await encrypt(source, key, temporary)
-    : await decrypt(source, key, temporary);
-  // Publish only verified output and leave an existing destination intact.
-  await link(result, target);
-  console.log(target);
+  const key = await readFile(paths.at(-1));
+  try {
+    if (key.length !== 32) throw new Error("Use a dedicated 32-byte random backup key file");
+    const result = operation === "backup"
+      ? await encrypt(source, key, temporary)
+      : await decrypt(source, key, temporary);
+    if (verifyOnly) {
+      console.log("Backup verification passed");
+    } else {
+      // Publish only verified output and leave an existing destination intact.
+      await link(result, target);
+      console.log(target);
+    }
+  } finally {
+    key.fill(0);
+  }
 } finally {
-  key.fill(0);
   await rm(temporary, { recursive: true, force: true });
 }
