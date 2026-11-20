@@ -4,6 +4,8 @@ import { isIP } from "node:net";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { DatabaseSync } from "node:sqlite";
+import { readFileSync } from "node:fs";
+import { createOpaqueAuth } from "./auth-v2.mjs";
 import { createVerificationMailer, createOnboarding, normalizedEmail } from "./onboarding.mjs";
 
 const derive = promisify(scrypt);
@@ -115,10 +117,15 @@ export function createSyncServer(databasePath, options = {}) {
   db.exec("BEGIN IMMEDIATE");
   try {
     const columns = new Set(db.prepare("PRAGMA table_info(sessions)").all().map(({ name }) => name));
+    const accountColumns = db.prepare("PRAGMA table_info(accounts)").all();
+    if (!accountColumns.some(({ name }) => name === "opaque_record")) {
+      db.exec("ALTER TABLE accounts ADD COLUMN opaque_record TEXT");
+    }
     if (!columns.has("device_id")) db.exec("ALTER TABLE sessions ADD COLUMN device_id TEXT");
     if (!columns.has("device_name")) db.exec("ALTER TABLE sessions ADD COLUMN device_name TEXT");
     if (!columns.has("last_sync_at")) db.exec("ALTER TABLE sessions ADD COLUMN last_sync_at INTEGER");
     db.exec(`
+      CREATE TABLE IF NOT EXISTS sync_auth_metadata (name TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT;
       UPDATE sessions SET device_id = lower(hex(randomblob(16))) WHERE device_id IS NULL;
       CREATE UNIQUE INDEX IF NOT EXISTS session_device_id ON sessions(device_id);
       CREATE INDEX IF NOT EXISTS session_account ON sessions(account_id);
@@ -130,7 +137,7 @@ export function createSyncServer(databasePath, options = {}) {
     throw error;
   }
   const onboarding = createOnboarding(db, options);
-  const readAccount = db.prepare("SELECT id, salt, password_hash FROM accounts WHERE email = ?");
+  const readAccount = db.prepare("SELECT id, salt, password_hash, opaque_record FROM accounts WHERE email = ?");
   const createAccount = db.prepare(
     "INSERT OR IGNORE INTO accounts (id, email, salt, password_hash, revision, vault) VALUES (?, ?, ?, ?, ?, ?)",
   );
@@ -177,6 +184,50 @@ export function createSyncServer(databasePath, options = {}) {
     return typeof input === "string" ? input.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 80) : "";
   }
 
+  function issueSession(accountId, deviceName) {
+    const now = Date.now();
+    pruneSessions.run(now);
+    const token = randomBytes(32).toString("base64url");
+    createSession.run(hashToken(token), accountId, now + sessionLifetime,
+      randomBytes(16).toString("hex"), deviceLabel(deviceName) || "栈渡");
+    return { accountId, token };
+  }
+
+  async function verifyLegacy(email, password) {
+    credentials({ email, password });
+    if (deriving >= 4) throw new HttpError(429, "Too many attempts. Try again later");
+    const existing = readAccount.get(email);
+    deriving++;
+    let derived;
+    try {
+      derived = await derive(password, existing?.opaque_record || !existing ? dummySalt : Buffer.from(existing.salt, "hex"), 32);
+    } finally {
+      deriving--;
+    }
+    const current = readAccount.get(email);
+    if (!existing || existing.opaque_record || current?.opaque_record || current?.id !== existing.id ||
+        current.password_hash !== existing.password_hash || !/^[a-f0-9]{64}$/.test(existing.password_hash) ||
+        !timingSafeEqual(derived, Buffer.from(existing.password_hash, "hex"))) {
+      throw new HttpError(401, "Invalid account or password");
+    }
+    return existing;
+  }
+
+  let opaqueAuth;
+  try {
+    if (options.opaqueSetup) {
+      opaqueAuth = createOpaqueAuth({
+        setup: options.opaqueSetup, db, onboarding, readAccount, verifyLegacy, issueSession,
+        validateVault, revokeAccountSessions, sendRecovery: options.sendRecovery, HttpError,
+      });
+    } else if (db.prepare("SELECT 1 FROM sync_auth_metadata WHERE name = 'opaque_setup'").get()) {
+      throw new Error("OPAQUE setup file is required for this database");
+    }
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+
   async function authenticate(request, register) {
     const body = await readJson(request, 4096);
     const { email, password } = credentials(body);
@@ -187,6 +238,7 @@ export function createSyncServer(databasePath, options = {}) {
       throw new HttpError(429, "Too many attempts. Try again later");
     }
     attempts.set(email, [...recent, now]);
+    if (register && opaqueAuth) throw new HttpError(400, "Update the client to register an account");
     if (register && onboarding.registration === "closed") {
       throw new HttpError(403, "Registration is closed");
     }
@@ -205,7 +257,7 @@ export function createSyncServer(databasePath, options = {}) {
     if (creating && !onboarding.authorized(email, body, now)) {
       throw new HttpError(403, "Invitation or email verification is invalid");
     }
-    const salt = creating ? randomBytes(16) : existing ? Buffer.from(existing.salt, "hex") : dummySalt;
+    const salt = creating ? randomBytes(16) : existing && !existing.opaque_record ? Buffer.from(existing.salt, "hex") : dummySalt;
     deriving++;
     let derived;
     try {
@@ -229,16 +281,15 @@ export function createSyncServer(databasePath, options = {}) {
         throw error;
       }
     } else {
-      if (!existing || !timingSafeEqual(derived, Buffer.from(existing.password_hash, "hex"))) {
+      const current = readAccount.get(email);
+      if (!existing || existing.opaque_record || current?.opaque_record || current?.id !== existing.id ||
+          current.password_hash !== existing.password_hash || !/^[a-f0-9]{64}$/.test(existing.password_hash) ||
+          !timingSafeEqual(derived, Buffer.from(existing.password_hash, "hex"))) {
         throw new HttpError(401, "Invalid account or password");
       }
       accountId = existing.id;
     }
-    pruneSessions.run(now);
-    const token = randomBytes(32).toString("base64url");
-    createSession.run(hashToken(token), accountId, now + sessionLifetime,
-      randomBytes(16).toString("hex"), deviceName || "栈渡");
-    return { accountId, token };
+    return issueSession(accountId, deviceName);
   }
 
   const server = createServer(async (request, response) => {
@@ -253,7 +304,17 @@ export function createSyncServer(databasePath, options = {}) {
         return;
       }
       if (url === "/v1/registration" && method === "GET") {
-        send(response, 200, { mode: onboarding.registration, masterPassword: true });
+        send(response, 200, { mode: onboarding.registration, masterPassword: true,
+          ...(opaqueAuth ? { opaquePublicKey: opaqueAuth.publicKey, passwordRecovery: opaqueAuth.recoveryEnabled } : {}) });
+        return;
+      }
+      if (method === "POST" && url?.startsWith("/v1/auth/")) {
+        if (!opaqueAuth) throw new HttpError(404, "Authentication upgrade is not enabled");
+        const path = url.slice("/v1/auth/".length);
+        enforceSourceLimit(request, "/v1/auth/" + (path.startsWith("recovery/") ? "recovery" : "exchange"));
+        const result = await opaqueAuth.handle(path, await readJson(request, 8192));
+        if (path === "register/finish") registrations++;
+        send(response, 200, result);
         return;
       }
       if (url === "/v1/registration/verify" && method === "POST") {
@@ -273,7 +334,7 @@ export function createSyncServer(databasePath, options = {}) {
       const isRotation = url === "/v1/vault/rotate-key" && method === "POST";
       const isVaultStatus = url === "/v1/vault/status" && method === "GET";
       const deviceRoute = /^\/v1\/devices\/([a-f0-9]{32})$/.exec(url ?? "");
-      if (url !== "/v1/vault" && url !== "/v1/logout" && url !== "/v1/devices" &&
+      if (url !== "/v1/vault" && url !== "/v1/logout" && url !== "/v1/devices" && url !== "/v1/session" &&
           url !== "/v1/devices/synced" && url !== "/v1/devices/name" && !deviceRoute && !isRecovery && !isRotation && !isVaultStatus) {
         throw new HttpError(404, "Not found");
       }
@@ -281,7 +342,9 @@ export function createSyncServer(databasePath, options = {}) {
       const tokenHash = match && hashToken(match[1]);
       const session = tokenHash && readSession.get(tokenHash, Date.now());
       if (!session) throw new HttpError(401, "Sign in again");
-      if (url === "/v1/logout" && method === "POST") {
+      if (url === "/v1/session" && method === "GET") {
+        send(response, 200, { accountId: session.account_id });
+      } else if (url === "/v1/logout" && method === "POST") {
         deleteSession.run(tokenHash);
         send(response, 200, {});
       } else if (url === "/v1/devices" && method === "GET") {
@@ -385,6 +448,7 @@ export function createSyncServer(databasePath, options = {}) {
     for (const [source, bucket] of sourceAttempts) {
       if (bucket.expires <= now) sourceAttempts.delete(source);
     }
+    opaqueAuth?.sweep(now);
     if (registrations >= 10 || throttled >= 20) {
       console.warn("ZhanDu authentication activity", JSON.stringify({ registrations, throttled, windowSeconds: 60 }));
     }
@@ -404,12 +468,17 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const port = Number(process.env.FINESHELL_SYNC_PORT ?? 8787);
   const host = process.env.FINESHELL_SYNC_HOST || "127.0.0.1";
   const registration = process.env.FINESHELL_SYNC_REGISTRATION || "open";
-  const sendVerification = registration === "invite"
-    ? createVerificationMailer(process.env)
-    : undefined;
+  const setupPath = process.env.FINESHELL_SYNC_OPAQUE_SETUP_FILE;
+  if (setupPath && process.env.FINESHELL_SYNC_OPAQUE_SETUP) throw new Error("Use one OPAQUE setup source");
+  const opaqueSetup = setupPath ? readFileSync(setupPath, "utf8").trim() : process.env.FINESHELL_SYNC_OPAQUE_SETUP?.trim();
+  if (setupPath && !opaqueSetup) throw new Error("OPAQUE setup file is empty");
+  const recoveryEnabled = Boolean(opaqueSetup && process.env.FINESHELL_SYNC_MAIL_FROM);
+  const mailer = registration === "invite" || recoveryEnabled ? createVerificationMailer(process.env) : undefined;
   const server = createSyncServer(databasePath, {
     registration,
-    sendVerification,
+    sendVerification: mailer,
+    sendRecovery: recoveryEnabled ? (email, code) => mailer(email, code, "recovery") : undefined,
+    opaqueSetup,
     trustLoopbackProxy: process.env.FINESHELL_SYNC_TRUST_LOOPBACK_PROXY === "1",
   });
   server.listen(port, host, () => {

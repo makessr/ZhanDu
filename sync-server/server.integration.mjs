@@ -32,6 +32,10 @@ test("SMTP 465 uses authenticated TLS and sends verification to one recipient", 
   assert.equal(message.to.address, "user@example.com");
   assert.match(message.text, /栈渡注册窗口/);
   assert.match(message.text, /example-code/);
+  await sendCode("user@example.com", "reset-code", "recovery");
+  assert.equal(message.subject, "栈渡账号密码重设");
+  assert.match(message.text, /账号找回窗口/);
+  assert.match(message.text, /reset-code/);
 });
 
 test("invite and verification are bound to one email, consumed once, and allow a device rename", async () => {

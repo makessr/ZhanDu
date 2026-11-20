@@ -2,6 +2,7 @@
   "name": "zhandu",
   "private": true,
   "dependencies": {
+    "@serenity-kit/opaque": "1.1.0",
     "nodemailer": "10.6.0"
   }
 }

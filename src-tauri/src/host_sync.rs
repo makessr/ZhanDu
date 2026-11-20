@@ -51,6 +51,8 @@ struct Device {
     account_id: String,
     token: String,
     key: [u8; 32],
+    #[serde(default)]
+    opaque: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     previous_key: Option<[u8; 32]>,
     wrapped_key: WrappedMasterKey,
@@ -62,6 +64,7 @@ pub(crate) struct Account {
     server: String,
     email: String,
     account_id: String,
+    opaque: bool,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -77,6 +80,7 @@ pub(crate) struct DeviceInfo {
 impl Device {
     fn account(&self) -> Account {
         Account {
+            opaque: self.opaque,
             server: self.server.clone(),
             email: self.email.clone(),
             account_id: self.account_id.clone(),
@@ -248,6 +252,12 @@ async fn request<T: DeserializeOwned>(
         StatusCode::UNAUTHORIZED => return Err("账号、密码或登录状态无效，请重新登录".into()),
         StatusCode::FORBIDDEN if matches!(path, "register" | "registration/verify") => {
             return Err("邀请码、邮箱或验证码无效，请核对后重试".into());
+        }
+        StatusCode::FORBIDDEN if path.starts_with("auth/recovery/") => {
+            return Err("找回验证码无效或已过期，请重新获取".into());
+        }
+        StatusCode::FORBIDDEN if path.starts_with("auth/register/") => {
+            return Err("注册已关闭，或邀请码与邮箱验证码无效".into());
         }
         StatusCode::SERVICE_UNAVAILABLE if path == "registration/verify" => {
             return Err("邮件发送暂不可用，请稍后重试".into());
@@ -662,6 +672,64 @@ pub(crate) async fn host_sync_registration(
 }
 
 #[tauri::command]
+pub(crate) async fn host_sync_auth(server: String, action: String, body: Value) -> CommandResult<Value> {
+    let result = async {
+        if !matches!(action.as_str(), "login/start" | "login/finish" | "register/start" |
+            "register/finish" | "upgrade/start" | "upgrade/finish" | "recovery/request" |
+            "recovery/start" | "recovery/finish") {
+            return Err("不支持的账号操作".into());
+        }
+        let server = server_url(&server)?;
+        request(&server, Method::POST, &format!("auth/{action}"), None, Some(body)).await
+    }.await;
+    result.map_err(|e: String| error("host_sync_auth", e))
+}
+
+#[tauri::command]
+pub(crate) fn host_sync_prepare_vault(account_id: String, master_password: String) -> CommandResult<Vault> {
+    let result = (|| {
+        if !valid_account_id(&account_id) {
+            return Err("同步账号标识无效".into());
+        }
+        let key = random_master_key();
+        let wrapped_key = wrap_sync_password(&key, &master_password)?;
+        seal(&Device {
+            account_id, key, wrapped_key, previous_key: None, opaque: true,
+            server: String::new(), email: String::new(), token: String::new(),
+        }, 1, &Records::default())
+    })();
+    result.map_err(|e: String| error("host_sync_prepare_vault", e))
+}
+
+#[tauri::command]
+pub(crate) async fn host_sync_accept_login(
+    server: String, email: String, recovery_key: String, account_id: String, token: String,
+    bound_account: Option<String>,
+) -> CommandResult<Account> {
+    let result = async {
+        let server = server_url(&server)?;
+        if !valid_account_id(&account_id) || !valid_sync_token(&token) {
+            return Err("登录会话无效".into());
+        }
+        let login = Login { account_id, token };
+        let finished = complete_login(&server, email.trim().to_ascii_lowercase(), &login, &recovery_key, bound_account, true).await;
+        if finished.is_err() {
+            let _ = request::<Value>(&server, Method::POST, "logout", Some(&login.token), None).await;
+        }
+        finished
+    }.await;
+    result.map_err(|e: String| error("host_sync_accept_login", e))
+}
+
+fn valid_account_id(id: &str) -> bool {
+    id.len() == 32 && id.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+}
+
+fn valid_sync_token(token: &str) -> bool {
+    token.len() == 43 && URL_SAFE_NO_PAD.decode(token).is_ok_and(|bytes| bytes.len() == 32)
+}
+
+#[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn host_sync_login(
     server: String, email: String, password: String, recovery_key: String, register: bool,
@@ -691,8 +759,7 @@ pub(crate) async fn host_sync_login(
         if register {
             // The original recovery key makes retries after a lost response identify the same account.
             let account_id = if master_password {
-                registration_id.filter(|id| id.len() == 32 &&
-                    id.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()))
+                registration_id.filter(|id| valid_account_id(id))
                     .ok_or("无法创建同步账号标识")?
             } else {
                 let identity = serde_json::to_vec(&("fineshell-sync-registration-v1",
@@ -708,13 +775,13 @@ pub(crate) async fn host_sync_login(
             };
             let initial = Device {
                 server: server.clone(), email: email.clone(), account_id: account_id.clone(),
-                token: String::new(), key, previous_key: None, wrapped_key,
+                token: String::new(), key, previous_key: None, wrapped_key, opaque: false,
             };
             body["accountId"] = json!(account_id);
             body["vault"] = json!(seal(&initial, 1, &Records::default())?);
         }
         let login: Login = request(&server, Method::POST, path, None, Some(body)).await?;
-        let finished = complete_login(&server, email, &login, &recovery_key, bound_account).await;
+        let finished = complete_login(&server, email, &login, &recovery_key, bound_account, false).await;
         if finished.is_err() {
             let _ = request::<Value>(&server, Method::POST, "logout", Some(&login.token), None).await;
         }
@@ -745,7 +812,7 @@ fn unlock_sync_key(wrapped: &WrappedMasterKey, secret: &str) -> Result<[u8; 32],
 }
 
 async fn complete_login(
-    server: &str, email: String, login: &Login, recovery_key: &str, bound_account: Option<String>,
+    server: &str, email: String, login: &Login, recovery_key: &str, bound_account: Option<String>, opaque: bool,
 ) -> Result<Account, String> {
     if bound_account.as_ref().is_some_and(|id| id != &login.account_id) {
         return Err("此栈渡配置已绑定另一个同步账号".into());
@@ -755,7 +822,13 @@ async fn complete_login(
         if vault.version != 1 {
             return Err("同步仓库版本不受支持".into());
         }
-        let key = unlock_sync_key(&vault.wrapped_key, recovery_key)?;
+        let key = if recovery_key.is_empty() {
+            load_device()?.filter(|device| device.server == server && device.account_id == login.account_id)
+                .map(|device| device.key)
+                .ok_or("此设备没有保存可用的主密钥，请输入主密码或旧恢复密钥")?
+        } else {
+            unlock_sync_key(&vault.wrapped_key, recovery_key)?
+        };
         (key, vault.wrapped_key.clone())
     } else {
         if bound_account.is_some() {
@@ -774,7 +847,7 @@ async fn complete_login(
         .and_then(|device| if device.key == key { device.previous_key } else { Some(device.key) });
     let device = Device {
         server: server.to_owned(), email, account_id: login.account_id.clone(), token: login.token.clone(),
-        key, previous_key, wrapped_key,
+        key, previous_key, wrapped_key, opaque,
     };
     // Establish the recovery key before another device can initialize the same account.
     if let Some(vault) = &remote.vault {
@@ -857,6 +930,7 @@ pub(crate) async fn host_sync_probe(
 #[tauri::command]
 pub(crate) async fn host_sync_rotate_key(
     account_id: String, base: Vault, recovery_key: String, account_password: Option<String>,
+    opaque_reauth_token: Option<String>,
 ) -> CommandResult<Vault> {
     let result = async {
         let mut device = require_device(&account_id)?;
@@ -878,10 +952,22 @@ pub(crate) async fn host_sync_rotate_key(
                 return Err("账号密码和主密码必须不同".into());
             }
             let wrapped = wrap_sync_password(&key, &recovery_key)?;
-            let check: Login = request(&device.server, Method::POST, "login", None,
-                Some(json!({ "email": device.email, "password": password }))).await?;
-            let _: Value = request(&device.server, Method::POST, "logout", Some(&check.token), None).await?;
-            if check.account_id != device.account_id {
+            let verified_account = if let Some(token) = opaque_reauth_token {
+                if !valid_sync_token(&token) || token == device.token {
+                    return Err("账号验证会话无效".into());
+                }
+                let check: Value = request(&device.server, Method::GET, "session", Some(&token), None).await?;
+                let _: Value = request(&device.server, Method::POST, "logout", Some(&token), None).await?;
+                check["accountId"].as_str().unwrap_or_default().to_owned()
+            } else if !device.opaque {
+                let check: Login = request(&device.server, Method::POST, "login", None,
+                    Some(json!({ "email": device.email, "password": password }))).await?;
+                let _: Value = request(&device.server, Method::POST, "logout", Some(&check.token), None).await?;
+                check.account_id
+            } else {
+                return Err("安全认证不可用，请重新登录".into());
+            };
+            if verified_account != device.account_id {
                 return Err("当前账号无法验证".into());
             }
             wrapped
@@ -1109,6 +1195,7 @@ mod tests {
             account_id: "first".into(),
             token: String::new(),
             key,
+            opaque: false,
             previous_key: None,
             wrapped_key: wrap_master_key(&key, &recovery, true).unwrap(),
         };

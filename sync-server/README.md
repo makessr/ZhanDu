@@ -23,7 +23,7 @@
 ```bash
 sudo install -d -m 0755 /opt/fineshell-sync
 sudo install -d -m 0700 /etc/fineshell-sync
-sudo install -m 0644 sync-server/server.mjs sync-server/onboarding.mjs \
+sudo install -m 0644 sync-server/server.mjs sync-server/onboarding.mjs sync-server/auth-v2.mjs \
   sync-server/package.json sync-server/package-lock.json /opt/fineshell-sync/
 sudo install -m 0644 sync-server/deploy/backup-snapshot.mjs \
   sync-server/deploy/portable-backup.mjs /opt/fineshell-sync/
@@ -120,13 +120,41 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://sync.example.com/v1/vault
 
 ## 注册与邮件配置
 
+### OPAQUE 登录和邮箱找回
+
+客户端和服务端都升级后，在配置文件中启用 `FINESHELL_SYNC_OPAQUE_SETUP`。OPAQUE 注册、登录和重设账号密码使用协议消息，账号密码留在客户端。旧账号继续支持明确选择的兼容登录，可在新版客户端用旧账号密码验证一次并迁移，迁移会使其他设备重新登录。
+
+systemd 部署可用下列命令生成一次配置。命令只把随机配置追加到已有的 root 专用文件，请在设置新的同步实例时运行。已有 OPAQUE 配置的服务器必须沿用原值。
+
+```bash
+sudo sh -eu -c '
+  cd /opt/fineshell-sync
+  config=/etc/fineshell-sync/sync.env
+  test "$(stat -c %a "$config")" = 600
+  if grep -Eq "^[[:space:]]*FINESHELL_SYNC_OPAQUE_SETUP(_FILE)?=" "$config"; then
+    printf "%s\n" "已有 OPAQUE 配置，请沿用原值" >&2
+    exit 1
+  fi
+  ./node/bin/node --input-type=module -e "
+    import * as opaque from \"@serenity-kit/opaque\";
+    await opaque.ready;
+    process.stdout.write(\"\\nFINESHELL_SYNC_OPAQUE_SETUP=\" + opaque.server.createSetup() + \"\\n\");
+  " >> "$config"
+'
+sudo systemctl restart zhandu
+```
+
+Docker Compose 部署可在权限为 `0600` 的 `.env` 中设置同一变量，再重建容器。把该配置作为密钥单独保护，并与对应数据库一同纳入异机恢复演练。已有数据库会校验配置指纹，缺少或使用了不同配置时会拒绝启动。
+
+配置了 SMTP 或 Resend 后，客户端可在登录页请求一次性邮箱验证码并重设账号密码。重设会撤销旧会话，主密码和主机密文保留。已解锁设备可用系统凭据库里保存的主密钥重新登录。旧数据库备份仍可能包含迁移前的账号密码校验哈希。
+
 | `FINESHELL_SYNC_REGISTRATION` | 新账号 | 已有账号 |
 | --- | --- | --- |
 | `open`（默认） | 自助注册 | 可登录、同步 |
 | `invite` | 管理员发放邀请码，用户填写邮件验证码 | 可登录、同步 |
 | `closed` | 暂停注册 | 可登录、同步 |
 
-改完配置后，systemd 执行 `sudo systemctl restart zhandu`，Compose 执行 `docker compose up -d` 使新的环境变量生效。自建 SMTP 465 使用隐式 TLS，587 使用强制 STARTTLS。两种方式都校验证书。邀请注册发送「栈渡邮箱验证」。
+改完配置后，systemd 执行 `sudo systemctl restart zhandu`，Compose 执行 `docker compose up -d` 使新的环境变量生效。自建 SMTP 465 使用隐式 TLS，587 使用强制 STARTTLS。两种方式都校验证书。邀请注册发送「栈渡邮箱验证」，找回流程发送「栈渡账号密码重设」。
 
 ```dotenv
 FINESHELL_SYNC_REGISTRATION=invite

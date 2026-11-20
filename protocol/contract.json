@@ -1,10 +1,13 @@
 {
-  "version": 41,
+  "version": 42,
   "commands": {
     "protocol_version": true,
     "host_sync_account": true,
     "host_sync_recovery_key": true,
     "host_sync_login": true,
+    "host_sync_auth": true,
+    "host_sync_prepare_vault": true,
+    "host_sync_accept_login": true,
     "host_sync_registration": true,
     "host_sync_logout": true,
     "host_sync_devices": true,
