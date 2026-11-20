@@ -65,6 +65,10 @@ Gatekeeper 处于启用状态。两台运行器都拒绝了手动赋予下载标
 
 从 v0.6.0 经 v0.6.1 到 v0.6.2 的应用内升级已分别在 macOS Apple Silicon、macOS Intel、Ubuntu x64 和 Ubuntu ARM64 上跑通。每个阶段都检查了版本、窗口和本地配置目录中的测试标记。[两段升级工作流](https://github.com/makessr/ZhanDu/actions/runs/44649992142)
 
+## Debian XFCE 安装验收
+
+v0.6.2 的正式 Debian 安装包已在 Debian 12（Bookworm）和 Debian 13（Trixie）中各验证 x64 和 ARM64。测试在对应 CPU 架构的 GitHub 托管运行器上使用 Debian 容器和 Xvfb，核对了 SHA-256、APT 依赖安装、软件包架构与版本，并在干净的 XFCE 会话内以普通用户通过已安装的桌面入口打开应用窗口。个人电脑上的图形驱动和 Debian 上的应用内升级另行验收。[四项安装及启动记录](https://github.com/makessr/ZhanDu/actions/runs/44655325742)
+
 ## Windows 桌面验收
 
 在安装了 WebView2、Node.js 26、Bun、Rust MSVC 工具链和 Windows 原生 Perl（如 Strawberry Perl）的测试机上运行。Perl 用于编译随 Windows 客户端构建的 OpenSSL。先在仓库安装 Bun 前端依赖和 `sync-server` 的 npm 依赖。为 SSH 测试另装 `ssh2`，传入其入口文件，测试会使用本地回环地址和合成凭据。
