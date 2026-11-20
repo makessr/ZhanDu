@@ -1,5 +1,7 @@
 .sftp-toolbar {
   gap: 10px;
+  background: var(--workspace-chrome);
+  border-bottom-color: var(--workspace-border);
 }
 
 .sftp-directory-preview-status {
@@ -29,6 +31,10 @@
   outline: none;
 }
 
+.sftp-panel {
+  background: var(--workspace-surface);
+}
+
 .sftp-path-controls {
   min-width: 120px;
   flex: 1;
@@ -53,9 +59,9 @@
   display: flex;
   align-items: stretch;
   overflow: hidden;
-  background: var(--color-fill-2);
-  border: 1px solid transparent;
-  border-radius: 2px;
+  background: var(--workspace-surface);
+  border: 1px solid var(--workspace-border);
+  border-radius: 5px;
 }
 
 .sftp-path-breadcrumb-scroll {
@@ -190,8 +196,16 @@
   position: sticky;
   top: 0;
   z-index: 3;
-  background: var(--color-fill-1);
-  border-bottom: 1px solid var(--color-border-2);
+  background: var(--workspace-group);
+  border-bottom: 1px solid var(--workspace-border);
+}
+
+.sftp-table :where(.arco-table-tr) > .arco-table-td {
+  background-color: var(--workspace-surface);
+}
+
+.sftp-table :where(.arco-table-tr:hover) > .arco-table-td {
+  background-color: var(--workspace-group);
 }
 
 .sftp-table .arco-table-tr {

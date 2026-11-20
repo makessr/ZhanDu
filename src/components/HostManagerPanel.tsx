@@ -32,9 +32,6 @@ import {
 } from "../tauri-protocol";
 import {
   IconCopy,
-  IconFolder,
-  IconHistory,
-  IconPlus,
   IconSort,
 } from "@arco-design/web-react/icon";
 import type {
@@ -48,6 +45,7 @@ import type {
 } from "../models";
 import HostEditorModal from "./HostEditorModal";
 import HostActions from "./HostActions";
+import WorkspaceIcon from "./WorkspaceIcon";
 import HostConnectionHistoryModal, {
   type QuickConnectionRequest,
 } from "./HostConnectionHistoryModal";
@@ -828,30 +826,35 @@ function HostManagerPanel({ onConnect, settings }: HostManagerPanelProps) {
       render: (_, row) =>
         row.type === "group" ? (
           <div className="host-table-group-cell">
-            <IconFolder />
+            <WorkspaceIcon name="folder" />
             <Typography.Text bold>{row.name}</Typography.Text>
             <Typography.Text type="secondary">{row.count} 台</Typography.Text>
           </div>
         ) : (
-          <div className="host-name-cell">
-            <Typography.Text bold>{row.host.name}</Typography.Text>
-            <div className="host-address-cell">
-              <Typography.Text type="secondary">
-                {row.host.username}@{row.host.address}:{row.host.port}
-              </Typography.Text>
-              <Tooltip content="复制 IP">
-                <Button
-                  aria-label={`复制 ${row.host.name} IP`}
-                  className="host-address-copy-button"
-                  icon={<IconCopy />}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    void copyHostAddress(row.host);
-                  }}
-                  size="mini"
-                  type="text"
-                />
-              </Tooltip>
+          <div className="host-item-cell">
+            <span className="host-item-emblem">
+              <WorkspaceIcon name="server" />
+            </span>
+            <div className="host-name-cell">
+              <Typography.Text bold>{row.host.name}</Typography.Text>
+              <div className="host-address-cell">
+                <Typography.Text type="secondary">
+                  {row.host.username}@{row.host.address}:{row.host.port}
+                </Typography.Text>
+                <Tooltip content="复制 IP">
+                  <Button
+                    aria-label={`复制 ${row.host.name} IP`}
+                    className="host-address-copy-button"
+                    icon={<IconCopy />}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void copyHostAddress(row.host);
+                    }}
+                    size="mini"
+                    type="text"
+                  />
+                </Tooltip>
+              </div>
             </div>
           </div>
         ),
@@ -900,35 +903,27 @@ function HostManagerPanel({ onConnect, settings }: HostManagerPanelProps) {
         />
       )}
       <section className="manager-pane hosts-manager-content">
-        <div className="manager-toolbar">
-          <div className="manager-toolbar-filters">
-            <Input.Search
-              allowClear
-              onChange={setKeyword}
-              placeholder="搜索名称、地址或分组"
-              value={keyword}
-            />
-            <div className="host-sort-control">
-              <IconSort />
-              <Select
-                aria-label="主机排序方式"
-                disabled={configurationLoading || configurationAction}
-                onChange={(value) => void changeHostSort(value as HostSortMode)}
-                options={[
-                  { label: "添加顺序", value: "manual" },
-                  { label: "名称升序", value: "nameAsc" },
-                  { label: "名称降序", value: "nameDesc" },
-                  { label: "地址升序", value: "addressAsc" },
-                  { label: "最近连接", value: "recentDesc" },
-                ]}
-                value={hostSort}
-              />
+        <div className="host-directory-heading">
+          <div className="host-directory-identity">
+            <span className="host-directory-emblem">
+              <WorkspaceIcon name="server-rack" />
+            </span>
+            <div>
+              <h1>主机</h1>
+              {!configurationLoading && (
+                <p>
+                  {keyword.trim()
+                    ? `匹配 ${visibleHosts.length} / ${hosts.length} 台主机`
+                    : `${hosts.length} 台主机`}
+                </p>
+              )}
             </div>
           </div>
           <div className="manager-toolbar-actions">
             {isTauri() && (
               <Button
                 disabled={configurationLoading || configurationAction}
+                icon={<WorkspaceIcon name="download" />}
                 onClick={async () => {
                   try {
                     const path = await open({ multiple: false, directory: false, title: "选择 OpenSSH 配置文件" });
@@ -949,7 +944,7 @@ function HostManagerPanel({ onConnect, settings }: HostManagerPanelProps) {
             )}
             <Button
               disabled={configurationLoading || configurationAction}
-              icon={<IconPlus />}
+              icon={<WorkspaceIcon name="folder-plus" />}
               onClick={() => openHostEditor(null)}
               type="primary"
             >
@@ -958,10 +953,35 @@ function HostManagerPanel({ onConnect, settings }: HostManagerPanelProps) {
             <Tooltip content="连接历史">
               <Button
                 aria-label="打开连接历史"
-                icon={<IconHistory />}
+                icon={<WorkspaceIcon name="history" />}
                 onClick={() => setHistoryVisible(true)}
               />
             </Tooltip>
+          </div>
+        </div>
+        <div className="manager-toolbar-filters">
+          <Input.Search
+            allowClear
+            aria-label="搜索主机"
+            onChange={setKeyword}
+            placeholder="搜索名称、地址或分组"
+            value={keyword}
+          />
+          <div className="host-sort-control">
+            <IconSort />
+            <Select
+              aria-label="主机排序方式"
+              disabled={configurationLoading || configurationAction}
+              onChange={(value) => void changeHostSort(value as HostSortMode)}
+              options={[
+                { label: "添加顺序", value: "manual" },
+                { label: "名称升序", value: "nameAsc" },
+                { label: "名称降序", value: "nameDesc" },
+                { label: "地址升序", value: "addressAsc" },
+                { label: "最近连接", value: "recentDesc" },
+              ]}
+              value={hostSort}
+            />
           </div>
         </div>
         <div

@@ -851,8 +851,8 @@ function App() {
             localStorage.setItem(SERVER_MONITOR_COLLAPSED_KEY, String(collapsed));
           }}
           onToggleSftp={() => setSftpCollapsed((collapsed) => !collapsed)}
-          serverMonitorCollapsed={serverMonitorCollapsed}
-          sftpCollapsed={sftpCollapsed}
+          serverMonitorCollapsed={serverMonitorCollapsed || !activeSession}
+          sftpCollapsed={sftpCollapsed || !activeSession}
         />
       }
       aiAssistantPanel={aiAssistantPanel}
@@ -862,9 +862,9 @@ function App() {
       frozenWorkspaceWidth={mainWorkspaceFrozenWidth}
       mainSplitRef={mainSplitRef}
       onAiSidebarWidthChange={setAiSidebarWidth}
-      serverMonitorCollapsed={serverMonitorCollapsed}
+      serverMonitorCollapsed={serverMonitorCollapsed || !activeSession}
       serverMonitorPanel={serverMonitorPanel}
-      sftpCollapsed={sftpCollapsed}
+      sftpCollapsed={sftpCollapsed || !activeSession}
       sftpPanel={sftpPanel}
       terminalPanel={terminalPanel}
     />

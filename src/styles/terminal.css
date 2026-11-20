@@ -24,7 +24,7 @@
   border-right: 1px solid var(--color-border-2);
   border-left: 1px solid var(--color-border-2);
   border-radius: 0;
-  color: var(--color-text-2);
+  color: var(--workspace-muted);
   background: transparent;
   font: inherit;
   cursor: pointer;
@@ -33,24 +33,25 @@
 }
 
 .terminal-home-tab:hover {
-  color: var(--color-text-1);
-  background: var(--color-fill-2);
+  color: var(--workspace-ink);
+  background: var(--workspace-chrome);
 }
 
 .terminal-home-tab-active,
 .terminal-home-tab-active:hover {
-  color: var(--color-text-1);
-  background: var(--color-bg-2);
+  color: var(--workspace-ink);
+  background: var(--workspace-active);
+  font-weight: 650;
 }
 
 .terminal-home-tab-active::after {
   content: "";
   position: absolute;
-  top: 0;
+  bottom: 0;
   right: 0;
   left: 0;
   height: 2px;
-  background: rgb(var(--primary-6));
+  background: var(--workspace-accent);
 }
 
 .terminal-tabs {
@@ -68,11 +69,11 @@
   margin: 0;
   padding: 0 calc(8px + var(--terminal-ai-action-width)) 0
     calc(8px + var(--terminal-home-tab-width));
-  background: var(--color-fill-2);
+  background: var(--workspace-chrome);
 }
 
 .terminal-tabs > .arco-tabs-header-nav::before {
-  background: var(--color-border-2);
+  background: var(--workspace-border);
 }
 
 .terminal-tabs > .arco-tabs-header-nav .arco-tabs-header-scroll {
@@ -115,18 +116,18 @@
 
 .terminal-tabs .arco-tabs-header-title-active,
 .terminal-tabs .arco-tabs-header-title-active:hover {
-  color: var(--color-text-1);
-  background: var(--color-bg-2) !important;
+  color: var(--workspace-ink);
+  background: var(--workspace-active) !important;
 }
 
 .terminal-tabs .arco-tabs-header-title-active::after {
   content: "";
   position: absolute;
-  top: 0;
+  bottom: 0;
   right: 0;
   left: 0;
   height: 2px;
-  background: rgb(var(--primary-6));
+  background: var(--workspace-accent);
 }
 
 .terminal-tabs .arco-tabs-header-title-text {
@@ -225,14 +226,17 @@
 
 .terminal-ai-action-button.arco-btn.is-active,
 .terminal-ai-action-button.arco-btn.is-active:hover {
-  color: rgb(var(--primary-6));
-  background: var(--color-primary-light-1);
+  color: var(--workspace-accent);
+  background: var(--workspace-active);
 }
 
-.terminal-ai-action-button svg {
+.terminal-ai-action-button .workspace-icon {
   width: 17px;
   height: 17px;
-  stroke-width: 1.75;
+}
+
+.terminal-ai-action-button.arco-btn-disabled .workspace-icon {
+  opacity: 0.4;
 }
 
 .terminal-tab-label {
