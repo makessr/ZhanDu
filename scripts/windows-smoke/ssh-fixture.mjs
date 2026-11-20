@@ -48,8 +48,13 @@ export async function startSshFixture(ssh2, directory) {
       session.on("window-change", (acceptResize) => acceptResize?.());
       session.on("env", (acceptEnv) => acceptEnv?.());
       session.on("shell", (acceptShell) => acceptShell().write("FINESHELL_SMOKE_READY\r\n"));
-      session.on("exec", (acceptExec) => {
+      session.on("exec", (acceptExec, _reject, info) => {
         const stream = acceptExec();
+        if (info.command.includes("cpu_percent=") && info.command.includes("memory_kib=")) {
+          stream.write("hostname=smoke-fixture\noperating_system=Debian\nkernel=6.1\nuptime_seconds=300\n" +
+            "cpu_percent=24.0\nmemory_kib=2048000,1536000\ndisk_kib=10485760,2621440,7864320\n" +
+            "load_average=0.12,0.07,0.04\nnetwork_bytes=952932,93100\n");
+        }
         stream.exit(0);
         stream.end();
       });

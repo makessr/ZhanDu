@@ -25,6 +25,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { APP_DISPLAY_NAME } from "../application-brand";
+import { confirmHostFingerprint } from "../app-window-actions";
 import { diagnosticInvoke as invoke } from "../diagnostics";
 import {
   loadConfiguration,
@@ -45,10 +46,29 @@ import type {
 } from "../models";
 import { getSshKeySource } from "../ssh-keys";
 import { sshKeyInstallCommand } from "../ssh-key-install";
+import { jumpHostRequest } from "../terminal-utils";
+import { resolveWorkspaceConnection } from "../terminal-workspaces";
 import {
   emitProtocolEventTo,
   listenProtocolEvent,
+  type SshConnectResult,
 } from "../tauri-protocol";
+
+function keyChange(
+  configuration: Awaited<ReturnType<typeof loadConfiguration>>,
+  hostId: string,
+  keyId: string,
+) {
+  const host = configuration.hosts.find(({ id }) => id === hostId);
+  if (!host) throw new Error("所选主机已被删除");
+  const replacement = { ...host, authMethod: "privateKey" as const, sshKeyId: keyId, privateKeyPath: undefined };
+  const [candidate, proxy, jump] = resolveWorkspaceConnection(replacement, configuration);
+  const { address, port, username, authMethod, privateKeyPath, connectTimeoutSeconds, keepAliveIntervalSeconds } = candidate;
+  const request = { hostId: keyId, address, port, username, authMethod, privateKeyPath, connectTimeoutSeconds,
+    keepAliveIntervalSeconds, expectedFingerprint: host.hostFingerprint, proxy, jumpHost: jumpHostRequest(jump) };
+  const original = [host.authMethod, host.sshKeyId, host.privateKeyPath];
+  return { host, replacement, request, snapshot: JSON.stringify([request, original]) };
+}
 
 function createSshKeyId() {
   return `ssh-key-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -353,28 +373,43 @@ function SshKeySettings() {
   const applyToHost = async () => {
     if (!installKey || !installHostId || acting) return;
     const keyId = installKey.id;
+    const hostId = installHostId;
     setActing(true);
     try {
+      const change = keyChange(await loadConfiguration(), hostId, keyId);
+      const verify = (expectedFingerprint = change.request.expectedFingerprint) =>
+        invoke<SshConnectResult>("ssh_verify_private_key", { request: { ...change.request, expectedFingerprint } });
+      let result = await verify();
+      if (result.status === "hostKeyVerificationRequired") {
+        if (!await confirmHostFingerprint(change.host, result)) return;
+        result = await verify(result.fingerprint);
+        if (result.status !== "connected") throw new Error("验证期间主机指纹已变化，请重试");
+      }
       await updateConfiguration((current) => {
-        if (!current.sshKeys.some((key) => key.id === keyId)) {
-          throw new Error("密钥已被删除");
-        }
-        if (!current.hosts.some((host) => host.id === installHostId)) {
-          throw new Error("所选主机已被删除");
+        const latest = keyChange(current, hostId, keyId);
+        if (latest.snapshot !== change.snapshot) {
+          throw new Error("验证期间连接配置已变化，请重试");
         }
         return {
           ...current,
           hosts: current.hosts.map((host) =>
-            host.id === installHostId
-              ? { ...host, authMethod: "privateKey", sshKeyId: keyId, privateKeyPath: undefined }
+            host.id === hostId
+              ? { ...latest.replacement, hostFingerprint: result.fingerprint }
               : host,
           ),
         };
       });
       setInstallKey(null);
-      Message.success("主机已切换为密钥登录，请新开会话测试");
       await notifyMainWindow();
       await refresh();
+      if (change.host.authMethod !== "password" && change.host.sshKeyId !== keyId) {
+        Modal.info({
+          title: "新密钥已验证并启用",
+          content: "确认没有其他设备或主机需要旧公钥后，可以从服务器的 authorized_keys 手动移除旧公钥。",
+        });
+      } else {
+        Message.success("新密钥已验证，主机已切换为密钥登录");
+      }
     } catch (error) {
       Message.error(String(error));
     } finally {
@@ -613,7 +648,7 @@ function SshKeySettings() {
         >
           <Space direction="vertical" size="medium" style={{ width: "100%" }}>
             <Typography.Text>
-              用要登录的账号打开服务器终端，粘贴并执行安装命令。完成后用新会话测试密钥登录。
+              用要登录的账号打开服务器终端，粘贴并执行安装命令。栈渡验证新密钥后才会切换主机配置。
             </Typography.Text>
             <Input.TextArea aria-label="OpenSSH 公钥" autoSize readOnly value={installKey.publicKey} />
             <Space wrap>
@@ -645,7 +680,7 @@ function SshKeySettings() {
                   loading={acting}
                   onClick={() => void applyToHost()}
                 >
-                  已安装，用于此主机
+                  已安装，验证并启用
                 </Button>
               </>
             )}

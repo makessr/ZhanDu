@@ -1,6 +1,16 @@
 import { useMemo } from "react";
-import type { ITooltipLineActual } from "@visactor/vchart";
-import { AreaChart, BarChart } from "@visactor/react-vchart";
+import { VChartSimple, type AreaChartProps, type BarChartProps } from "@visactor/react-vchart";
+import {
+  VChart,
+  registerAreaChart,
+  registerBarChart,
+  registerCartesianBandAxis,
+  registerCartesianLinearAxis,
+  registerDiscreteLegend,
+  registerDomTooltipHandler,
+  registerTooltip,
+  type ITooltipLineActual,
+} from "@visactor/vchart";
 import { useResolvedAppearance } from "../hooks/useResolvedAppearance";
 import type { ServerMonitorHistoryPoint } from "../models";
 import {
@@ -8,6 +18,22 @@ import {
   formatMonitorRate,
   normalizeMonitorPercent,
 } from "../monitor-utils";
+
+VChart.useRegisters([
+  registerAreaChart,
+  registerBarChart,
+  registerCartesianBandAxis,
+  registerCartesianLinearAxis,
+  registerDiscreteLegend,
+  registerDomTooltipHandler,
+  registerTooltip,
+]);
+
+type MonitorChartProps = ({ type: "area" } & AreaChartProps) | ({ type: "bar" } & BarChartProps);
+
+function MonitorChart({ className, height, ...spec }: MonitorChartProps) {
+  return <VChartSimple vchartConstructor={VChart} className={className} style={{ height }} spec={spec} />;
+}
 
 interface UtilizationDatum {
   metric: string;
@@ -50,7 +76,8 @@ export function UtilizationChart({ utilizationData }: { utilizationData: Utiliza
   const appearance = useResolvedAppearance();
   const chartTextColor = appearance === "dark" ? "#c9cdd4" : "#4e5969";
   return (
-    <BarChart
+    <MonitorChart
+      type="bar"
       animation={false}
       axes={[
         {
@@ -114,7 +141,8 @@ export function ResourceTrendChart({ monitorHistory }: { monitorHistory: ServerM
     [monitorHistory],
   );
   return (
-    <AreaChart
+    <MonitorChart
+      type="area"
       animation={false}
       area={{ style: { fillOpacity: 0.12 } }}
       axes={[
@@ -179,7 +207,8 @@ export function NetworkTrendChart({ monitorHistory }: { monitorHistory: ServerMo
     [monitorHistory],
   );
   return (
-    <AreaChart
+    <MonitorChart
+      type="area"
       animation={false}
       area={{ style: { fillOpacity: 0.12 } }}
       axes={[

@@ -167,6 +167,7 @@ pub fn run() {
             terminal_logs::terminal_log_stop,
             terminal_logs::terminal_log_open_directory,
             ssh::ssh_connect,
+            ssh::ssh_verify_private_key,
             ssh::ssh_write,
             ssh::ssh_resize,
             ssh::ssh_monitor_snapshot,
