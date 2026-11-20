@@ -1,5 +1,5 @@
 {
-  "version": 43,
+  "version": 44,
   "commands": {
     "protocol_version": true,
     "host_sync_account": true,
@@ -79,6 +79,7 @@
     "terminal_log_stop": true,
     "terminal_log_open_directory": true,
     "ssh_connect": true,
+    "ssh_verify_private_key": true,
     "ssh_write": true,
     "ssh_resize": true,
     "ssh_monitor_snapshot": true,

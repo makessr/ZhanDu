@@ -15,7 +15,7 @@ export async function until(label, action, timeout = 45_000) {
   throw new Error(label + " timed out", { cause: failure });
 }
 
-export async function evaluate(view, fn, ...args) {
+export async function devTools(view, method, params) {
   const socket = new WebSocket(view);
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => finish(new Error("WebView evaluation timed out")), 8_000);
@@ -26,21 +26,26 @@ export async function evaluate(view, fn, ...args) {
       else resolve(result);
     }
     socket.addEventListener("error", () => finish(new Error("WebView connection failed")), { once: true });
-    socket.addEventListener("open", () => socket.send(JSON.stringify({
-      id: 1, method: "Runtime.evaluate",
-      params: { expression: "(" + fn.toString() + ")(..." + JSON.stringify(args) + ")",
-        awaitPromise: true, returnByValue: true },
-    })), { once: true });
+    socket.addEventListener("open", () => socket.send(JSON.stringify({ id: 1, method, params })), { once: true });
     socket.addEventListener("message", ({ data }) => {
       const message = JSON.parse(data);
       if (message.id !== 1) return;
       if (message.error || message.result.exceptionDetails) {
         finish(new Error(message.result?.exceptionDetails?.exception?.description ?? message.error?.message));
       } else {
-        finish(null, message.result.result.value);
+        finish(null, message.result);
       }
     });
   });
+}
+
+export async function evaluate(view, fn, ...args) {
+  const result = await devTools(view, "Runtime.evaluate", {
+    expression: "(" + fn.toString() + ")(..." + JSON.stringify(args) + ")",
+    awaitPromise: true,
+    returnByValue: true,
+  });
+  return result.result.value;
 }
 
 export function findWindow(port, label) {

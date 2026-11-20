@@ -69,6 +69,7 @@ Copy-Item -LiteralPath (Join-Path $target 'debug/fineshell.exe') -Destination $b
 $oldProfile = $env:FINESHELL_SMOKE_PROFILE
 $oldWebView = $env:WEBVIEW2_USER_DATA_FOLDER
 $oldFlags = $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS
+$oldDevice = $env:ZHANDU_SMOKE_DEVICE_B_PID
 $apps = @()
 $ports = @()
 try {
@@ -84,6 +85,7 @@ try {
         $apps += Start-Process -FilePath $binary -WindowStyle Hidden -PassThru
     }
 
+    $env:ZHANDU_SMOKE_DEVICE_B_PID = [string]$apps[1].Id
     & $Node (Join-Path $PSScriptRoot 'sync.mjs') $ports[0] $ports[1] $Ssh2Module
     if ($LASTEXITCODE) { throw 'FineShell desktop synchronization smoke test failed' }
 } finally {
@@ -95,5 +97,6 @@ try {
     $env:FINESHELL_SMOKE_PROFILE = $oldProfile
     $env:WEBVIEW2_USER_DATA_FOLDER = $oldWebView
     $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = $oldFlags
+    $env:ZHANDU_SMOKE_DEVICE_B_PID = $oldDevice
     Write-Output "Test workspace: $root"
 }

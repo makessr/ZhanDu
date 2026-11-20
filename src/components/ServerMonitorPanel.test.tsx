@@ -4,9 +4,10 @@ import { clearMocks, mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { HostRecord, TerminalSession } from "../models";
 
-mock.module("@visactor/react-vchart", () => ({
-  AreaChart: () => <div data-testid="area-chart" />,
-  BarChart: () => <div data-testid="bar-chart" />,
+mock.module("./ServerMonitorCharts", () => ({
+  UtilizationChart: () => <div data-testid="bar-chart" />,
+  ResourceTrendChart: () => <div data-testid="area-chart" />,
+  NetworkTrendChart: () => <div data-testid="network-chart" />,
 }));
 
 import ServerMonitorPanel from "./ServerMonitorPanel";
