@@ -200,6 +200,14 @@ sudo /opt/fineshell-sync/node/bin/node /opt/fineshell-sync/portable-backup.mjs b
   /var/lib/fineshell-sync/vault.sqlite "$backup" /etc/fineshell-sync/backup-keys/portable.key
 ```
 
+将备份复制到异机后，可以单独核对文件和密钥是否匹配。验收机器需要 Node.js 26，并把同一版本的 `portable-backup.mjs` 和 `backup-snapshot.mjs` 放在同一目录。
+
+```bash
+node /path/to/portable-backup.mjs verify /path/to/vault.backup /path/to/portable.key
+```
+
+校验检查加密认证标签、SQLite 完整性及恢复步骤，成功时输出 `Backup verification passed`。校验只读取备份和密钥，解密副本位于当前用户的临时目录内，正常结束或检测失败时都会清理。请在受控环境运行，并为临时目录预留足够空间。需要切换服务时，仍应执行下面的隔离实例恢复演练。
+
 在新 Linux 实例上安装相同或兼容版本的服务。先把加密文件和对应密钥安全传到新实例，并将文件权限设为 `0600`。在下面的命令中换入实际路径。恢复目录需要支持硬链接，因为脚本在同一目录验证结果后才发布文件。输出目标须是新文件，脚本会拒绝覆盖已有数据库。
 
 ```bash

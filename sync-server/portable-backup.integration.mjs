@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { execFile } from "node:child_process";
 import { once } from "node:events";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -14,14 +14,20 @@ const cli = fileURLToPath(new URL("./deploy/portable-backup.mjs", import.meta.ur
 const run = (...args) => promisify(execFile)(process.execPath, [cli, ...args]);
 const bytes = (length) => randomBytes(length).toString("base64");
 
-test("restores an authenticated backup into a fresh database and resumes sync after login", async () => {
+test("verifies a portable backup, restores into a fresh database, and resumes sync after login", async () => {
   const dir = await mkdtemp(join(tmpdir(), "fineshell-portable-"));
   const active = join(dir, "active.sqlite");
   const file = join(dir, "encrypted");
   const key = join(dir, "key");
   const wrongKey = join(dir, "wrong-key");
   const fresh = join(dir, "fresh");
+  const verificationTemp = join(dir, "verification-temp");
   const restored = join(fresh, "vault.sqlite");
+  const verify = (backup, keyFile) => promisify(execFile)(
+    process.execPath, [cli, "verify", backup, keyFile], {
+      env: { ...process.env, TMPDIR: verificationTemp, TMP: verificationTemp, TEMP: verificationTemp },
+    },
+  );
   let server;
   let origin;
   async function start(database, options) {
@@ -44,6 +50,7 @@ test("restores an authenticated backup into a fresh database and resumes sync af
 
   try {
     await mkdir(fresh);
+    await mkdir(verificationTemp);
     await writeFile(key, randomBytes(32), { mode: 0o600 });
     await writeFile(wrongKey, randomBytes(32), { mode: 0o600 });
     await start(active);
@@ -55,12 +62,20 @@ test("restores an authenticated backup into a fresh database and resumes sync af
     });
     assert.equal(registered.status, 200);
     await run("backup", active, file, key);
-    assert(!(await readFile(file)).includes(credentials.email));
+    const originalBackup = await readFile(file);
+    assert(!originalBackup.includes(credentials.email));
+    assert.match((await verify(file, key)).stdout, /Backup verification passed/);
+    assert.deepEqual(await readFile(file), originalBackup);
+    assert.deepEqual(await readdir(verificationTemp), []);
+    await assert.rejects(verify(file, wrongKey), /authenticate/);
+    assert.deepEqual(await readdir(verificationTemp), []);
     await assert.rejects(run("restore", file, restored, wrongKey), /authenticate/);
     const tampered = await readFile(file);
     tampered[tampered.length - 1] ^= 1;
     const damaged = join(dir, "damaged");
     await writeFile(damaged, tampered);
+    await assert.rejects(verify(damaged, key), /authenticate/);
+    assert.deepEqual(await readdir(verificationTemp), []);
     await assert.rejects(run("restore", damaged, restored, key), /authenticate/);
     await run("restore", file, restored, key);
     await assert.rejects(run("restore", file, restored, key), /EEXIST/);
