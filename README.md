@@ -42,7 +42,7 @@ v0.6.2 的 macOS 包使用临时签名，尚未通过 Apple 公证，首次打�
 
 栈渡 v0.6.2 已在 Debian 12 和 Debian 13 的 XFCE 会话中完成 x64 和 ARM64 安装启动验收，也验证了从 FineShell v0.5.1 经 v0.6.1 到栈渡 v0.6.2 的应用内升级。运行 `dpkg --print-architecture` 查看架构。`amd64` 下载文件名带 `linux_amd64` 的包，`arm64` 下载文件名带 `linux_arm64` 的包。安装后可从 XFCE 应用菜单启动。[Debian XFCE 验收记录](docs/release-pipeline.md#debian-xfce-安装验收)
 
-使用 APT 安装 `.deb`，它会解析 WebKitGTK 等依赖。下一版 Linux 安装包会将 `ca-certificates` 声明为依赖，供精简系统验证更新服务的 HTTPS 证书。
+使用 APT 安装 `.deb`，它会解析 WebKitGTK 等依赖。本验收分支验证下一版 Linux 安装包将 `ca-certificates` 声明为依赖，供精简系统验证更新服务的 HTTPS 证书。
 
 ```bash
 sudo apt update
