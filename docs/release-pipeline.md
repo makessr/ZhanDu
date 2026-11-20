@@ -67,7 +67,9 @@ Gatekeeper 处于启用状态。两台运行器都拒绝了手动赋予下载标
 
 ## Debian XFCE 安装验收
 
-v0.6.2 的正式 Debian 安装包已在 Debian 12（Bookworm）和 Debian 13（Trixie）中各验证 x64 和 ARM64。测试在对应 CPU 架构的 GitHub 托管运行器上使用 Debian 容器和 Xvfb，核对了 SHA-256、APT 依赖安装、软件包架构与版本，并在干净的 XFCE 会话内以普通用户通过已安装的桌面入口打开应用窗口。个人电脑上的图形驱动和 Debian 上的应用内升级另行验收。[四项安装及启动记录](https://github.com/makessr/ZhanDu/actions/runs/44655325742)
+v0.6.2 的正式 Debian 安装包已在 Debian 12（Bookworm）和 Debian 13（Trixie）中各验证 x64 和 ARM64。测试在对应 CPU 架构的 GitHub 托管运行器上使用 Debian 容器和 Xvfb，核对了 SHA-256、APT 依赖安装、软件包架构与版本，并在干净的 XFCE 会话内以普通用户通过已安装的桌面入口打开应用窗口。[四项安装及启动记录](https://github.com/makessr/ZhanDu/actions/runs/44655325742)
+
+同样的四个组合均通过应用内升级。从公开的 v0.5.1 安装包起步，在 XFCE 会话内确认更新，依次安装 v0.6.1 和 v0.6.2。每次确认软件包版本、架构、应用自动重启后的可见窗口和本地配置目录中的测试标记。精简 Debian 镜像需提供 `ca-certificates`，供应用验证更新地址的 TLS 证书。本次使用容器与虚拟显示，实体机上的图形驱动及系统提权交互仍待验证。[四项应用内升级记录](https://github.com/makessr/ZhanDu/actions/runs/44662958965)
 
 ## Windows 桌面验收
 
