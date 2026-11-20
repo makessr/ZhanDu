@@ -6,7 +6,8 @@ FineShell 将版本准备与跨平台构建拆成两个 GitHub Actions 工作流
 2. 工作流将 `CHANGELOG.md` 的 `Unreleased` 内容归档到新版本，并创建 `fix/release-vX.Y.Z` Pull Request。
 3. 发布 PR 合并到 `main` 后，`Release` 自动校验版本和发布说明并创建 Draft Release。
 4. 工作流并行构建 macOS、Linux 和 Windows 安装包及更新签名。
-5. 工作流规范化并校验 `latest.json`，写入发布说明后公开 GitHub Release。
+5. 工作流规范化并校验 `latest.json`，保存发布说明，并在运行摘要中提供草稿链接。
+6. 维护者验收草稿后，从 GitHub Releases 手动公开版本。
 
 客户端通过 GitHub Releases 的 `latest.json` 检查更新，并由 Tauri Updater 校验安装包签名。
 
@@ -18,7 +19,7 @@ v0.6.2 已在栈渡仓库公开，v0.6.1 已在 FineShell 仓库公开。已安�
 
 1. 首个栈渡签名过渡版从 `makessr/FineShell` 发布，使用与已安装客户端公钥匹配的签名。保留安装标识、凭据存储和更新地址。
 2. 从公开的 FineShell v0.5.1 安装包开始，验证应用内更新能自动下载、验签并安装过渡版，以及已有主机连接、密码和私钥仍可使用。
-3. 先在本仓库准备独立首发 v0.6.2，从 `main` 手动运行 `Release` 时勾选 `draft_only`，核对全平台产物、新签名和更新清单。获准后先公开独立渠道，确认客户端能读取 v0.6.2。
+3. 先在本仓库准备独立首发 v0.6.2，当时从 `main` 手动运行 `Release` 并勾选 `draft_only`，核对了全平台产物、新签名和更新清单。获准后先公开独立渠道，确认客户端能读取 v0.6.2。
 4. 旧仓库使用旧私钥签署切换版 v0.6.1。该版本内置栈渡渠道的更新地址和新公钥。两个候选版完成两段升级验收后，再从原渠道交付 v0.6.1。
 
 常规 `Release` 会在创建草稿前检查应用更新地址是否属于发布仓库，并在公开前检查 `latest.json` 中每个安装包下载地址。迁移渠道时，须先设计和验收从旧渠道交付切换版的路径，再启用新仓库的常规发布。
@@ -42,7 +43,8 @@ GitHub Actions 需要配置仓库密钥 `TAURI_SIGNING_PRIVATE_KEY`，用于生�
 1. 在 GitHub Actions 中运行 `Prepare Release`。
 2. 选择 `patch`、`minor` 或 `major`。
 3. 检查工作流创建的发布 PR，确认版本和更新日志后合并。
-4. 合并会自动触发 `Release`；所有平台构建通过后 Release 自动公开。
+4. `Release` 工作流启用时，版本变更合入 `main` 会触发构建。所有平台构建和清单检查通过后，打开运行摘要中的草稿链接。
+5. 核对草稿对应的提交、安装包、签名和更新清单，完成适用的升级验收。在 GitHub Releases 打开草稿，确认正式版本或预发行版本的设置，再选择 `Publish release`。
 
 发布 PR 会同步更新：
 
@@ -83,7 +85,7 @@ pwsh -File ./scripts/windows-smoke/ota.ps1 -VerifiedInstaller ./FineShell_0.4.0_
 
 ## 手动恢复
 
-正常流程不需要手动创建 tag。自动发布未触发时，可以在 GitHub Actions 中从 `main` 手动运行 `Release` 并填写与应用版本一致的 `vX.Y.Z`；发布提交必须属于 `main`。
+正常流程由 Release 创建版本标签。工作流已启用但自动构建未触发时，可以在 GitHub Actions 中从 `main` 手动运行 `Release`，并填写与应用版本一致的 `vX.Y.Z`。手动运行也会生成待验收草稿。
 
 ## 失败重试
 

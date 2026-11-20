@@ -7,10 +7,6 @@ on:
         description: "版本标签，例如 v0.1.0（必须与应用版本一致）"
         required: true
         type: string
-      draft_only:
-        description: "构建、验签并保留发布草稿"
-        type: boolean
-        default: false
   push:
     branches:
       - main
@@ -241,10 +237,11 @@ jobs:
             exit 1
           fi
 
-  publish:
-    name: Publish release
+  finalize-draft:
+    name: Finalize release draft
     needs:
       - validate
+      - prepare
       - build
     permissions:
       contents: write
@@ -254,23 +251,21 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.11
-      - name: Download updater manifest
+      - name: Check release draft and download updater manifest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.validate.outputs.release_tag }}
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
         run: |
           mkdir -p "$RUNNER_TEMP/updater"
+          gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" \
+            > "$RUNNER_TEMP/updater/release.json"
+          jq -e --arg tag "$RELEASE_TAG" --arg commit "$GITHUB_SHA" \
+            '.draft and .tag_name == $tag and .target_commitish == $commit' \
+            "$RUNNER_TEMP/updater/release.json" > /dev/null
           gh release download "$RELEASE_TAG" \
             --pattern latest.json \
             --dir "$RUNNER_TEMP/updater"
-          release_id="$(
-            gh release view "$RELEASE_TAG" \
-              --json databaseId \
-              --jq '.databaseId'
-          )"
-          gh api \
-            "repos/$GITHUB_REPOSITORY/releases/$release_id" \
-            > "$RUNNER_TEMP/updater/release.json"
       - name: Normalize updater download URLs
         run: |
           bun scripts/normalize-updater-manifest.ts \
@@ -303,9 +298,18 @@ jobs:
           set -o pipefail
           curl --fail --silent --show-error --max-time 15 "$SYNC_HEALTH_URL" |
             jq -e '.service == "fineshell-sync" and .status == "ok"'
-      - name: Publish completed release
-        if: github.event_name != 'workflow_dispatch' || !inputs.draft_only
+      - name: Save release notes and report the draft
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.validate.outputs.release_tag }}
-        run: gh release edit "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.md" --draft=false
+          RELEASE_ID: ${{ needs.prepare.outputs.release_id }}
+        run: |
+          endpoint="repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID"
+          gh api "$endpoint" --jq '.draft' | grep -Fxq true
+          draft_url="$(
+            gh api --method PATCH "$endpoint" -F "body=@$RUNNER_TEMP/release-notes.md" \
+              --jq 'select(.draft) | .html_url'
+          )"
+          test -n "$draft_url"
+          printf 'Release draft [%s](%s) is ready for acceptance.\n' \
+            "$RELEASE_TAG" "$draft_url" >> "$GITHUB_STEP_SUMMARY"
