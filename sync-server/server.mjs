@@ -59,13 +59,15 @@ function credentials(body) {
   return { email, password };
 }
 
+const masterPasswordKdf = "Argon2id-sync-password-v1";
+
 function validateVault(vault) {
   const key = vault?.wrappedKey;
   const base64 = (value, bytes) => typeof value === "string" &&
     Buffer.from(value, "base64").length === bytes &&
     Buffer.from(value, "base64").toString("base64") === value;
   if (vault?.version !== 1 || key?.algorithm !== "XChaCha20-Poly1305" ||
-      key.kdf !== "Argon2id" || !base64(key.salt, 16) || !base64(key.nonce, 24) ||
+      !["Argon2id", masterPasswordKdf].includes(key.kdf) || !base64(key.salt, 16) || !base64(key.nonce, 24) ||
       !base64(key.ciphertext, 48) || !base64(vault.nonce, 24) ||
       typeof vault.ciphertext !== "string" || vault.ciphertext.length < 24 ||
       !/^[A-Za-z0-9+/]+={0,2}$/.test(vault.ciphertext)) {
@@ -80,6 +82,10 @@ function validateVault(vault) {
     nonce: vault.nonce,
     ciphertext: vault.ciphertext,
   };
+}
+
+function vaultKdf(storedVault) {
+  return storedVault && JSON.parse(storedVault).wrappedKey.kdf;
 }
 
 function authSource(request, trustLoopbackProxy) {
@@ -247,7 +253,7 @@ export function createSyncServer(databasePath, options = {}) {
         return;
       }
       if (url === "/v1/registration" && method === "GET") {
-        send(response, 200, { mode: onboarding.registration });
+        send(response, 200, { mode: onboarding.registration, masterPassword: true });
         return;
       }
       if (url === "/v1/registration/verify" && method === "POST") {
@@ -316,6 +322,10 @@ export function createSyncServer(databasePath, options = {}) {
         db.exec("BEGIN IMMEDIATE");
         try {
           if (!readSession.get(tokenHash, now)) throw new HttpError(401, "Sign in again");
+          if (vaultKdf(readVault.get(session.account_id).vault) === masterPasswordKdf &&
+              encrypted.wrappedKey.kdf !== masterPasswordKdf) {
+            throw new HttpError(409, "Master password protection cannot be downgraded");
+          }
           if (!writeVault.run(revision + 1, JSON.stringify(encrypted), session.account_id, revision).changes) {
             throw new HttpError(409, "Vault changed. Read the current revision and try again");
           }
@@ -340,6 +350,11 @@ export function createSyncServer(databasePath, options = {}) {
         const encrypted = validateVault(vault);
         if (!readSession.get(tokenHash, Date.now())) {
           throw new HttpError(401, "Sign in again");
+        }
+        const protection = vaultKdf(readVault.get(session.account_id).vault);
+        if (protection && protection !== encrypted.wrappedKey.kdf &&
+            !(isRecovery && encrypted.wrappedKey.kdf === masterPasswordKdf)) {
+          throw new HttpError(409, "Use key rotation to change vault protection");
         }
         if (!writeVault.run(next, JSON.stringify(encrypted), session.account_id, revision).changes) {
           throw new HttpError(409, "Vault changed. Read the current revision and try again");

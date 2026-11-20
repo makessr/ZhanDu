@@ -10,7 +10,7 @@ use std::sync::OnceLock;
 
 use crate::{
     cloud_backup::{
-        crypto::{decrypt_payload, encrypt_payload, generate_recovery_key, random_master_key, unwrap_master_key, wrap_master_key},
+        crypto::{decrypt_payload, encrypt_payload, generate_recovery_key, random_master_key, unwrap_master_key, unwrap_sync_password, wrap_master_key, wrap_sync_password, SYNC_PASSWORD_KDF},
         types::WrappedMasterKey,
     },
     credentials::{delete_backup_credential, read_backup_credential, restore_backup_credential, sync_credential_generation},
@@ -666,15 +666,17 @@ pub(crate) async fn host_sync_registration(
 pub(crate) async fn host_sync_login(
     server: String, email: String, password: String, recovery_key: String, register: bool,
     bound_account: Option<String>, device_name: Option<String>, proof: Option<RegistrationProof>,
+    use_master_password: Option<bool>, registration_id: Option<String>,
 ) -> CommandResult<Account> {
     let result = async {
         let server = server_url(&server)?;
         let email = email.trim().to_ascii_lowercase();
         if password == recovery_key {
-            return Err("账号密码和恢复密钥必须不同".into());
+            return Err("账号密码与主密码或恢复密钥必须不同".into());
         }
         let normalized: String = recovery_key.chars().filter(|ch| *ch != '-' && !ch.is_ascii_whitespace()).collect();
-        if normalized.len() != 64 || !normalized.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        let master_password = use_master_password == Some(true);
+        if register && !master_password && !legacy_recovery_key(&normalized) {
             return Err("请输入完整的 64 位十六进制恢复密钥".into());
         }
         if register && bound_account.is_some() {
@@ -688,14 +690,25 @@ pub(crate) async fn host_sync_login(
         }
         if register {
             // The original recovery key makes retries after a lost response identify the same account.
-            let identity = serde_json::to_vec(&("fineshell-sync-registration-v1",
-                &server, &email, normalized.to_ascii_lowercase()))
-                .map_err(|_| "无法创建同步账号标识")?;
-            let account_id = format!("{:x}", Sha256::digest(identity))[..32].to_owned();
+            let account_id = if master_password {
+                registration_id.filter(|id| id.len() == 32 &&
+                    id.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()))
+                    .ok_or("无法创建同步账号标识")?
+            } else {
+                let identity = serde_json::to_vec(&("fineshell-sync-registration-v1",
+                    &server, &email, normalized.to_ascii_lowercase()))
+                    .map_err(|_| "无法创建同步账号标识")?;
+                format!("{:x}", Sha256::digest(identity))[..32].to_owned()
+            };
             let key = random_master_key();
+            let wrapped_key = if master_password {
+                wrap_sync_password(&key, &recovery_key)?
+            } else {
+                wrap_master_key(&key, &recovery_key, true)?
+            };
             let initial = Device {
                 server: server.clone(), email: email.clone(), account_id: account_id.clone(),
-                token: String::new(), key, previous_key: None, wrapped_key: wrap_master_key(&key, &recovery_key, true)?,
+                token: String::new(), key, previous_key: None, wrapped_key,
             };
             body["accountId"] = json!(account_id);
             body["vault"] = json!(seal(&initial, 1, &Records::default())?);
@@ -710,6 +723,27 @@ pub(crate) async fn host_sync_login(
     result.map_err(|e: String| error("host_sync_login", e))
 }
 
+fn legacy_recovery_key(normalized: &str) -> bool {
+    normalized.len() == 64 && normalized.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn unlock_sync_key(wrapped: &WrappedMasterKey, secret: &str) -> Result<[u8; 32], String> {
+    if wrapped.algorithm != "XChaCha20-Poly1305" {
+        return Err("同步仓库版本不受支持".into());
+    }
+    match wrapped.kdf.as_str() {
+        "Argon2id" => {
+            let normalized: String = secret.chars().filter(|ch| *ch != '-' && !ch.is_ascii_whitespace()).collect();
+            if !legacy_recovery_key(&normalized) {
+                return Err("该账号需要完整的旧恢复密钥".into());
+            }
+            unwrap_master_key(wrapped, secret, true).map_err(|_| "恢复密钥不正确".into())
+        }
+        SYNC_PASSWORD_KDF => unwrap_sync_password(wrapped, secret).map_err(|_| "主密码不正确".into()),
+        _ => Err("同步仓库版本不受支持".into()),
+    }
+}
+
 async fn complete_login(
     server: &str, email: String, login: &Login, recovery_key: &str, bound_account: Option<String>,
 ) -> Result<Account, String> {
@@ -718,17 +752,18 @@ async fn complete_login(
     }
     let remote: RemoteVault = request(server, Method::GET, "vault", Some(&login.token), None).await?;
     let (key, wrapped_key) = if let Some(vault) = &remote.vault {
-        if vault.version != 1 || vault.wrapped_key.algorithm != "XChaCha20-Poly1305"
-            || vault.wrapped_key.kdf != "Argon2id"
-        {
+        if vault.version != 1 {
             return Err("同步仓库版本不受支持".into());
         }
-        let key = unwrap_master_key(&vault.wrapped_key, recovery_key, true)
-            .map_err(|_| "恢复密钥不正确")?;
+        let key = unlock_sync_key(&vault.wrapped_key, recovery_key)?;
         (key, vault.wrapped_key.clone())
     } else {
         if bound_account.is_some() {
             return Err("已绑定账号的同步仓库不存在，请检查同步服务".into());
+        }
+        let normalized: String = recovery_key.chars().filter(|ch| *ch != '-' && !ch.is_ascii_whitespace()).collect();
+        if !legacy_recovery_key(&normalized) {
+            return Err("首次初始化旧同步仓库需要旧恢复密钥".into());
         }
         let key = random_master_key();
         let wrapped = wrap_master_key(&key, recovery_key, true)?;
@@ -821,7 +856,7 @@ pub(crate) async fn host_sync_probe(
 
 #[tauri::command]
 pub(crate) async fn host_sync_rotate_key(
-    account_id: String, base: Vault, recovery_key: String,
+    account_id: String, base: Vault, recovery_key: String, account_password: Option<String>,
 ) -> CommandResult<Vault> {
     let result = async {
         let mut device = require_device(&account_id)?;
@@ -831,14 +866,32 @@ pub(crate) async fn host_sync_rotate_key(
         let (signed_revision, records) = open(&device, &vault)?;
         let (base_revision, base_records) = open(&device, &base)?;
         if signed_revision != revision || base_revision != revision || base_records != records {
-            return Err("请先完成一次同步，再更换恢复密钥".into());
+            return Err("请先完成一次同步，再更换主密码".into());
         }
-        if unwrap_master_key(&vault.wrapped_key, &recovery_key, true).is_ok() {
-            return Err("请生成新的恢复密钥".into());
+        if unlock_sync_key(&vault.wrapped_key, &recovery_key).is_ok() {
+            return Err("请使用不同的主密码".into());
         }
         let next = revision.checked_add(1).ok_or("同步版本超出范围")?;
         let key = random_master_key();
-        device.wrapped_key = wrap_master_key(&key, &recovery_key, true)?;
+        device.wrapped_key = if let Some(password) = account_password {
+            if password == recovery_key {
+                return Err("账号密码和主密码必须不同".into());
+            }
+            let wrapped = wrap_sync_password(&key, &recovery_key)?;
+            let check: Login = request(&device.server, Method::POST, "login", None,
+                Some(json!({ "email": device.email, "password": password }))).await?;
+            let _: Value = request(&device.server, Method::POST, "logout", Some(&check.token), None).await?;
+            if check.account_id != device.account_id {
+                return Err("当前账号无法验证".into());
+            }
+            wrapped
+        } else {
+            let normalized: String = recovery_key.chars().filter(|ch| *ch != '-' && !ch.is_ascii_whitespace()).collect();
+            if !legacy_recovery_key(&normalized) || vault.wrapped_key.kdf != "Argon2id" {
+                return Err("请更新客户端并使用主密码".into());
+            }
+            wrap_master_key(&key, &recovery_key, true)?
+        };
         device.previous_key = Some(device.key);
         device.key = key;
         let replacement = seal(&device, next, &records)?;
@@ -851,12 +904,12 @@ pub(crate) async fn host_sync_rotate_key(
         let rotated: Rotation = request(&device.server, Method::POST, "vault/rotate-key",
             Some(&device.token), Some(json!({ "revision": revision, "vault": replacement }))).await?;
         if rotated.revision != next || rotated.token.is_empty() {
-            return Err("无法确认密钥更换，请使用新恢复密钥重新登录".into());
+            return Err("无法确认密钥更换，请使用新主密码或恢复密钥重新登录".into());
         }
         device.token = rotated.token;
         let encoded = serde_json::to_string(&device).map_err(|_| "无法保存同步登录信息")?;
         entry()?.set_password(&encoded)
-            .map_err(|_| "无法保存同步登录信息，请使用新恢复密钥重新登录")?;
+            .map_err(|_| "无法保存同步登录信息，请使用新主密码或恢复密钥重新登录")?;
         Ok(replacement)
     }.await;
     result.map_err(|e: String| error("host_sync_rotate_key", e))
