@@ -1,8 +1,8 @@
-name: Verify public upgrade to ZhanDu v0.6.3
+name: Verify public upgrade to ZhanDu v0.7.0
 
 on:
   push:
-    branches: [test/public-v063-ota]
+    branches: [test/public-v070-ota]
 
 permissions:
   contents: read
@@ -19,13 +19,13 @@ jobs:
           - runner: macos-latest
             platform: macOS
             arch: arm64
-            artifact: FineShell_0.6.2_darwin_aarch64.dmg
-            digest: 1aefbc605cc6c790131c2c5266579cd968003e1efe932db7aa576656f731c94b
+            artifact: FineShell_0.6.3_darwin_aarch64.dmg
+            digest: e327377edba95232e5a644f4e3fbd385848a1a94e55541246e12e36fc5da41b8
           - runner: macos-15-intel
             platform: macOS
             arch: x86_64
-            artifact: FineShell_0.6.2_darwin_x64.dmg
-            digest: b49e98dca7662a2a6e3bf83fb744c7dda566369f07b6607f5082b8da2f9cd580
+            artifact: FineShell_0.6.3_darwin_x64.dmg
+            digest: 52d9359bbab2ce2e5abb0170d16391345ce075cbebc861529a6e5568698af18c
     steps:
       - uses: actions/checkout@v7
         with:
@@ -38,7 +38,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           cd "$RUNNER_TEMP"
-          for release in ZhanDu:0.6.3; do
+          for release in ZhanDu:0.7.0; do
             repo="${release%:*}"
             version="${release#*:}"
             url="https://github.com/makessr/$repo/releases/download/v$version"
@@ -48,7 +48,7 @@ jobs:
                 (.platforms | length > 0 and all(.[]; (.url | startswith($url)) and (.signature | length > 0)))
               '
           done
-          curl -fsSL --retry 3 -o "$ARTIFACT" "https://github.com/makessr/ZhanDu/releases/download/v0.6.2/$ARTIFACT"
+          curl -fsSL --retry 3 -o "$ARTIFACT" "https://github.com/makessr/ZhanDu/releases/download/v0.6.3/$ARTIFACT"
           printf '%s  %s\n' "$DIGEST" "$ARTIFACT" | shasum -a 256 --check
       - name: Upgrade through the macOS desktop
         if: runner.os == 'macOS'
@@ -67,10 +67,10 @@ jobs:
         include:
           - arch: x64
             runner: windows-latest
-            digest: 2c4e70f134bef6f6fdb26bbe85cd2267bad16eb35ab66e9fd15f5313d311d97d
+            digest: dab5cca6535cef1713eab37dd7e3c16f578227697db8208ae3a5c1f8e91c88e1
           - arch: arm64
             runner: windows-11-arm
-            digest: f750075c77011d5a814d9b91e17ce6afe3fa404824e7806a48e4bdee51cda7ab
+            digest: 6d77f9dd3dfc943b7c286bfd169b1917164dca47466f4f0b5b7407b173cc92b0
     env:
       WINDOWS_ARCH: ${{ matrix.arch }}
       BASELINE_SHA256: ${{ matrix.digest }}
@@ -83,22 +83,22 @@ jobs:
         with:
           node-version: "26"
           architecture: ${{ matrix.arch }}
-      - name: Download the official v0.6.2 baseline and check the public update feed
+      - name: Download the official v0.6.3 baseline and check the public update feed
         run: |
           if ($env:RUNNER_ARCH -ne $env:WINDOWS_ARCH) { throw 'Runner architecture differs from installer architecture.' }
           $newFeed = Invoke-RestMethod 'https://github.com/makessr/ZhanDu/releases/latest/download/latest.json' -TimeoutSec 20
-          if ($newFeed.version -ne '0.6.3') { throw 'The expected public update sequence is unavailable.' }
-          $file = Join-Path $env:RUNNER_TEMP 'FineShell-v0.6.2.exe'
-          $url = "https://github.com/makessr/ZhanDu/releases/download/v0.6.2/FineShell_0.6.2_windows_$env:WINDOWS_ARCH-setup.exe"
+          if ($newFeed.version -ne '0.7.0') { throw 'The expected public update sequence is unavailable.' }
+          $file = Join-Path $env:RUNNER_TEMP 'FineShell-v0.6.3.exe'
+          $url = "https://github.com/makessr/ZhanDu/releases/download/v0.6.3/FineShell_0.6.3_windows_$env:WINDOWS_ARCH-setup.exe"
           curl.exe --silent --show-error --fail --location --retry 3 --output $file $url
           if ($LASTEXITCODE -or (Get-FileHash -LiteralPath $file).Hash -ne $env:BASELINE_SHA256) { throw 'The baseline installer did not match the official asset.' }
       - name: Upgrade through GitHub Direct and reconnect to saved hosts
         run: |
           npm install --prefix "$env:RUNNER_TEMP/fixture" --ignore-scripts --no-audit --no-fund ssh2@1.17.0
           if ($LASTEXITCODE) { throw 'Could not install the loopback SSH fixture.' }
-          $baseline = Join-Path $env:RUNNER_TEMP 'FineShell-v0.6.2.exe'
+          $baseline = Join-Path $env:RUNNER_TEMP 'FineShell-v0.6.3.exe'
           $fixture = Join-Path $env:RUNNER_TEMP 'fixture/node_modules/ssh2/lib/index.js'
-          ./scripts/windows-smoke/ota.ps1 -VerifiedInstaller $baseline -Baseline 0.6.2 -Target 0.6.3 -Ssh2Module $fixture -UseHostedRunnerWebView2Policy -RequireArm64:($env:WINDOWS_ARCH -eq 'arm64')
+          ./scripts/windows-smoke/ota.ps1 -VerifiedInstaller $baseline -Baseline 0.6.3 -Target 0.7.0 -Ssh2Module $fixture -UseHostedRunnerWebView2Policy -RequireArm64:($env:WINDOWS_ARCH -eq 'arm64')
 
   desktop:
     name: Debian ${{ matrix.debian }} / ${{ matrix.arch }}
@@ -117,14 +117,14 @@ jobs:
         env:
           DEBIAN_VERSION: ${{ matrix.debian }}
           ARCH: ${{ matrix.arch }}
-          DIGEST: ${{ matrix.arch == 'arm64' && '97903c1ed788e5e1086c35ec81cbcda6e306919267499e0f2cc058ce6b21333f' || '2ae243bfe625c5a4a92d233d549985bb2cbd194706f6213da65c2f50e05b29d1' }}
+          DIGEST: ${{ matrix.arch == 'arm64' && '2d880cbfbf8e1f45d3aa004f3640395d30866506200e032dabe537d6fe46eec3' || 'ee2918e919ff3aa52844cf3708cf8295c5548c79c5950f96e284b5ab914bb22c' }}
         run: |
           set -Eeuo pipefail
-          artifact="FineShell_0.6.2_linux_$ARCH.deb"
+          artifact="FineShell_0.6.3_linux_$ARCH.deb"
           pkg="$RUNNER_TEMP/$artifact"
-          curl -fsSL --retry 3 -o "$pkg" "https://github.com/makessr/ZhanDu/releases/download/v0.6.2/$artifact"
+          curl -fsSL --retry 3 -o "$pkg" "https://github.com/makessr/ZhanDu/releases/download/v0.6.3/$artifact"
           printf '%s  %s\n' "$DIGEST" "$pkg" | sha256sum --check
-          for release in ZhanDu:0.6.3; do
+          for release in ZhanDu:0.7.0; do
             repo="${release%:*}"
             version="${release#*:}"
             curl -fsSL --retry 3 "https://github.com/makessr/$repo/releases/latest/download/latest.json" |

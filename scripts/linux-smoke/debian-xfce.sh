@@ -13,7 +13,7 @@ if [[ "${1:-}" != '--session' ]]; then
     apt-get -o Acquire::Retries=3 update -qq
     apt-get -o Acquire::Retries=3 install -y --no-install-recommends /tmp/zhandu.deb
     package="$(dpkg-deb -f /tmp/zhandu.deb Package)"
-    test "$(dpkg-query -W -f='${Version}' "$package")" = 0.6.2
+    test "$(dpkg-query -W -f='${Version}' "$package")" = 0.6.3
     test "$(dpkg-query -W -f='${Architecture}' "$package")" = "$expected_arch"
     test "$(dpkg-query -W -f='${Status}' "$package")" = 'install ok installed'
     desktop_file="$(dpkg -L "$package" | grep -E '^/usr/share/applications/[^/]+\.desktop$')"
@@ -100,9 +100,9 @@ app_pid="$(window_pid '')"
 mkdir -p "$profile"
 marker="$(cat /proc/sys/kernel/random/uuid)"
 printf '%s\n' "$marker" > "$profile/ota-smoke-marker"
-test "$(dpkg-query -W -f='${Version}' "$package")" = 0.6.2
+test "$(dpkg-query -W -f='${Version}' "$package")" = 0.6.3
 
-for target in 0.6.3; do
+for target in 0.7.0; do
     printf 'Requesting application update to %s using XFCE, PID %s.\n' "$target" "$app_pid"
     timeout 85s /usr/bin/python3 /tmp/press-update.py "$app_pid"
     previous="$app_pid"
