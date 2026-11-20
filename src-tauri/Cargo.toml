@@ -37,6 +37,7 @@ rand = "0.8.5"
 httparse = "1.10.1"
 glob = "0.3.3"
 sha2 = "0.10.9"
+ssh-key = { version = "0.6.7", default-features = false, features = ["std", "ed25519"] }
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls", "stream"] }
 rig-core = { version = "0.40.0", default-features = false, features = ["reqwest", "rustls"] }
 tauri = { version = "2", features = [] }

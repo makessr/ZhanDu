@@ -108,14 +108,25 @@ try {
   const password = randomBytes(24).toString("base64url");
   const common = { address: "127.0.0.1", port: fixture.port, group: "Smoke group",
     connectTimeoutSeconds: 8, keepAliveIntervalSeconds: 15, autoReconnect: false, maxReconnectAttempts: 0 };
+  const generatedKeyId = "smoke-generated-key";
+  const generated = await invoke(a, "managed_ssh_key_generate", { keyId: generatedKeyId });
+  const standaloneKeyId = "smoke-standalone-key";
+  const standalone = await invoke(a, "managed_ssh_key_generate", { keyId: standaloneKeyId });
+  assert.match(generated.publicKey, /^ssh-ed25519 /);
+  fixture.allowPublicKey("fineshell-generated", generated.publicKey);
   const hosts = [
     { ...common, id: "smoke-password", name: "Smoke password host", username: "fineshell-password", authMethod: "password" },
     { ...common, id: "smoke-key", name: "Smoke key host", username: "fineshell-key", authMethod: "privateKey", sshKeyId: "smoke-key-file" },
+    { ...common, id: "smoke-generated", name: "Smoke generated key host", username: "fineshell-generated",
+      authMethod: "privateKey", sshKeyId: generatedKeyId },
   ];
   await invoke(a, "store_host_password", { hostId: "smoke-password", password: fixture.password });
   await invoke(a, "store_private_key_passphrase", { hostId: "smoke-key-file", passphrase: fixture.keyPassphrase });
-  await evaluate(a, configuration, { hosts, sshKeys: [{ id: "smoke-key-file", name: "Smoke identity",
-    privateKeyPath: fixture.deviceKeyFile, source: "file" }] });
+  await evaluate(a, configuration, { hosts, sshKeys: [
+    { id: "smoke-key-file", name: "Smoke identity", privateKeyPath: fixture.deviceKeyFile, source: "file" },
+    { id: generatedKeyId, name: "Generated identity", privateKeyPath: generated.reference, source: "managed" },
+    { id: standaloneKeyId, name: "Standalone identity", privateKeyPath: standalone.reference, source: "managed" },
+  ] });
 
   const setupA = await settings(a, portA);
   const setupB = await settings(b, portB);
@@ -128,13 +139,19 @@ try {
   await until("Device A uploads host credentials", async () => (await evaluate(a, configuration)).synced);
   await fill(setupB, { ...form, "主密码或旧恢复密钥": original });
   await click(setupB, "登录并同步");
-  await until("Device B automatically receives both hosts and the managed key", async () => {
+  const received = await until("Device B automatically receives all three hosts and their keys", async () => {
     const state = await evaluate(b, configuration);
-    return state.synced && state.hosts.length === 2 &&
-      state.keys.some((key) => key.privateKeyPath === "managed://smoke-key-file");
+    return state.synced && state.hosts.length === hosts.length &&
+      state.keys.some((key) => key.privateKeyPath === "managed://smoke-key-file") &&
+      state.keys.some((key) => key.id === generatedKeyId) && state;
   });
+  assert.ok(!received.keys.some((key) => key.id === standaloneKeyId), "Unlinked keys stay on device A");
+  const receivedKey = received.keys.find((key) => key.id === generatedKeyId);
+  assert.equal(await invoke(b, "managed_ssh_key_public", { reference: receivedKey.privateKeyPath }), generated.publicKey);
 
-  for (const [host, method] of [[hosts[0], "password"], [hosts[1], "publickey"]]) {
+  for (const host of hosts) {
+    const method = host.authMethod === "password" ? "password" : "publickey";
+    const initialAuthCount = fixture.counts[method];
     await evaluate(b, () => document.querySelector(".terminal-home-tab")?.click());
     await until("Connect to " + host.name, () => evaluate(b, (name) => {
       const row = [...document.querySelectorAll("tr")].find((item) => item.textContent.includes(name));
@@ -155,13 +172,13 @@ try {
           !document.querySelector(".sftp-table input[type=checkbox]") &&
           document.body.innerText.includes("fineshell-smoke.txt");
       }, fixture.fingerprint);
-      return fixture.counts[method] > 0 && state;
+      return fixture.counts[method] > initialAuthCount && state;
     });
     await until("Show the completed SFTP directory", () => evaluate(b, () =>
       !document.querySelector(".sftp-directory-preview-status") &&
       !!document.querySelector(".sftp-table input[type=checkbox]") &&
       document.body.innerText.includes("after-preview.txt")));
-    console.log("设备 B 使用同步过来的 " + method + " 登录，并读取了 SFTP 测试目录。");
+    console.log("设备 B 使用同步凭据登录 " + host.name + "，并读取了 SFTP 测试目录。");
   }
 
   const peer = await invoke(b, "host_sync_account");

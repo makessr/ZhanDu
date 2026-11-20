@@ -17,7 +17,7 @@ export async function startSshFixture(ssh2, directory) {
   const deviceKey = privateKey(keyPassphrase);
   const deviceKeyFile = join(directory, "fixture-private-key");
   await writeFile(deviceKeyFile, deviceKey, { mode: 0o600 });
-  const authorized = ssh2.utils.parseKey(deviceKey, keyPassphrase);
+  const authorized = new Map([["fineshell-key", ssh2.utils.parseKey(deviceKey, keyPassphrase)]]);
   const fingerprint = "SHA256:" + createHash("sha256").update(ssh2.utils.parseKey(hostKey).getPublicSSH())
     .digest("base64").replace(/=+$/, "");
   const counts = { password: 0, publickey: 0 };
@@ -31,16 +31,16 @@ export async function startSshFixture(ssh2, directory) {
   const server = new ssh2.Server({ hostKeys: [hostKey], algorithms }, (client) => {
     client.on("error", () => client.end());
     client.on("authentication", (auth) => {
+      const key = authorized.get(auth.username);
       if (auth.method === "password" && auth.username === "fineshell-password" && auth.password === password) {
         counts.password++;
         auth.accept();
-      } else if (auth.method === "publickey" && auth.username === "fineshell-key" &&
-          auth.key.data.equals(authorized.getPublicSSH())) {
-        if (!auth.signature || authorized.verify(auth.blob, auth.signature, auth.hashAlgo) === true) {
+      } else if (auth.method === "publickey" && key && auth.key.data.equals(key.getPublicSSH())) {
+        if (!auth.signature || key.verify(auth.blob, auth.signature, auth.hashAlgo) === true) {
           if (auth.signature) counts.publickey++;
           auth.accept();
         } else auth.reject(["publickey"]);
-      } else auth.reject([auth.username === "fineshell-key" ? "publickey" : "password"]);
+      } else auth.reject([key ? "publickey" : "password"]);
     });
     client.on("ready", () => client.on("session", (accept) => {
       const session = accept();
@@ -90,6 +90,11 @@ export async function startSshFixture(ssh2, directory) {
   listener.listen(0, "127.0.0.1");
   await once(listener, "listening");
   return { password, keyPassphrase, deviceKeyFile, fingerprint, counts, port: listener.address().port,
+    allowPublicKey: (username, publicKey) => {
+      const key = ssh2.utils.parseKey(publicKey);
+      if (key instanceof Error) throw key;
+      authorized.set(username, key);
+    },
     close: () => new Promise((resolve) => {
       for (const socket of sockets) socket.destroy();
       listener.close(resolve);

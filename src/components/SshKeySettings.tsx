@@ -8,6 +8,7 @@ import {
   Modal,
   Popconfirm,
   Radio,
+  Select,
   Space,
   Table,
   Tooltip,
@@ -22,10 +23,12 @@ import {
 } from "@arco-design/web-react/icon";
 import { isTauri } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { APP_DISPLAY_NAME } from "../application-brand";
 import { diagnosticInvoke as invoke } from "../diagnostics";
 import {
   loadConfiguration,
+  updateConfiguration,
 } from "../config-database";
 import {
   deleteSshKey,
@@ -35,11 +38,13 @@ import {
 } from "../configuration-mutations";
 import { createCredentialReference } from "../credential-registry";
 import type {
+  HostRecord,
   SshKeyFormValues,
   SshKeyRecord,
   SshKeySource,
 } from "../models";
 import { getSshKeySource } from "../ssh-keys";
+import { sshKeyInstallCommand } from "../ssh-key-install";
 import {
   emitProtocolEventTo,
   listenProtocolEvent,
@@ -77,6 +82,11 @@ async function removePassphrase(sshKeyId: string) {
 interface ManagedSshKeyImportResult {
   reference: string;
   keyType: string;
+}
+
+interface GeneratedSshKey {
+  reference: string;
+  publicKey: string;
 }
 
 async function importManagedSshKey(sshKeyId: string, privateKey: string) {
@@ -223,15 +233,24 @@ function SshKeyEditorModal({
 
 function SshKeySettings() {
   const [sshKeys, setSshKeys] = useState<SshKeyRecord[]>([]);
+  const [hosts, setHosts] = useState<HostRecord[]>([]);
   const [usage, setUsage] = useState(new Map<string, number>());
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [editorVisible, setEditorVisible] = useState(false);
   const [editingSshKey, setEditingSshKey] = useState<SshKeyRecord | null>(null);
+  const [generatorOpen, setGeneratorOpen] = useState(false);
+  const [installKey, setInstallKey] = useState<{
+    id: string;
+    name: string;
+    publicKey: string;
+  } | null>(null);
+  const [installHostId, setInstallHostId] = useState<string>();
 
   const refresh = useCallback(async () => {
     const configuration = await loadConfiguration();
     setSshKeys(configuration.sshKeys);
+    setHosts(configuration.hosts);
     const nextUsage = new Map<string, number>();
     for (const host of configuration.hosts) {
       if (host.sshKeyId) {
@@ -282,6 +301,85 @@ function SshKeySettings() {
     await emitProtocolEventTo("main", "configuration:changed").catch(
       () => undefined,
     );
+  };
+
+  const showKeyInstall = useCallback(async (key: SshKeyRecord) => {
+    setActing(true);
+    try {
+      const publicKey = await invoke<string>("managed_ssh_key_public", {
+        reference: key.privateKeyPath,
+      });
+      setInstallHostId(undefined);
+      setInstallKey({ id: key.id, name: key.name, publicKey });
+    } catch (error) {
+      Message.error(String(error));
+    } finally {
+      setActing(false);
+    }
+  }, []);
+
+  const generateSshKey = async ({ name }: { name: string }) => {
+    const keyName = name.trim();
+    if (!keyName || acting) return;
+    const id = createSshKeyId();
+    setActing(true);
+    try {
+      const result = await invoke<GeneratedSshKey>("managed_ssh_key_generate", { keyId: id });
+      let configuration: Awaited<ReturnType<typeof upsertSshKey>>;
+      try {
+        configuration = await upsertSshKey({
+          id,
+          name: keyName,
+          privateKeyPath: result.reference,
+          source: "managed",
+        });
+      } catch (error) {
+        await deleteManagedSshKey(id).catch(() => undefined);
+        throw error;
+      }
+      setSshKeys(configuration.sshKeys);
+      setHosts(configuration.hosts);
+      setGeneratorOpen(false);
+      setInstallHostId(undefined);
+      setInstallKey({ id, name: keyName, publicKey: result.publicKey });
+      await notifyMainWindow();
+    } catch (error) {
+      Message.error(String(error));
+    } finally {
+      setActing(false);
+    }
+  };
+
+  const applyToHost = async () => {
+    if (!installKey || !installHostId || acting) return;
+    const keyId = installKey.id;
+    setActing(true);
+    try {
+      await updateConfiguration((current) => {
+        if (!current.sshKeys.some((key) => key.id === keyId)) {
+          throw new Error("密钥已被删除");
+        }
+        if (!current.hosts.some((host) => host.id === installHostId)) {
+          throw new Error("所选主机已被删除");
+        }
+        return {
+          ...current,
+          hosts: current.hosts.map((host) =>
+            host.id === installHostId
+              ? { ...host, authMethod: "privateKey", sshKeyId: keyId, privateKeyPath: undefined }
+              : host,
+          ),
+        };
+      });
+      setInstallKey(null);
+      Message.success("主机已切换为密钥登录，请新开会话测试");
+      await notifyMainWindow();
+      await refresh();
+    } catch (error) {
+      Message.error(String(error));
+    } finally {
+      setActing(false);
+    }
   };
 
   const saveSshKey = async (values: SshKeyFormValues) => {
@@ -395,11 +493,20 @@ function SshKeySettings() {
       },
       {
         title: "操作",
-        width: 100,
+        width: 176,
         render: (_, sshKey) => {
           const used = (usage.get(sshKey.id) ?? 0) > 0;
           return (
             <Space size="mini">
+              {isTauri() && getSshKeySource(sshKey) === "managed" && (
+                <Button
+                  disabled={acting}
+                  onClick={() => void showKeyInstall(sshKey)}
+                  size="mini"
+                >
+                  安装公钥
+                </Button>
+              )}
               <Button
                 aria-label={`编辑 ${sshKey.name}`}
                 disabled={acting}
@@ -432,12 +539,17 @@ function SshKeySettings() {
         },
       },
     ],
-    [acting, usage],
+    [acting, showKeyInstall, usage],
   );
 
   return (
     <div className="ssh-key-settings">
       <div className="ssh-key-settings-heading">
+        {isTauri() && (
+          <Button disabled={loading || acting} onClick={() => setGeneratorOpen(true)}>
+            生成密钥
+          </Button>
+        )}
         <Button
           disabled={loading || acting}
           icon={<IconPlus />}
@@ -470,6 +582,78 @@ function SshKeySettings() {
           sshKey={editingSshKey}
           visible
         />
+      )}
+      {generatorOpen && (
+        <Modal
+          confirmLoading={acting}
+          footer={null}
+          maskClosable={false}
+          onCancel={() => { if (!acting) setGeneratorOpen(false); }}
+          title="生成 Ed25519 密钥"
+          visible
+        >
+          <Form<{ name: string }> layout="vertical" onSubmit={(values) => void generateSshKey(values)}>
+            <Form.Item field="name" label="密钥名称" rules={[{ required: true }]}>
+              <Input autoFocus maxLength={80} placeholder="例如：我的工作服务器" />
+            </Form.Item>
+            <div className="modal-actions">
+              <Button htmlType="submit" loading={acting} type="primary">生成密钥</Button>
+            </div>
+          </Form>
+        </Modal>
+      )}
+      {installKey && (
+        <Modal
+          footer={null}
+          maskClosable={false}
+          onCancel={() => { if (!acting) setInstallKey(null); }}
+          style={{ width: 620 }}
+          title={`安装公钥 · ${installKey.name}`}
+          visible
+        >
+          <Space direction="vertical" size="medium" style={{ width: "100%" }}>
+            <Typography.Text>
+              用要登录的账号打开服务器终端，粘贴并执行安装命令。完成后用新会话测试密钥登录。
+            </Typography.Text>
+            <Input.TextArea aria-label="OpenSSH 公钥" autoSize readOnly value={installKey.publicKey} />
+            <Space wrap>
+              <Button onClick={() => void writeText(installKey.publicKey)
+                .then(() => Message.success("公钥已复制")).catch((error) => Message.error(String(error)))}>
+                复制公钥
+              </Button>
+              <Button type="primary" onClick={() => void Promise.resolve()
+                .then(() => writeText(sshKeyInstallCommand(installKey.publicKey)))
+                .then(() => Message.success("安装命令已复制")).catch((error) => Message.error(String(error)))}>
+                复制安装命令
+              </Button>
+            </Space>
+            {hosts.length > 0 && (
+              <>
+                <Select
+                  aria-label="选择要使用密钥的主机"
+                  onChange={setInstallHostId}
+                  options={hosts.map((host) => ({
+                    label: `${host.name}（${host.username}@${host.address}）`,
+                    value: host.id,
+                  }))}
+                  placeholder="选择要使用密钥的已保存主机"
+                  showSearch
+                  value={installHostId}
+                />
+                <Button
+                  disabled={!installHostId}
+                  loading={acting}
+                  onClick={() => void applyToHost()}
+                >
+                  已安装，用于此主机
+                </Button>
+              </>
+            )}
+            <Typography.Text type="secondary">
+              启用主机同步后，密钥会随关联的主机端到端加密同步。
+            </Typography.Text>
+          </Space>
+        </Modal>
       )}
     </div>
   );

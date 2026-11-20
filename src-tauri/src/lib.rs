@@ -152,6 +152,8 @@ pub fn run() {
             agent_executor::ai_task_action_execute,
             managed_keys::managed_ssh_key_import,
             managed_keys::managed_ssh_key_delete,
+            managed_keys::managed_ssh_key_generate,
+            managed_keys::managed_ssh_key_public,
             diagnostics::diagnostic_set_level,
             diagnostics::diagnostic_record,
             diagnostics::diagnostic_open_log,
