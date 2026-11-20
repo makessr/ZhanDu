@@ -271,3 +271,5 @@ GitHub 仓库需要配置 Tauri 更新签名私钥 `TAURI_SIGNING_PRIVATE_KEY`�
 ## 开源许可
 
 栈渡以 Apache License 2.0 开源。你可以使用、修改和分发本项目，并需保留许可证及相关版权声明。 [许可证](LICENSE)
+
+本分支验收从栈渡 v0.6.2 到 v0.6.3 的正式应用内升级。

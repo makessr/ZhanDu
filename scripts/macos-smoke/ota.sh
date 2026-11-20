@@ -29,7 +29,7 @@ verify_bundle() {
     codesign --verify --deep --strict "$app"
 }
 
-verify_bundle 0.5.1
+verify_bundle 0.6.2
 swiftc scripts/macos-smoke/verify-window.swift -o "$work/verify-window"
 open -n "$app"
 app_pid="$("$work/verify-window" "$app" 0)"
@@ -43,7 +43,7 @@ test -d "$profile"
 marker="$(uuidgen)"
 printf '%s\n' "$marker" > "$profile/fineshell-ota-test-marker"
 
-for target in 0.6.1 0.6.2; do
+for target in 0.6.3; do
     echo "Requesting update to $target from PID $app_pid."
     osascript scripts/macos-smoke/press-update.applescript "$app_pid"
     for ((attempt=0; attempt<120; attempt++)); do

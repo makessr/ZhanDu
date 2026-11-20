@@ -180,7 +180,7 @@ async function runPublicHops(oldView, bridgeVersion) {
   let view = oldView;
   let current = baseline;
   await evaluate(view, (marker) => localStorage.setItem("fineshell-ota-smoke-marker", marker), marker);
-  for (const version of [bridgeVersion, target]) {
+  for (const version of [bridgeVersion, target].filter(Boolean)) {
     await beginSignedUpdate(view, { route: "direct" }, "GitHub 直连", current, version);
     view = await waitForVersion(version, true);
     assert.equal(await evaluate(view, () => localStorage.getItem("fineshell-ota-smoke-marker")), marker);
@@ -255,7 +255,7 @@ try {
   let newView;
   if (signedUpdateConfig) {
     newView = await runSignedHops(oldView, JSON.parse(await readFile(signedUpdateConfig, "utf8")));
-  } else if (publicBridge) {
+  } else if (publicBridge || process.env.FINESHELL_OTA_PUBLIC_DIRECT === "1") {
     newView = await runPublicHops(oldView, publicBridge);
   } else {
     if (transitionInstaller) {
