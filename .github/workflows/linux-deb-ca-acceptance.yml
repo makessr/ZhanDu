@@ -69,3 +69,4 @@ jobs:
                 curl -fsSL --retry 3 -o /dev/null https://github.com/makessr/ZhanDu/releases/latest/download/latest.json
                 printf "Debian %s / %s installed its trust store and reached the public update feed.\n" "$1" "$2"
               ' bash "$version" "$ARCH"
+          done
