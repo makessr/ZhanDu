@@ -1,6 +1,6 @@
-# FineShell 主机同步服务
+# 栈渡主机同步服务
 
-FineShell 桌面端通过 HTTPS 登录同步服务。服务端用 SQLite 保存账号、登录会话和加密后的主机数据，SSH 凭据在设备端用恢复密钥解锁。
+栈渡桌面端通过 HTTPS 登录同步服务。SQLite 保存邮箱、登录密码的校验哈希、设备会话、加密的主机数据及被加密包裹的主密钥。用户的恢复密钥原文不上传，服务端数据库备份也不包含它。
 
 ## 选择部署方式
 
@@ -17,8 +17,8 @@ FineShell 桌面端通过 HTTPS 登录同步服务。服务端用 SQLite 保存�
 
 ### systemd
 
-1. 安装 Node.js 26，确认 `/opt/fineshell-sync/node/bin/node --version` 显示 `v26.x`，同一目录下也应有 `npm`。如果使用系统安装的 Node.js，请用 `command -v node` 和 `command -v npm` 查到实际路径，相应调整下面的命令以及 [systemd 服务单元](deploy/fineshell-sync.service) 的 `ExecStart`。
-2. 从 FineShell 仓库根目录执行下面的命令。首次安装会从示例创建配置文件，已有配置会保留。
+1. 安装 Node.js 26，确认 `/opt/fineshell-sync/node/bin/node --version` 显示 `v26.x`，同一目录下也应有 `npm`。如果使用系统安装的 Node.js，请用 `command -v node` 和 `command -v npm` 查到实际路径，相应调整下面的命令以及 [systemd 服务单元](deploy/zhandu.service) 的 `ExecStart`。
+2. 从栈渡仓库根目录执行下面的命令。首次安装会从示例创建配置文件，已有配置会保留。
 
 ```bash
 sudo install -d -m 0755 /opt/fineshell-sync
@@ -31,15 +31,15 @@ sudo test -e /etc/fineshell-sync/sync.env ||
   sudo install -m 0600 sync-server/deploy/sync.env.example /etc/fineshell-sync/sync.env
 sudo env PATH=/opt/fineshell-sync/node/bin:/usr/bin:/bin \
   /opt/fineshell-sync/node/bin/npm ci --prefix /opt/fineshell-sync --omit=dev --ignore-scripts
-sudo install -m 0644 sync-server/deploy/fineshell-sync.service /etc/systemd/system/
+sudo install -m 0644 sync-server/deploy/zhandu.service /etc/systemd/system/
 sudo systemctl daemon-reload
 ```
 
 3. 编辑 `/etc/fineshell-sync/sync.env`，根据[注册与邮件配置](#注册与邮件配置)选择注册模式。自用且暂时不创建账号时可设为 `closed`。首次建号可在开放注册期间完成，之后再改为 `closed`。文件保持 root 专用的 `0600` 权限。
-4. 启动服务并确认本机探针返回 `{"service":"fineshell-sync","status":"ok"}`。systemd 会管理数据库目录，默认数据库位于 `/var/lib/fineshell-sync/vault.sqlite`。
+4. 启动服务并确认本机探针返回 `{"service":"zhandu","status":"ok"}`。systemd 会管理数据库目录，默认数据库位于 `/var/lib/fineshell-sync/vault.sqlite`。
 
 ```bash
-sudo systemctl enable --now fineshell-sync
+sudo systemctl enable --now zhandu
 curl -fsS http://127.0.0.1:8787/healthz
 ```
 
@@ -105,15 +105,15 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://sync.example.com/v1/vault
 
 | 现象 | 优先检查 |
 | --- | --- |
-| 本机 8787 无法连接 | systemd 用 `sudo journalctl -u fineshell-sync -n 50 --no-pager`，Compose 用 `docker compose logs --tail 50 sync` |
+| 本机 8787 无法连接 | systemd 用 `sudo journalctl -u zhandu -n 50 --no-pager`，Compose 用 `docker compose logs --tail 50 sync` |
 | 本机正常，公网返回 `404` 或 `502` | 确认请求命中正确的 HTTPS 站点、代理路径和目标 `127.0.0.1:8787` |
 | Cloudflare 返回 `526` | 核对宝塔源站证书的有效期、域名与证书链 |
 | 同步返回 `413` | 检查 Nginx 的 `client_max_body_size`；服务自身接受的同步请求体上限是 8 MiB |
-| 多个人同时登录遇到 `429` | 检查 Nginx 是否识别真实访客 IP，并查看日志中的 `FineShell authentication activity` |
+| 多个人同时登录遇到 `429` | 检查 Nginx 是否识别真实访客 IP，并查看日志中的 `ZhanDu authentication activity` |
 
 ## 升级已有服务
 
-- **systemd**。记录当前部署的源码版本，先做[在线快照](#异机备份与恢复)。从新的源码版本重新执行 [systemd 安装](#systemd)第 2 步，把程序和依赖更新到同一版本。如果修改过单元文件，安装前先合并本地调整。保留 `/etc/fineshell-sync/sync.env` 和 SQLite 数据。执行 `sudo systemctl restart fineshell-sync`，按[上线验证](#上线验证与排错)检查本机和公网。
+- **systemd**。记录当前部署的源码版本，先做[在线快照](#异机备份与恢复)。从新的源码版本重新执行 [systemd 安装](#systemd)第 2 步，把程序和依赖更新到同一版本。如果修改过单元文件，安装前先合并本地调整。保留 `/etc/fineshell-sync/sync.env` 和 SQLite 数据。如果旧单元名称是 `fineshell-sync.service`，先执行 `sudo systemctl disable --now fineshell-sync.service`，再执行 `sudo systemctl enable --now zhandu.service`。已使用 `zhandu.service` 时，执行 `sudo systemctl restart zhandu.service`。按[上线验证](#上线验证与排错)检查本机和公网。
 - **Docker Compose**。先备份现有数据卷中的数据库。从原 Compose 目录更新源码并运行 `docker compose up -d --build`。保留原项目名、`.env` 和现有命名卷，再检查服务日志和健康探针。
 
 升级失败时，先查看服务日志。如果确认上一版程序兼容当前数据库，可用升级前记录的源码版本重新部署程序。需要回退数据时，按[切换到恢复后的数据库](#切换到恢复后的数据库)操作。
@@ -126,7 +126,7 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://sync.example.com/v1/vault
 | `invite` | 管理员发放邀请码，用户填写邮件验证码 | 可登录、同步 |
 | `closed` | 暂停注册 | 可登录、同步 |
 
-改完配置后，systemd 执行 `sudo systemctl restart fineshell-sync`，Compose 执行 `docker compose up -d` 使新的环境变量生效。自建 SMTP 465 使用隐式 TLS，587 使用强制 STARTTLS。两种方式都校验证书。只有邀请注册流程需要发信。
+改完配置后，systemd 执行 `sudo systemctl restart zhandu`，Compose 执行 `docker compose up -d` 使新的环境变量生效。自建 SMTP 465 使用隐式 TLS，587 使用强制 STARTTLS。两种方式都校验证书。邀请注册发送「栈渡邮箱验证」。
 
 ```dotenv
 FINESHELL_SYNC_REGISTRATION=invite
@@ -154,7 +154,7 @@ docker compose exec sync node onboarding.mjs invite user@example.com
 1. 在第一台设备的「主机同步」中创建账号，把生成的恢复密钥保存在密码管理器。
 2. 在另一台设备中输入同一个服务地址、账号密码和恢复密钥。成功后凭据会写入设备的系统凭据库，私钥文件导入本机。首次连接时仍需按提示核对服务器指纹。SSH Agent 中的密钥要在对应设备配置。
 3. 主窗口运行时会自动检查同步，新改动可在设置中点「立即同步」发起同步。不同主机的修改会合并。同一项在两台设备同时修改时，设置中可比较并逐项选择版本。本机找不到某个私钥文件时，其他主机仍会同步，设置会显示受影响条目并提供重新关联入口。
-4. 一个 FineShell 本地配置绑定一个同步账号。退出登录会停止自动同步，已同步的连接仍保留在本机。同步设置可以查看账号的登录设备和最后同步时间，重命名当前设备，并撤销其他设备的登录。
+4. 一个栈渡本地配置绑定一个同步账号。退出登录会停止自动同步，已同步的连接仍保留在本机。同步设置可以查看账号的登录设备和最后同步时间，重命名当前设备，并撤销其他设备的登录。
 
 同步包括已保存的主机、分组、关联代理与 SSH 密钥，以及已经保存的对应密码或口令。连接历史、服务器指纹信任、应用设置和终端记录保留在各设备。恢复密钥丢失后，账号密码无法解密远端主机数据。
 

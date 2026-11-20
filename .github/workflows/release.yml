@@ -298,7 +298,7 @@ jobs:
         run: |
           set -o pipefail
           curl --fail --silent --show-error --max-time 15 "$SYNC_HEALTH_URL" |
-            jq -e '.service == "fineshell-sync" and .status == "ok"'
+            jq -e '(.service == "zhandu" or .service == "fineshell-sync") and .status == "ok"'
       - name: Save release notes and report the draft
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

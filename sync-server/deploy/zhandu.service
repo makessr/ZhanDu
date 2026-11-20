@@ -1,5 +1,5 @@
 [Unit]
-Description=FineShell account sync
+Description=栈渡主机同步
 After=network.target
 
 [Service]

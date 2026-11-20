@@ -231,7 +231,7 @@ export function createSyncServer(databasePath, options = {}) {
     pruneSessions.run(now);
     const token = randomBytes(32).toString("base64url");
     createSession.run(hashToken(token), accountId, now + sessionLifetime,
-      randomBytes(16).toString("hex"), deviceName || "FineShell");
+      randomBytes(16).toString("hex"), deviceName || "栈渡");
     return { accountId, token };
   }
 
@@ -243,7 +243,7 @@ export function createSyncServer(databasePath, options = {}) {
       }
       if (method === "GET" && url === "/healthz") {
         db.prepare("SELECT 1 FROM accounts LIMIT 1").get();
-        send(response, 200, { service: "fineshell-sync", status: "ok" });
+        send(response, 200, { service: "zhandu", status: "ok" });
         return;
       }
       if (url === "/v1/registration" && method === "GET") {
@@ -280,7 +280,7 @@ export function createSyncServer(databasePath, options = {}) {
         send(response, 200, {});
       } else if (url === "/v1/devices" && method === "GET") {
         send(response, 200, listDevices.all(session.account_id, Date.now()).map((item) => ({
-          id: item.device_id, name: item.device_name || "FineShell",
+          id: item.device_id, name: item.device_name || "栈渡",
           current: item.device_id === session.device_id,
           lastSyncAt: item.last_sync_at, expiresAt: item.expires_at,
         })));
@@ -371,7 +371,7 @@ export function createSyncServer(databasePath, options = {}) {
       if (bucket.expires <= now) sourceAttempts.delete(source);
     }
     if (registrations >= 10 || throttled >= 20) {
-      console.warn("FineShell authentication activity", JSON.stringify({ registrations, throttled, windowSeconds: 60 }));
+      console.warn("ZhanDu authentication activity", JSON.stringify({ registrations, throttled, windowSeconds: 60 }));
     }
     registrations = 0;
     throttled = 0;
@@ -398,7 +398,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     trustLoopbackProxy: process.env.FINESHELL_SYNC_TRUST_LOOPBACK_PROXY === "1",
   });
   server.listen(port, host, () => {
-    console.log(`FineShell sync listening on ${host}:${port}`);
+    console.log(`ZhanDu sync listening on ${host}:${port}`);
   });
   process.once("SIGTERM", () => server.close());
   process.once("SIGINT", () => server.close());
