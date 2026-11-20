@@ -1,0 +1,55 @@
+name: Audit signed v0.6.3 draft
+
+on:
+  push:
+    branches: [test/audit-v063-draft]
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      TAG: v0.6.3
+      RELEASE_SHA: bde7f58f819b25923f45d5da73975a1c372cdba1
+      SIGNER_REF: v0.6.2
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '26'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Verify release provenance and asset signatures
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/contents/src-tauri/tauri.conf.json?ref=$SIGNER_REF" --jq '.content' |
+            base64 -d > "$RUNNER_TEMP/signer.json"
+          public_key="$(jq -r .plugins.updater.pubkey "$RUNNER_TEMP/signer.json")"
+          jq -e --arg key "$public_key" '.plugins.updater.pubkey == $key' src-tauri/tauri.conf.json
+          id="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json databaseId --jq .databaseId)"
+          gh api "repos/$GITHUB_REPOSITORY/releases/$id" > "$RUNNER_TEMP/release.json"
+          jq -e --arg tag "$TAG" --arg sha "$RELEASE_SHA" '
+            .draft and .tag_name == $tag and .target_commitish == $sha and (.body | contains("CA 证书依赖"))
+          ' "$RUNNER_TEMP/release.json"
+          test "$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)" = "$SIGNER_REF"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/assets"
+          cargo build --locked --manifest-path scripts/verify-release-signature/Cargo.toml --target-dir "$RUNNER_TEMP/verifier"
+          node scripts/verify-draft-release.mjs "$RUNNER_TEMP/assets" "$RUNNER_TEMP/release.json" \
+            "$RUNNER_TEMP/signer.json" "$RUNNER_TEMP/verifier/debug/verify-release-signature" \
+            "$GITHUB_REPOSITORY" "$TAG" "$RELEASE_SHA"
+      - name: Verify CA dependency in both signed Debian packages
+        shell: bash
+        run: |
+          for arch in amd64 arm64; do
+            package="$RUNNER_TEMP/assets/FineShell_0.6.3_linux_$arch.deb"
+            test "$(dpkg-deb -f "$package" Architecture)" = "$arch"
+            test "$(dpkg-deb -f "$package" Version)" = 0.6.3
+            dpkg-deb -f "$package" Depends | tr ',' '\n' | grep -E '^ *ca-certificates$'
+            printf '%s: signed Debian package declares the system CA dependency.\n' "$arch"
+          done
