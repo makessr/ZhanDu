@@ -13,5 +13,12 @@
         "dragDropEnabled": true
       }
     ]
+  },
+  "bundle": {
+    "linux": {
+      "deb": {
+        "depends": ["ca-certificates"]
+      }
+    }
   }
 }
