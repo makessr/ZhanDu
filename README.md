@@ -323,6 +323,7 @@ SFTP 大目录预览会分批显示最先读取的项目，最多预览 1,024 �
 GitHub 仓库需要配置 Tauri 更新签名私钥 `TAURI_SIGNING_PRIVATE_KEY`。完整架构与失败重试方式见 [发布流水线文档](docs/release-pipeline.md)。
 
 发布构建在 Actions 保存各架构的 Cargo 计时报告，便于查找 Rust 编译瓶颈。
+macOS Intel 安装包在 Apple Silicon 运行器上交叉编译，安装与应用内升级在 Intel 运行器上验收。
 
 公开草稿前，在 Actions 运行 `Audit release assets`。它用当前公开版的验签公钥核验各平台更新包，同时核对发布提交、产物 SHA-256 和更新清单。[草稿验收步骤](docs/release-pipeline.md#草稿产物验收)
 

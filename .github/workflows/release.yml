@@ -92,7 +92,7 @@ jobs:
           RELEASE_MATRIX: >-
             [
               {"name":"macOS Apple Silicon","platform":"macos-latest","rustTargets":"aarch64-apple-darwin","args":"--target aarch64-apple-darwin --bundles app,dmg","appleSigningIdentity":"-"},
-              {"name":"macOS Intel","platform":"macos-15-intel","rustTargets":"x86_64-apple-darwin","args":"--target x86_64-apple-darwin --bundles app,dmg","appleSigningIdentity":"-"},
+                {"name":"macOS Intel","platform":"macos-latest","rustTargets":"x86_64-apple-darwin","args":"--target x86_64-apple-darwin --bundles app,dmg","appleSigningIdentity":"-","rustCacheKey":"macos-intel-cross"},
               {"name":"Linux x64","platform":"ubuntu-22.04","rustTargets":"","args":"--bundles deb","appleSigningIdentity":""},
               {"name":"Linux ARM64","platform":"ubuntu-22.04-arm","rustTargets":"aarch64-unknown-linux-gnu","args":"--target aarch64-unknown-linux-gnu --bundles deb","appleSigningIdentity":""},
               {"name":"Windows x64","platform":"windows-latest","rustTargets":"","args":"--bundles nsis,msi","appleSigningIdentity":""},
@@ -186,6 +186,7 @@ jobs:
           targets: ${{ matrix.rustTargets }}
       - uses: Swatinem/rust-cache@v2
         with:
+          key: ${{ matrix.rustCacheKey }}
           workspaces: src-tauri -> target
       - name: Install frontend dependencies
         run: bun install --frozen-lockfile
@@ -220,7 +221,7 @@ jobs:
           path: src-tauri/target/cargo-timings/cargo-timing.html
           retention-days: 7
           if-no-files-found: ignore
-      - name: Verify macOS binary dependencies
+      - name: Verify macOS binary architecture and dependencies
         if: startsWith(matrix.platform, 'macos-')
         shell: bash
         env:
@@ -231,6 +232,16 @@ jobs:
           binary="src-tauri/target/$RUST_TARGET/release/fineshell"
           if [[ ! -x "$binary" ]]; then
             echo "macOS application binary not found: $binary" >&2
+            exit 1
+          fi
+          case "$RUST_TARGET" in
+            aarch64-apple-darwin) expected_arch=arm64 ;;
+            x86_64-apple-darwin) expected_arch=x86_64 ;;
+            *) echo "Unexpected macOS target: $RUST_TARGET" >&2; exit 1 ;;
+          esac
+          actual_arch="$(lipo -archs "$binary")"
+          if [[ "$actual_arch" != "$expected_arch" ]]; then
+            echo "Expected $expected_arch, found $actual_arch in $binary" >&2
             exit 1
           fi
 
