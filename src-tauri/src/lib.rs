@@ -154,6 +154,7 @@ pub fn run() {
             managed_keys::managed_ssh_key_delete,
             managed_keys::managed_ssh_key_generate,
             managed_keys::managed_ssh_key_public,
+            managed_keys::ssh_private_key_identity,
             diagnostics::diagnostic_set_level,
             diagnostics::diagnostic_record,
             diagnostics::diagnostic_open_log,

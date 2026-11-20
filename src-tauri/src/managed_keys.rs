@@ -7,7 +7,7 @@ use std::{
 };
 
 use serde::Serialize;
-use ssh_key::{Algorithm, LineEnding, PrivateKey};
+use ssh_key::{Algorithm, HashAlg, LineEnding, PrivateKey};
 use tauri::{AppHandle, Manager};
 
 use crate::protocol::{CommandError, CommandResult};
@@ -30,6 +30,27 @@ pub(crate) struct ManagedSshKeyImportResult {
 pub(crate) struct GeneratedSshKey {
     reference: String,
     public_key: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SshPrivateKeyIdentity {
+    public_key: String,
+    fingerprint: String,
+}
+
+#[tauri::command]
+pub(crate) fn ssh_private_key_identity(reference: String) -> CommandResult<SshPrivateKeyIdentity> {
+    let read = || {
+        let contents = read_sync_key(&reference)?;
+        let private = PrivateKey::from_openssh(contents.as_bytes())
+            .map_err(|_| "仅支持识别 OpenSSH 格式的私钥".to_string())?;
+        Ok::<_, String>(SshPrivateKeyIdentity {
+            public_key: encode_public_key(&private)?,
+            fingerprint: private.public_key().fingerprint(HashAlg::Sha256).to_string(),
+        })
+    };
+    read().map_err(|error| CommandError::from_message("ssh_private_key_identity", error))
 }
 
 #[tauri::command]

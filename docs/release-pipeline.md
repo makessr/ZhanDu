@@ -1,10 +1,10 @@
 # 发布流水线
 
-FineShell 将版本准备与跨平台构建拆成两个 GitHub Actions 工作流：
+栈渡将版本准备与跨平台构建拆成两个 GitHub Actions 工作流：
 
 1. `Prepare Release` 根据 `patch`、`minor` 或 `major` 自动升级所有版本文件。
 2. 工作流将 `CHANGELOG.md` 的 `Unreleased` 内容归档到新版本，并创建 `fix/release-vX.Y.Z` Pull Request。
-3. 发布 PR 合并到 `main` 后，`Release` 自动校验版本和发布说明并创建 Draft Release。
+3. 发布 PR 合并到 `main` 后，`Release` 校验版本和发布说明，创建标题为「栈渡 vX.Y.Z」的 Release 草稿。
 4. 工作流并行构建 macOS、Linux 和 Windows 安装包及更新签名。
 5. 工作流规范化并校验 `latest.json`，保存发布说明，并在运行摘要中提供草稿链接。
 6. 维护者运行 `Audit release assets` 并完成客户端验收后，从 GitHub Releases 手动公开版本。
@@ -63,6 +63,8 @@ GitHub Actions 需要配置仓库密钥 `TAURI_SIGNING_PRIVATE_KEY`，用于生�
 
 Windows ARM64 的实测比较了三套独立运行器。恢复 Bun 软件包缓存并安装依赖的两次耗时约 90 秒和 123 秒，直接安装约 100 秒。发布流程继续使用冻结锁文件安装依赖。[Windows ARM64 缓存对照](https://github.com/makessr/ZhanDu/actions/runs/44758275558)
 
+Windows ARM64 可以分别缓存内置 OpenSSL 的头文件和静态库。缓存按锁定的 OpenSSL 源、Rust 工具链和 Windows 运行器镜像区分，并校验头文件版本。已有 Cargo 构建产物时沿用 Cargo 缓存。两个缓存都缺失时，从锁定源码构建并在成功后保存库文件。
+
 在 GitHub Actions 打开 `Audit release assets`，选择 `main` 分支运行。
 
 | 输入 | 填写方式 |
@@ -76,6 +78,10 @@ Windows ARM64 的实测比较了三套独立运行器。恢复 Bun 软件包缓�
 流程核对发布提交及客户端公钥，逐件计算 SHA-256，验证更新包的 Tauri 签名和 `latest.json` 的平台、下载地址及签名，并检查 Debian 包的架构、版本与 CA 证书依赖。macOS 的 DMG 参与哈希核对，Tauri 签名验收使用实际 OTA 下载的 `.app.tar.gz`。
 
 验收仅访问现有发布数据。草稿的说明、产物或目标提交在验收后有改动时，公开前重新运行。签名轮换需要单独验证过渡路径。发布仍由维护者手动操作。
+
+## 公开渠道升级验收
+
+正式版公开后，在 GitHub Actions 运行 `Verify public OTA`，输入 `baseline` 和 `target`，例如 `0.8.0` 和 `0.9.0`。目标必须是当前公开更新频道提供的正式版。流程校验起始安装包的 SHA-256，并在 Windows x64/ARM64、macOS Intel/Apple Silicon、Debian 12/13 XFCE x64/ARM64 的测试环境中走应用内升级。所有环境核对升级版本及配置标记，Windows 同时复验已保存的密码和私钥能否登录本机 SSH 测试服务。
 
 ## macOS 首次安装验收
 
