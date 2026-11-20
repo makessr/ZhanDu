@@ -5,6 +5,7 @@ import {
   type FineShellConfiguration,
 } from "./config-database";
 import { createDeletedHostRecord } from "./configuration-mutations";
+import { authenticateOpaque, enrollOpaque } from "./host-sync-auth";
 import {
   connectionTargetKey,
   createCredentialReference,
@@ -23,6 +24,7 @@ export interface HostSyncAccount {
   accountId: string;
   email: string;
   server: string;
+  opaque?: boolean;
 }
 
 interface HostSyncConfiguration {
@@ -82,11 +84,19 @@ export function hostSyncDevices(accountId: string, revoke?: string, rename?: str
   return invoke<HostSyncDevice[]>("host_sync_devices", { accountId, revoke, rename });
 }
 
-export async function rotateHostSyncKey(accountId: string, recoveryKey: string, accountPassword: string) {
+export async function rotateHostSyncKey(account: HostSyncAccount, recoveryKey: string, accountPassword: string) {
   const { hostSyncBase } = await loadConfiguration();
   if (!hostSyncBase) throw new Error("请先完成一次同步，再更换主密码");
+  if (recoveryKey === accountPassword) throw new Error("账号密码和主密码必须不同");
+  const capabilities = await hostSyncRegistration(account.server);
+  if (!account.opaque && capabilities.opaquePublicKey) throw new Error("请先迁移旧账号认证，再更换主密码");
+  const auth = capabilities.opaquePublicKey
+    ? await authenticateOpaque({ server: account.server, email: account.email, password: accountPassword,
+      publicKey: capabilities.opaquePublicKey })
+    : undefined;
   const replacement = await invoke<object>("host_sync_rotate_key", {
-    accountId, base: JSON.parse(hostSyncBase), recoveryKey, accountPassword,
+    accountId: account.accountId, base: JSON.parse(hostSyncBase), recoveryKey, accountPassword,
+    opaqueReauthToken: auth?.token,
   });
   await updateConfiguration((current) => current.hostSyncBase === hostSyncBase
     ? { ...current, hostSyncBase: JSON.stringify(replacement) }
@@ -94,8 +104,18 @@ export async function rotateHostSyncKey(accountId: string, recoveryKey: string, 
   void requestHostSync({ manual: true }).catch(() => undefined);
 }
 
-export function hostSyncRegistration(server: string) {
-  return invoke<{ mode: "open" | "invite" | "closed"; masterPassword?: boolean }>("host_sync_registration", { server });
+export async function hostSyncRegistration(server: string) {
+  const info = await invoke<{
+    mode: "open" | "invite" | "closed";
+    masterPassword?: boolean;
+    opaquePublicKey?: string;
+    passwordRecovery?: boolean;
+  }>("host_sync_registration", { server });
+  const pinName = "zhandu.hostSync.opaque." + new URL(server.trim()).origin;
+  const pinned = localStorage.getItem(pinName);
+  if (pinned && pinned !== info.opaquePublicKey) throw new Error("同步服务器的认证公钥已变化或新认证不可用");
+  if (info.opaquePublicKey && !pinned) localStorage.setItem(pinName, info.opaquePublicKey);
+  return info;
 }
 
 export function sendHostSyncVerification(server: string, email: string, inviteCode: string) {
@@ -145,17 +165,47 @@ export async function signInToHostSync(values: {
   useMasterPassword?: boolean;
   registrationId?: string;
   register: boolean;
+  legacyLogin?: boolean;
   deviceName: string;
   proof?: { inviteCode: string; verificationCode: string };
 }) {
   const boundAccount = localStorage.getItem(bindingKey);
-  const account = await invoke<HostSyncAccount>("host_sync_login", {
-    ...values,
-    boundAccount,
-  });
+  const { server, email, deviceName, password, recoveryKey, register, legacyLogin } = values;
+  if (password === recoveryKey) throw new Error("账号密码与主密码或恢复密钥必须不同");
+  const { opaquePublicKey } = await hostSyncRegistration(server);
+  let account: HostSyncAccount;
+  if (opaquePublicKey) {
+    const credentials = { server, email, password, deviceName, publicKey: opaquePublicKey };
+    let session;
+    if (register) {
+      if (!values.registrationId) throw new Error("注册标识无效");
+      const vault = await invoke<object>("host_sync_prepare_vault", {
+        accountId: values.registrationId, masterPassword: recoveryKey,
+      });
+      session = await enrollOpaque<{ accountId: string; token: string }>(credentials, {
+        flow: "register", accountId: values.registrationId, vault, proof: values.proof,
+      });
+    } else if (legacyLogin) {
+      session = await enrollOpaque<{ accountId: string; token: string }>(credentials, { flow: "upgrade" });
+    } else {
+      session = await authenticateOpaque(credentials);
+    }
+    account = await invoke<HostSyncAccount>("host_sync_accept_login", {
+      server, email, recoveryKey, boundAccount, ...session,
+    });
+  } else {
+    if (!register && !legacyLogin) throw new Error("此同步服务仅支持旧版认证，请确认后选择兼容登录");
+    account = await invoke<HostSyncAccount>("host_sync_login", { ...values, boundAccount });
+  }
   localStorage.setItem(bindingKey, account.accountId);
   void requestHostSync({ manual: true }).catch(() => undefined);
   return account;
+}
+
+export async function resetHostSyncPassword(server: string, email: string, code: string, password: string) {
+  const { opaquePublicKey, passwordRecovery } = await hostSyncRegistration(server);
+  if (!opaquePublicKey || !passwordRecovery) throw new Error("同步服务未启用邮箱找回");
+  await enrollOpaque<object>({ server, email, password, publicKey: opaquePublicKey }, { flow: "recovery", code });
 }
 
 export async function signOutOfHostSync() {

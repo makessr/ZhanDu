@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Alert, Button, Input, Message, Popconfirm, Space, Typography } from "@arco-design/web-react";
+import { Alert, Button, Checkbox, Input, Message, Popconfirm, Space, Typography } from "@arco-design/web-react";
 import { isTauri } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { APP_DISPLAY_NAME } from "../application-brand";
+import { requestPasswordRecovery } from "../host-sync-auth";
 import { commandErrorMessage } from "../tauri-protocol";
 import {
   hostSyncAccount,
@@ -19,6 +20,7 @@ import {
   isHostSyncStorageEvent,
   readHostSyncStatus,
   requestHostSync,
+  resetHostSyncPassword,
   signInToHostSync,
   signOutOfHostSync,
   type HostSyncAccount,
@@ -42,6 +44,12 @@ export default function HostSyncSettings() {
   const [renameDevice, setRenameDevice] = useState<string | null>(null);
   const [registrationMode, setRegistrationMode] = useState<"open" | "invite" | "closed" | null>(null);
   const [masterPasswordSupported, setMasterPasswordSupported] = useState(false);
+  const [opaqueEnabled, setOpaqueEnabled] = useState(false);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [legacyLogin, setLegacyLogin] = useState(false);
+  const [migrateActive, setMigrateActive] = useState(false);
+  const [recovering, setRecovering] = useState(false);
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const registrationAttempt = useRef<{ server: string; email: string; id: string } | null>(null);
   const inviteRequired = registrationMode === "invite";
   const [inviteCode, setInviteCode] = useState("");
@@ -101,13 +109,15 @@ export default function HostSyncSettings() {
   }, [accountId, status?.signInRequired]);
 
   useEffect(() => {
-    if (!register || !server.trim()) return;
+    if (!isTauri() || !server.trim()) return;
     let current = true;
     const timer = window.setTimeout(() => {
-      void hostSyncRegistration(server).then(({ mode, masterPassword }) => {
+      void hostSyncRegistration(server).then(({ mode, masterPassword, opaquePublicKey, passwordRecovery }) => {
         if (current) {
           setRegistrationMode(mode);
           setMasterPasswordSupported(masterPassword === true);
+          setOpaqueEnabled(Boolean(opaquePublicKey));
+          setPasswordRecovery(passwordRecovery === true);
         }
       }).catch((error) => {
         if (current) Message.error(commandErrorMessage(error));
@@ -176,6 +186,7 @@ export default function HostSyncSettings() {
     setConfirmedKey("");
     setRegistrationMode(null);
     setMasterPasswordSupported(false);
+    setLegacyLogin(false);
     setInviteCode("");
     setVerificationCode("");
     setRegister(next);
@@ -193,15 +204,18 @@ export default function HostSyncSettings() {
       const attempt = registrationAttempt.current;
       if (useMasterPassword && (!attempt || attempt.server !== server || attempt.email !== normalizedEmail)) {
         registrationAttempt.current = {
-          server, email: normalizedEmail, id: crypto.randomUUID().replace(/-/g, ""),
+          server, email: normalizedEmail,
+          id: Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join(""),
         };
       }
       const registrationId = useMasterPassword ? registrationAttempt.current?.id : undefined;
       setAccount(await signInToHostSync({
         server, email, password, recoveryKey, register, deviceName, proof,
-        useMasterPassword, registrationId,
+        useMasterPassword, registrationId, legacyLogin,
       }));
       registrationAttempt.current = null;
+      setMigrateActive(false);
+      setLegacyLogin(false);
       setInviteCode("");
       setVerificationCode("");
       setStatus(null);
@@ -218,10 +232,10 @@ export default function HostSyncSettings() {
   }
 
   async function rotateKey() {
-    if (!accountId) return;
+    if (!account) return;
     setBusy(true);
     try {
-      await rotateHostSyncKey(accountId, replacementKey, rotationAccountPassword);
+      await rotateHostSyncKey(account, replacementKey, rotationAccountPassword);
       setReplacementKey("");
       setChangingPassword(false);
       setConfirmedKey("");
@@ -231,6 +245,45 @@ export default function HostSyncSettings() {
       Message.error(commandErrorMessage(error));
     } finally {
       setRotationAccountPassword("");
+      setBusy(false);
+    }
+  }
+
+  function switchRecovery(next: boolean) {
+    setRecovering(next);
+    setPassword("");
+    setPasswordConfirmation("");
+    setVerificationCode("");
+    setRecoveryKey("");
+    setLegacyLogin(false);
+  }
+
+  async function sendRecoveryCode() {
+    setSendingCode(true);
+    try {
+      await requestPasswordRecovery(server, email);
+      Message.success("如果该邮箱关联有效账号，重设验证码将发送到邮箱");
+    } catch (error) {
+      Message.error(commandErrorMessage(error));
+    } finally {
+      setSendingCode(false);
+    }
+  }
+
+  async function submitRecovery(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (password.length < 12 || password !== passwordConfirmation || !verificationCode.trim()) return;
+    setBusy(true);
+    try {
+      await resetHostSyncPassword(server, email, verificationCode.trim(), password);
+      switchRecovery(false);
+      if (account) setStatus({ state: "failed", signInRequired: true, message: "账号密码已重设，请使用新密码重新登录。" });
+      Message.success("账号密码已重设，请重新登录。主密码与已有主机数据保持原样。");
+    } catch (error) {
+      Message.error(commandErrorMessage(error));
+    } finally {
+      setPassword("");
+      setPasswordConfirmation("");
       setBusy(false);
     }
   }
@@ -256,7 +309,7 @@ export default function HostSyncSettings() {
   if (!isTauri()) return <Alert content={`请在${APP_DISPLAY_NAME}桌面应用中使用主机同步。`} />;
   if (loading) return <Typography.Text>正在读取同步账号…</Typography.Text>;
 
-  if (account && !status?.signInRequired) {
+  if (account && !status?.signInRequired && !migrateActive && !recovering) {
     return (
       <Space direction="vertical" size="large">
         <Typography.Text>{account.email}</Typography.Text>
@@ -271,6 +324,12 @@ export default function HostSyncSettings() {
           <Button type="primary" onClick={() => sync()}>立即同步</Button>
           <Button disabled={busy || changingPassword} onClick={() => void signOut()}>退出登录</Button>
           {!changingPassword && <Button disabled={busy} onClick={() => setChangingPassword(true)}>设置或更换主密码</Button>}
+          {opaqueEnabled && !account.opaque && <Button disabled={busy || changingPassword}
+            onClick={() => { setMigrateActive(true); setLegacyLogin(true); }}>
+            迁移旧账号认证
+          </Button>}
+          {passwordRecovery && <Button disabled={busy || changingPassword}
+            onClick={() => switchRecovery(true)}>忘记账号密码</Button>}
         </Space>
         {changingPassword && <Space direction="vertical">
           <Alert type="warning" content="主密码至少 16 个字符，与账号密码不同。更换后其他设备需要重新登录，已经导出的旧快照仍可能由旧密码或旧密钥解开。" />
@@ -369,22 +428,45 @@ export default function HostSyncSettings() {
   }
 
   return (
-    <form onSubmit={submit}>
+    <form onSubmit={recovering ? submitRecovery : submit}>
       <Space direction="vertical" size="medium" style={{ width: "100%" }}>
         <Typography.Paragraph>
-          登录后自动同步已保存的主机、分组和相关凭据。新设备首次登录时使用恢复密钥解锁。
+          登录后自动同步已保存的主机、分组和相关凭据。新设备首次登录时用主密码或旧恢复密钥解锁。
         </Typography.Paragraph>
         {status?.signInRequired && <Alert type="warning" content={status.message} />}
         <label>
           同步服务地址
-          <Input value={server} onChange={(value) => { setRegistrationMode(null); setServer(value); }}
+          <Input value={server} disabled={recovering || migrateActive} onChange={(value) => {
+            setRegistrationMode(null); setOpaqueEnabled(false); setPasswordRecovery(false); setLegacyLogin(false); setServer(value);
+          }}
             placeholder="https://sync.example.com" />
         </label>
         <label>
           邮箱
-          <Input value={email} onChange={(value) => { setEmail(value); setVerificationCode(""); }}
+          <Input value={email} disabled={migrateActive || (recovering && Boolean(account))}
+            onChange={(value) => { setEmail(value); setVerificationCode(""); }}
             autoComplete="username" />
         </label>
+        {recovering ? <>
+          <Alert content="邮箱验证只能重设账号密码。解锁主机数据仍需要主密码、旧恢复密钥或本机保存的密钥。" />
+          <Space>
+            <label>邮箱验证码
+              <Input value={verificationCode} onChange={setVerificationCode} autoComplete="one-time-code" />
+            </label>
+            <Button loading={sendingCode} disabled={busy || !email.trim()} onClick={() => void sendRecoveryCode()}>发送验证码</Button>
+          </Space>
+          <label>新账号密码
+            <Input.Password value={password} onChange={setPassword} minLength={12} autoComplete="new-password" />
+          </label>
+          <label>再次输入账号密码
+            <Input.Password value={passwordConfirmation} onChange={setPasswordConfirmation} autoComplete="new-password" />
+          </label>
+          <Space>
+            <Button type="primary" htmlType="submit" loading={busy}
+              disabled={!verificationCode.trim() || password.length < 12 || password !== passwordConfirmation}>重设账号密码</Button>
+            <Button disabled={busy || sendingCode} onClick={() => switchRecovery(false)}>返回登录</Button>
+          </Space>
+        </> : <>
         <label>
           设备名称
           <Input value={deviceName} onChange={setDeviceName} maxLength={80} placeholder="例如 Windows 台式机" />
@@ -434,18 +516,25 @@ export default function HostSyncSettings() {
           </>
         ) : (
           <label>
-            主密码或旧恢复密钥
+            {account ? "主密码或旧恢复密钥（留空使用本机保存的密钥）" : "主密码或旧恢复密钥"}
             <Input.Password value={recoveryKey} onChange={setRecoveryKey} autoComplete="off" />
           </label>
         )}
+        {!register && !migrateActive && <Checkbox checked={legacyLogin} onChange={setLegacyLogin}>
+          {opaqueEnabled ? "旧账号首次迁移" : "确认使用旧版账号认证"}
+        </Checkbox>}
+        {!register && legacyLogin && <Alert type="warning" content={
+          opaqueEnabled ? "迁移时会通过 HTTPS 向当前同步服务验证一次旧账号密码。" : "旧版认证通过 HTTPS 将账号密码交给同步服务验证。"
+        } />}
         <Space>
           <Button type="primary" htmlType="submit" loading={busy}
-            disabled={!server || !email || password.length < 12 || !recoveryKey ||
+            disabled={!server || !email || password.length < 12 || (!recoveryKey && (register || !account)) ||
+              (!register && !opaqueEnabled && !legacyLogin) ||
               (register && (registrationMode === null || registrationMode === "closed" ||
                 (masterPasswordSupported && (!validMasterPassword(recoveryKey) || recoveryKey === password)) ||
                 recoveryKey !== (masterPasswordSupported ? confirmedKey : confirmedKey.trim()) ||
                 (inviteRequired && (!inviteCode.trim() || !verificationCode.trim()))))}>
-            {register ? "创建账号并同步" : "登录并同步"}
+            {register ? "创建账号并同步" : opaqueEnabled && legacyLogin ? "迁移并登录" : "登录并同步"}
           </Button>
           {!hostSyncIsBound() && (
             <Button disabled={busy} onClick={() => changeMode(!register)}>
@@ -453,7 +542,10 @@ export default function HostSyncSettings() {
             </Button>
           )}
           {account && <Button loading={busy} onClick={() => void signOut()}>退出登录</Button>}
+          {!register && !migrateActive && passwordRecovery && <Button disabled={busy} onClick={() => switchRecovery(true)}>忘记账号密码</Button>}
+          {migrateActive && <Button disabled={busy} onClick={() => { setMigrateActive(false); setLegacyLogin(false); setPassword(""); }}>取消迁移</Button>}
         </Space>
+        </>}
       </Space>
     </form>
   );

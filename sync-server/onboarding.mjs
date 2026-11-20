@@ -100,11 +100,11 @@ export function createOnboarding(db, { registration = "open", sendVerification }
   };
 }
 
-function verificationText(code) {
-  return "请在栈渡注册窗口输入以下验证码，15 分钟内有效。\n\n" + code;
+function verificationMail(code, purpose) {
+  return purpose === "recovery"
+    ? { subject: "栈渡账号密码重设", text: "请在栈渡账号找回窗口输入以下验证码，15 分钟内有效。\n\n" + code }
+    : { subject: "栈渡邮箱验证", text: "请在栈渡注册窗口输入以下验证码，15 分钟内有效。\n\n" + code };
 }
-
-const verificationSubject = "栈渡邮箱验证";
 
 export function createVerificationMailer(env, createTransport = nodemailer.createTransport) {
   const provider = env.FINESHELL_SYNC_MAIL_PROVIDER || "resend";
@@ -126,10 +126,10 @@ export function createVerificationMailer(env, createTransport = nodemailer.creat
     socketTimeout: 8_000,
     tls: { minVersion: "TLSv1.2" },
   });
-  return async (email, code) => {
+  return async (email, code, purpose) => {
     const result = await transport.sendMail({
       from: { name: "栈渡", address: from }, to: { address: email, name: "" },
-      subject: verificationSubject, text: verificationText(code),
+      ...verificationMail(code, purpose),
     });
     if (!result.accepted.length) throw new Error("No accepted recipient");
   };
@@ -138,7 +138,7 @@ export function createVerificationMailer(env, createTransport = nodemailer.creat
 function createMailSender(from, apiKey) {
   if (!from || !apiKey) throw new Error("Set FINESHELL_SYNC_MAIL_FROM and FINESHELL_SYNC_RESEND_API_KEY");
   const sender = normalizedEmail(from) ? `栈渡 <${from}>` : from;
-  return async (email, code) => {
+  return async (email, code, purpose) => {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -147,8 +147,7 @@ function createMailSender(from, apiKey) {
         "user-agent": "ZhanDu Sync",
       },
       body: JSON.stringify({
-        from: sender, to: [email], subject: verificationSubject,
-        text: verificationText(code),
+        from: sender, to: [email], ...verificationMail(code, purpose),
       }),
       redirect: "error",
       signal: AbortSignal.timeout(8_000),

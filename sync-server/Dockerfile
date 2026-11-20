@@ -3,7 +3,7 @@ FROM node:26-bookworm-slim
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts
-COPY server.mjs onboarding.mjs ./
+COPY server.mjs onboarding.mjs auth-v2.mjs ./
 COPY deploy/backup-snapshot.mjs deploy/portable-backup.mjs ./
 RUN mkdir /data && chown node:node /data
 USER node

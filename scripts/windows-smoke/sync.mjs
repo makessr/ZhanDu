@@ -5,6 +5,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import * as opaque from "@serenity-kit/opaque";
 import { createSyncServer } from "../../sync-server/server.mjs";
 import { evaluate, findWindow, invoke, until } from "./webview.mjs";
 import { startSshFixture } from "./ssh-fixture.mjs";
@@ -81,13 +82,6 @@ function fill(view, values) {
   }, values));
 }
 
-async function readKey(view, text) {
-  return until("Generated recovery key", () => evaluate(view, (text) => {
-    const label = [...document.querySelectorAll("label")].find((item) => item.textContent.trim() === text);
-    return label?.querySelector("input")?.value;
-  }, text));
-}
-
 try {
   const a = await findWindow(portA, "main");
   const b = await findWindow(portB, "main");
@@ -101,7 +95,12 @@ try {
     assert.deepEqual(initial, { hosts: [], keys: [], synced: false });
   }
   fixture = await startSshFixture(ssh2, directory);
-  server = createSyncServer(join(directory, "sync.sqlite"));
+  await opaque.ready;
+  let recoveryCode;
+  server = createSyncServer(join(directory, "sync.sqlite"), {
+    opaqueSetup: opaque.server.createSetup(),
+    sendRecovery: (_email, code) => { recoveryCode = code; },
+  });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   const address = "http://127.0.0.1:" + server.address().port;
@@ -123,11 +122,11 @@ try {
   const form = { "同步服务地址": address, "邮箱": email, "账号密码": password };
   await fill(setupA, form);
   await click(setupA, "创建账号");
-  const original = await readKey(setupA, "恢复密钥");
-  await fill(setupA, { "粘贴恢复密钥以确认已保存": original });
+  const original = randomBytes(24).toString("base64url");
+  await fill(setupA, { "主密码": original, "再次输入主密码": original });
   await click(setupA, "创建账号并同步");
   await until("Device A uploads host credentials", async () => (await evaluate(a, configuration)).synced);
-  await fill(setupB, { ...form, "恢复密钥": original });
+  await fill(setupB, { ...form, "主密码或旧恢复密钥": original });
   await click(setupB, "登录并同步");
   await until("Device B automatically receives both hosts and the managed key", async () => {
     const state = await evaluate(b, configuration);
@@ -166,27 +165,42 @@ try {
   }
 
   const peer = await invoke(b, "host_sync_account");
-  await click(setupA, "更换恢复密钥");
-  const replacement = await readKey(setupA, "新恢复密钥");
-  assert(replacement && replacement !== original, "Generated a distinct recovery key");
-  await fill(setupA, { "粘贴新密钥以确认已保存": replacement });
+  assert.equal(peer.opaque, true);
+  await click(setupA, "设置或更换主密码");
+  const replacement = randomBytes(24).toString("base64url");
+  await fill(setupA, { "账号密码": password, "新主密码": replacement, "再次输入新主密码": replacement });
   await click(setupA, "更换并撤销其他设备");
   await until("Device A completed key rotation", () => evaluate(setupA, () =>
-    ![...document.querySelectorAll("label")].some((label) => label.textContent.trim() === "新恢复密钥")));
+    ![...document.querySelectorAll("label")].some((label) => label.textContent.trim() === "新主密码")));
   await assert.rejects(invoke(b, "host_sync_devices", { accountId: peer.accountId }), /请重新登录/);
-  const login = { server: address, email, password, register: false, boundAccount: peer.accountId };
-  await assert.rejects(invoke(b, "host_sync_login", { ...login, recoveryKey: original }), /恢复密钥不正确/);
-  await invoke(b, "host_sync_login", { ...login, recoveryKey: replacement });
-  const devices = await invoke(b, "host_sync_devices", { accountId: peer.accountId });
-  assert.equal(devices.length, 2);
+  await evaluate(setupB, () => [...document.querySelectorAll("button")]
+    .find((button) => button.textContent.trim() === "立即同步")?.click());
+  const storedKeyLabel = "主密码或旧恢复密钥（留空使用本机保存的密钥）";
+  await fill(setupB, { "账号密码": password, [storedKeyLabel]: replacement });
+  await click(setupB, "登录并同步");
+  await until("Device B logs in with the rotated master password", async () =>
+    (await invoke(b, "host_sync_devices", { accountId: peer.accountId })).length === 2);
+  console.log("两台设备通过 OPAQUE 登录，主密码更换后旧会话已撤销。");
+
+  await click(setupB, "忘记账号密码");
+  await click(setupB, "发送验证码");
+  const code = await until("Wait for password recovery email fixture", () => recoveryCode);
+  const newPassword = randomBytes(24).toString("base64url");
+  await fill(setupB, { "邮箱验证码": code, "新账号密码": newPassword, "再次输入账号密码": newPassword });
+  await click(setupB, "重设账号密码");
+  await fill(setupB, { "账号密码": newPassword, [storedKeyLabel]: "" });
+  await click(setupB, "登录并同步");
+  await until("Device B unlocks with its saved key after email recovery", async () =>
+    (await invoke(b, "host_sync_devices", { accountId: peer.accountId })).length === 1);
+  await assert.rejects(invoke(a, "host_sync_devices", { accountId: peer.accountId }), /请重新登录/);
   const { hosts: syncedHosts, keys, base } = await evaluate(b, configuration, null, true);
   const resumed = await invoke(b, "host_sync_exchange", {
     accountId: peer.accountId, base, configuration: { hosts: syncedHosts, keys, proxies: [] },
   });
   assert.equal(resumed.conflicts?.length ?? 0, 0);
   assert.ok(resumed.inspection?.revision, "Recovered device received a verified sync revision");
-  assert.notEqual(resumed.base.wrappedKey.salt, base.wrappedKey.salt);
-  console.log("旧恢复密钥失效，旧会话已撤销，设备 B 使用新密钥重新登录并继续同步。");
+  assert.equal(resumed.base.wrappedKey.kdf, "Argon2id-sync-password-v1");
+  console.log("邮箱找回撤销旧会话并保留数据，设备 B 使用本机密钥恢复同步。");
 } finally {
   if (server?.listening) await new Promise((resolve) => {
     server.close(resolve);
