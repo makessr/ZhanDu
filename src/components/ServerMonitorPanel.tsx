@@ -7,6 +7,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { isTauri } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   Alert,
   Button,
@@ -125,7 +127,9 @@ function ServerMonitorPanel({
   const chartSecondaryTextColor =
     appearance === "dark" ? "rgba(255, 255, 255, 0.45)" : "#86909c";
   const [chartsVisible, setChartsVisible] = useState(false);
-  const [windowVisible, setWindowVisible] = useState(() => !document.hidden);
+  const [windowVisible, setWindowVisible] = useState(
+    () => !document.hidden && !isTauri(),
+  );
   const pendingSnapshotRef = useRef<{
     sessionId: string;
     request: Promise<ServerMonitorSnapshot>;
@@ -199,10 +203,43 @@ function ServerMonitorPanel({
   }, [resetMonitorState, session?.id, session?.status]);
 
   useEffect(() => {
-    const updateVisibility = () => setWindowVisible(!document.hidden);
+    if (!visible) {
+      setWindowVisible(false);
+      return;
+    }
+
+    const nativeWindow = isTauri() ? getCurrentWindow() : undefined;
+    const unlisten: (() => void)[] = [];
+    let disposed = false;
+    let generation = 0;
+    const updateVisibility = async () => {
+      const request = ++generation;
+      const minimized = await nativeWindow?.isMinimized().catch(() => false);
+      if (!disposed && request === generation) {
+        setWindowVisible(!document.hidden && !minimized);
+      }
+    };
+    if (nativeWindow) {
+      for (const registration of [
+        nativeWindow.onFocusChanged(updateVisibility),
+        nativeWindow.onResized(updateVisibility),
+      ]) {
+        void registration
+          .then((stop) => {
+            if (disposed) stop();
+            else unlisten.push(stop);
+          })
+          .catch(() => undefined);
+      }
+    }
+    void updateVisibility();
     document.addEventListener("visibilitychange", updateVisibility);
-    return () => document.removeEventListener("visibilitychange", updateVisibility);
-  }, []);
+    return () => {
+      disposed = true;
+      document.removeEventListener("visibilitychange", updateVisibility);
+      for (const stop of unlisten) stop();
+    };
+  }, [visible]);
 
   useEffect(() => {
     const sessionId = session?.id;
