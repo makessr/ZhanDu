@@ -53,6 +53,14 @@ GitHub Actions 需要配置仓库密钥 `TAURI_SIGNING_PRIVATE_KEY`，用于生�
 
 本地可以使用 `bun run release:prepare -- patch` 验证版本准备脚本。该命令会直接修改当前工作区，因此只能在干净的非 `main` 分支执行。
 
+## macOS 首次安装验收
+
+v0.6.2 的公开 DMG 已在 Apple Silicon（macOS 26.7.2）和 Intel（macOS 15.7.9）的 GitHub 托管运行器上验证。两份 DMG 的 SHA-256、应用版本、CPU 架构和临时签名均通过检查。在没有旧版 WebKit 配置的运行器上，从 DMG 复制出的应用成功打开桌面窗口。
+
+Gatekeeper 处于启用状态。两台运行器都拒绝了手动赋予下载标记的单独应用副本，评估命令是 `spctl --assess --type execute`。从浏览器下载后的提示、是否显示「仍要打开」以及手动确认后的启动仍需在个人 Mac 上验收。[首次安装工作流](https://github.com/makessr/ZhanDu/actions/runs/44650481203)
+
+从 v0.6.0 经 v0.6.1 到 v0.6.2 的应用内升级已分别在 macOS Apple Silicon、macOS Intel、Ubuntu x64 和 Ubuntu ARM64 上跑通。每个阶段都检查了版本、窗口和本地配置目录中的测试标记。[两段升级工作流](https://github.com/makessr/ZhanDu/actions/runs/44649992142)
+
 ## Windows 桌面验收
 
 在安装了 WebView2、Node.js 26、Bun、Rust MSVC 工具链和 Windows 原生 Perl（如 Strawberry Perl）的测试机上运行。Perl 用于编译随 Windows 客户端构建的 OpenSSL。先在仓库安装 Bun 前端依赖和 `sync-server` 的 npm 依赖。为 SSH 测试另装 `ssh2`，传入其入口文件，测试会使用本地回环地址和合成凭据。
