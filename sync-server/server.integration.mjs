@@ -61,7 +61,7 @@ test("invite and verification are bound to one email, consumed once, and allow a
         body: JSON.stringify(body),
       });
     }
-    assert.deepEqual(await (await fetch(base + "registration")).json(), { mode: "invite" });
+    assert.deepEqual(await (await fetch(base + "registration")).json(), { mode: "invite", masterPassword: true });
     const registration = { email, password: "test-only-password", inviteCode };
     assert.equal((await post("register", registration)).status, 403);
     assert.equal((await post("registration/verify", { email: "other@example.com", inviteCode })).status, 403);
@@ -256,7 +256,7 @@ test("sync isolates accounts and accepts only the current revision", async () =>
     await new Promise((resolve) => server.close(resolve));
     server = createSyncServer(snapshot, { registration: "closed" });
     origin = await start();
-    assert.deepEqual((await call("registration")).data, { mode: "closed" });
+    assert.deepEqual((await call("registration")).data, { mode: "closed", masterPassword: true });
     assert.equal((await call("register", {
       method: "POST", body: { ...body, email: "closed@example.com" },
     })).status, 403);
@@ -278,7 +278,7 @@ test("sync isolates accounts and accepts only the current revision", async () =>
     assert.equal((await call("vault", { token: login.data.token })).status, 401);
     const newLogin = await call("login", { method: "POST", body });
     const rotatedVault = { ...repaired, ciphertext: bytes(160),
-      wrappedKey: { ...vault.wrappedKey, salt: bytes(16) } };
+      wrappedKey: { ...vault.wrappedKey, kdf: "Argon2id-sync-password-v1", salt: bytes(16) } };
     const rotate = (revision) => call("vault/rotate-key", {
       method: "POST", token: first.token, body: { revision, vault: rotatedVault },
     });
@@ -290,6 +290,15 @@ test("sync isolates accounts and accepts only the current revision", async () =>
     assert.equal((await call("vault", { token: newLogin.data.token })).status, 401);
     assert.deepEqual((await call("vault", { token: rotation.data.token })).data,
       { revision: 4, vault: rotatedVault });
+    for (const [path, method, nextRevision] of [
+      ["vault", "PUT", undefined],
+      ["vault/rotate-key", "POST", undefined],
+      ["vault/recover", "POST", 7],
+    ]) {
+      assert.equal((await call(path, {
+        method, token: rotation.data.token, body: { revision: 4, nextRevision, vault },
+      })).status, 409);
+    }
     const afterRotation = await call("devices", { token: rotation.data.token });
     assert.deepEqual(afterRotation.data.map(({ id, current }) => ({ id, current })),
       [{ id: current.id, current: true }]);

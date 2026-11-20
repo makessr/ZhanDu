@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, Button, Input, Message, Popconfirm, Space, Typography } from "@arco-design/web-react";
 import { isTauri } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -24,6 +24,10 @@ import {
   type HostSyncAccount,
 } from "../host-sync";
 
+function validMasterPassword(value: string) {
+  return Array.from(value.trim()).length >= 16 && new TextEncoder().encode(value).length <= 1024;
+}
+
 export default function HostSyncSettings() {
   const [account, setAccount] = useState<HostSyncAccount | null>(null);
   const [status, setStatus] = useState(readHostSyncStatus);
@@ -37,6 +41,8 @@ export default function HostSyncSettings() {
   const [deviceName, setDeviceName] = useState("");
   const [renameDevice, setRenameDevice] = useState<string | null>(null);
   const [registrationMode, setRegistrationMode] = useState<"open" | "invite" | "closed" | null>(null);
+  const [masterPasswordSupported, setMasterPasswordSupported] = useState(false);
+  const registrationAttempt = useRef<{ server: string; email: string; id: string } | null>(null);
   const inviteRequired = registrationMode === "invite";
   const [inviteCode, setInviteCode] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
@@ -48,6 +54,8 @@ export default function HostSyncSettings() {
   const [recoveryKey, setRecoveryKey] = useState("");
   const [confirmedKey, setConfirmedKey] = useState("");
   const [replacementKey, setReplacementKey] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [rotationAccountPassword, setRotationAccountPassword] = useState("");
 
   useEffect(() => {
     if (!isTauri()) return;
@@ -96,8 +104,11 @@ export default function HostSyncSettings() {
     if (!register || !server.trim()) return;
     let current = true;
     const timer = window.setTimeout(() => {
-      void hostSyncRegistration(server).then(({ mode }) => {
-        if (current) setRegistrationMode(mode);
+      void hostSyncRegistration(server).then(({ mode, masterPassword }) => {
+        if (current) {
+          setRegistrationMode(mode);
+          setMasterPasswordSupported(masterPassword === true);
+        }
       }).catch((error) => {
         if (current) Message.error(commandErrorMessage(error));
       });
@@ -159,18 +170,15 @@ export default function HostSyncSettings() {
     </div>;
   }
 
-  async function changeMode(next: boolean) {
-    try {
-      const key = next ? await hostSyncRecoveryKey() : "";
-      setRecoveryKey(key);
-      setConfirmedKey("");
-      setRegistrationMode(null);
-      setInviteCode("");
-      setVerificationCode("");
-      setRegister(next);
-    } catch (error) {
-      Message.error(commandErrorMessage(error));
-    }
+  function changeMode(next: boolean) {
+    registrationAttempt.current = null;
+    setRecoveryKey("");
+    setConfirmedKey("");
+    setRegistrationMode(null);
+    setMasterPasswordSupported(false);
+    setInviteCode("");
+    setVerificationCode("");
+    setRegister(next);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -180,7 +188,20 @@ export default function HostSyncSettings() {
       const proof = register && inviteRequired
         ? { inviteCode: inviteCode.trim(), verificationCode: verificationCode.trim() }
         : undefined;
-      setAccount(await signInToHostSync({ server, email, password, recoveryKey, register, deviceName, proof }));
+      const useMasterPassword = register && masterPasswordSupported;
+      const normalizedEmail = email.trim().toLowerCase();
+      const attempt = registrationAttempt.current;
+      if (useMasterPassword && (!attempt || attempt.server !== server || attempt.email !== normalizedEmail)) {
+        registrationAttempt.current = {
+          server, email: normalizedEmail, id: crypto.randomUUID().replace(/-/g, ""),
+        };
+      }
+      const registrationId = useMasterPassword ? registrationAttempt.current?.id : undefined;
+      setAccount(await signInToHostSync({
+        server, email, password, recoveryKey, register, deviceName, proof,
+        useMasterPassword, registrationId,
+      }));
+      registrationAttempt.current = null;
       setInviteCode("");
       setVerificationCode("");
       setStatus(null);
@@ -200,14 +221,16 @@ export default function HostSyncSettings() {
     if (!accountId) return;
     setBusy(true);
     try {
-      await rotateHostSyncKey(accountId, replacementKey);
+      await rotateHostSyncKey(accountId, replacementKey, rotationAccountPassword);
       setReplacementKey("");
+      setChangingPassword(false);
       setConfirmedKey("");
       setDevices([]);
-      Message.success("已更换恢复密钥。其他设备必须使用新密钥重新登录。");
+      Message.success("已设置新主密码。其他设备需要用新主密码重新登录。");
     } catch (error) {
       Message.error(commandErrorMessage(error));
     } finally {
+      setRotationAccountPassword("");
       setBusy(false);
     }
   }
@@ -246,25 +269,32 @@ export default function HostSyncSettings() {
         )}
         <Space wrap>
           <Button type="primary" onClick={() => sync()}>立即同步</Button>
-          <Button disabled={busy || !!replacementKey} onClick={() => void signOut()}>退出登录</Button>
-          {!replacementKey && <Button disabled={busy} onClick={() => {
-            void hostSyncRecoveryKey().then(setReplacementKey)
-              .catch((error) => Message.error(commandErrorMessage(error)));
-          }}>更换恢复密钥</Button>}
+          <Button disabled={busy || changingPassword} onClick={() => void signOut()}>退出登录</Button>
+          {!changingPassword && <Button disabled={busy} onClick={() => setChangingPassword(true)}>设置或更换主密码</Button>}
         </Space>
-        {replacementKey && <Space direction="vertical">
-          <Alert type="warning" content="先保存新密钥。更换后其他设备需要重新登录，已经导出的旧快照仍可能由旧密钥解开。" />
-          <label>新恢复密钥<Input value={replacementKey} readOnly /></label>
-          <label>粘贴新密钥以确认已保存
+        {changingPassword && <Space direction="vertical">
+          <Alert type="warning" content="主密码至少 16 个字符，与账号密码不同。更换后其他设备需要重新登录，已经导出的旧快照仍可能由旧密码或旧密钥解开。" />
+          <label>账号密码
+            <Input.Password value={rotationAccountPassword} onChange={setRotationAccountPassword} autoComplete="current-password" />
+          </label>
+          <label>新主密码
+            <Input.Password value={replacementKey} onChange={setReplacementKey} autoComplete="new-password" />
+          </label>
+          <Button disabled={busy} onClick={() => void hostSyncRecoveryKey().then(setReplacementKey)
+            .catch((error) => Message.error(commandErrorMessage(error)))}>生成强主密码</Button>
+          <label>再次输入新主密码
             <Input.Password value={confirmedKey} onChange={setConfirmedKey} autoComplete="off" />
           </label>
           <Space>
             <Button type="primary" loading={busy}
-              disabled={confirmedKey.trim() !== replacementKey}
+              disabled={!validMasterPassword(replacementKey) || confirmedKey !== replacementKey ||
+                !rotationAccountPassword || rotationAccountPassword === replacementKey}
               onClick={() => void rotateKey()}>更换并撤销其他设备</Button>
             <Button disabled={busy} onClick={() => {
               setReplacementKey("");
               setConfirmedKey("");
+              setRotationAccountPassword("");
+              setChangingPassword(false);
             }}>取消</Button>
           </Space>
         </Space>}
@@ -386,19 +416,25 @@ export default function HostSyncSettings() {
         )}
         {register ? (
           <>
-            <Alert type="warning" content="请把恢复密钥存到密码管理器。丢失后，账号密码无法解密云端主机。" />
+            <Alert type="warning" content={masterPasswordSupported
+              ? "主密码至少 16 个字符，与账号密码不同。请保存在密码管理器。"
+              : "此同步服务使用恢复密钥。请生成并保存在密码管理器。"} />
             <label>
-              恢复密钥
-              <Input value={recoveryKey} readOnly />
+              {masterPasswordSupported ? "主密码" : "恢复密钥"}
+              <Input.Password value={recoveryKey} onChange={setRecoveryKey} readOnly={!masterPasswordSupported} autoComplete="new-password" />
             </label>
+            <Button disabled={busy} onClick={() => void hostSyncRecoveryKey().then(setRecoveryKey)
+              .catch((error) => Message.error(commandErrorMessage(error)))}>
+              {masterPasswordSupported ? "生成强主密码" : "生成恢复密钥"}
+            </Button>
             <label>
-              粘贴恢复密钥以确认已保存
+              {masterPasswordSupported ? "再次输入主密码" : "粘贴恢复密钥以确认已保存"}
               <Input.Password value={confirmedKey} onChange={setConfirmedKey} autoComplete="off" />
             </label>
           </>
         ) : (
           <label>
-            恢复密钥
+            主密码或旧恢复密钥
             <Input.Password value={recoveryKey} onChange={setRecoveryKey} autoComplete="off" />
           </label>
         )}
@@ -406,12 +442,13 @@ export default function HostSyncSettings() {
           <Button type="primary" htmlType="submit" loading={busy}
             disabled={!server || !email || password.length < 12 || !recoveryKey ||
               (register && (registrationMode === null || registrationMode === "closed" ||
-                recoveryKey !== confirmedKey.trim() ||
+                (masterPasswordSupported && (!validMasterPassword(recoveryKey) || recoveryKey === password)) ||
+                recoveryKey !== (masterPasswordSupported ? confirmedKey : confirmedKey.trim()) ||
                 (inviteRequired && (!inviteCode.trim() || !verificationCode.trim()))))}>
             {register ? "创建账号并同步" : "登录并同步"}
           </Button>
           {!hostSyncIsBound() && (
-            <Button disabled={busy} onClick={() => void changeMode(!register)}>
+            <Button disabled={busy} onClick={() => changeMode(!register)}>
               {register ? "已有账号" : "创建账号"}
             </Button>
           )}

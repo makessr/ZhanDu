@@ -82,11 +82,11 @@ export function hostSyncDevices(accountId: string, revoke?: string, rename?: str
   return invoke<HostSyncDevice[]>("host_sync_devices", { accountId, revoke, rename });
 }
 
-export async function rotateHostSyncKey(accountId: string, recoveryKey: string) {
+export async function rotateHostSyncKey(accountId: string, recoveryKey: string, accountPassword: string) {
   const { hostSyncBase } = await loadConfiguration();
-  if (!hostSyncBase) throw new Error("请先完成一次同步，再更换恢复密钥");
+  if (!hostSyncBase) throw new Error("请先完成一次同步，再更换主密码");
   const replacement = await invoke<object>("host_sync_rotate_key", {
-    accountId, base: JSON.parse(hostSyncBase), recoveryKey,
+    accountId, base: JSON.parse(hostSyncBase), recoveryKey, accountPassword,
   });
   await updateConfiguration((current) => current.hostSyncBase === hostSyncBase
     ? { ...current, hostSyncBase: JSON.stringify(replacement) }
@@ -95,7 +95,7 @@ export async function rotateHostSyncKey(accountId: string, recoveryKey: string) 
 }
 
 export function hostSyncRegistration(server: string) {
-  return invoke<{ mode: "open" | "invite" | "closed" }>("host_sync_registration", { server });
+  return invoke<{ mode: "open" | "invite" | "closed"; masterPassword?: boolean }>("host_sync_registration", { server });
 }
 
 export function sendHostSyncVerification(server: string, email: string, inviteCode: string) {
@@ -142,6 +142,8 @@ export async function signInToHostSync(values: {
   email: string;
   password: string;
   recoveryKey: string;
+  useMasterPassword?: boolean;
+  registrationId?: string;
   register: boolean;
   deviceName: string;
   proof?: { inviteCode: string; verificationCode: string };
