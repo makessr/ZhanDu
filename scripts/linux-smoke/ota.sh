@@ -24,7 +24,7 @@ window_for() {
     printf '%s\n' "${windows%%$'\n'*}"
 }
 
-test "$(package_field '${Version}')" = 0.6.0
+test "$(package_field '${Version}')" = 0.5.1
 test -x "$binary"
 log="$RUNNER_TEMP/fineshell-ota.log"
 "$binary" > "$log" 2>&1 &

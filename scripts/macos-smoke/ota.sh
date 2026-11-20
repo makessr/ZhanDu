@@ -29,7 +29,7 @@ verify_bundle() {
     codesign --verify --deep --strict "$app"
 }
 
-verify_bundle 0.6.0
+verify_bundle 0.5.1
 swiftc scripts/macos-smoke/verify-window.swift -o "$work/verify-window"
 open -n "$app"
 app_pid="$("$work/verify-window" "$app" 0)"

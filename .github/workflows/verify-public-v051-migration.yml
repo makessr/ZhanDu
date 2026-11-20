@@ -1,0 +1,135 @@
+name: Verify public channel migration from v0.5.1
+
+on:
+  push:
+    branches: [test/public-v051-migration-ota]
+
+permissions:
+  contents: read
+
+jobs:
+  upgrade:
+    name: ${{ matrix.platform }} ${{ matrix.arch }} public OTA
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            platform: Linux
+            arch: amd64
+            artifact: FineShell_0.5.1_linux_amd64.deb
+            digest: 731e3a28a8d8e367145074975085ccb42b50adc933bd1cde4793da892f569d92
+          - runner: ubuntu-22.04-arm
+            platform: Linux
+            arch: arm64
+            artifact: FineShell_0.5.1_linux_arm64.deb
+            digest: 6c2cb8883983064f1fb38bf26941520493191557b7214a3cacd8150c627f891b
+          - runner: macos-latest
+            platform: macOS
+            arch: arm64
+            artifact: FineShell_0.5.1_darwin_aarch64.dmg
+            digest: 1d70aa526f8fe25536d5d55a97c68004f569adeb8b42407819985f8978cae5f2
+          - runner: macos-15-intel
+            platform: macOS
+            arch: x86_64
+            artifact: FineShell_0.5.1_darwin_x64.dmg
+            digest: 6a386bb79c1f670d1151c153bf55a3110ba72f6f302d1dad46d73d9ef962608f
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Verify public release manifests and baseline installer
+        shell: bash
+        env:
+          ARTIFACT: ${{ matrix.artifact }}
+          DIGEST: ${{ matrix.digest }}
+        run: |
+          set -Eeuo pipefail
+          cd "$RUNNER_TEMP"
+          for release in FineShell:0.6.1 ZhanDu:0.6.2; do
+            repo="${release%:*}"
+            version="${release#*:}"
+            url="https://github.com/makessr/$repo/releases/download/v$version"
+            curl -fsSL --retry 3 "https://github.com/makessr/$repo/releases/latest/download/latest.json" |
+              jq -e --arg version "$version" --arg url "$url/" '
+                .version == $version and
+                (.platforms | length > 0 and all(.[]; (.url | startswith($url)) and (.signature | length > 0)))
+              '
+          done
+          curl -fsSL --retry 3 -o "$ARTIFACT" "https://github.com/makessr/FineShell/releases/download/v0.5.1/$ARTIFACT"
+          printf '%s  %s\n' "$DIGEST" "$ARTIFACT" | shasum -a 256 --check
+      - name: Install Linux baseline and desktop test dependencies
+        if: runner.os == 'Linux'
+        env:
+          ARCH: ${{ matrix.arch }}
+          ARTIFACT: ${{ matrix.artifact }}
+        run: |
+          set -Eeuo pipefail
+          package="$RUNNER_TEMP/$ARTIFACT"
+          test "$(dpkg --print-architecture)" = "$ARCH"
+          test "$(dpkg-deb -f "$package" Architecture)" = "$ARCH"
+          sudo apt-get -o Acquire::Retries=3 update -qq
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends "$package" xvfb xauth xdotool x11-utils dbus-x11 at-spi2-core python3-pyatspi
+      - name: Upgrade twice through the Linux desktop
+        if: runner.os == 'Linux'
+        env:
+          ARCH: ${{ matrix.arch }}
+          ARTIFACT: ${{ matrix.artifact }}
+        run: |
+          set -Eeuo pipefail
+          test "$(id -u)" -ne 0
+          sudo -n true
+          name="$(dpkg-deb -f "$RUNNER_TEMP/$ARTIFACT" Package)"
+          xvfb-run -a -s '-screen 0 1440x1000x24' dbus-run-session -- bash scripts/linux-smoke/ota.sh "$name" "$ARCH"
+      - name: Upgrade twice through the macOS desktop
+        if: runner.os == 'macOS'
+        env:
+          ARCH: ${{ matrix.arch }}
+          ARTIFACT: ${{ matrix.artifact }}
+        run: bash scripts/macos-smoke/ota.sh "$RUNNER_TEMP/$ARTIFACT" "$ARCH"
+
+  windows-ota:
+    name: Windows ${{ matrix.arch }} public two-hop OTA
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-latest
+            digest: 77d765e02ce1c34cc5df02790363ef4fb8dd57185f64c1d4e9d2989cca73ba52
+          - arch: arm64
+            runner: windows-11-arm
+            digest: 52a40172cbb63602a05a6420e3e15b2c62cf5b44e3f0937211df849269b1b520
+    env:
+      WINDOWS_ARCH: ${{ matrix.arch }}
+      BASELINE_SHA256: ${{ matrix.digest }}
+      FINESHELL_OTA_PUBLIC_BRIDGE: '0.6.1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "26"
+          architecture: ${{ matrix.arch }}
+      - name: Download the official v0.5.1 baseline and check both public channels
+        run: |
+          if ($env:RUNNER_ARCH -ne $env:WINDOWS_ARCH) { throw 'Runner architecture differs from installer architecture.' }
+          $oldFeed = Invoke-RestMethod 'https://github.com/makessr/FineShell/releases/latest/download/latest.json' -TimeoutSec 20
+          $newFeed = Invoke-RestMethod 'https://github.com/makessr/ZhanDu/releases/latest/download/latest.json' -TimeoutSec 20
+          if ($oldFeed.version -ne '0.6.1' -or $newFeed.version -ne '0.6.2') { throw 'The expected public update sequence is unavailable.' }
+          $file = Join-Path $env:RUNNER_TEMP 'FineShell-v0.5.1.exe'
+          $url = "https://github.com/makessr/FineShell/releases/download/v0.5.1/FineShell_0.5.1_windows_$env:WINDOWS_ARCH-setup.exe"
+          curl.exe --silent --show-error --fail --location --retry 3 --output $file $url
+          if ($LASTEXITCODE -or (Get-FileHash -LiteralPath $file).Hash -ne $env:BASELINE_SHA256) { throw 'The baseline installer did not match the official asset.' }
+      - name: Upgrade twice through GitHub Direct and reconnect to saved hosts
+        run: |
+          npm install --prefix "$env:RUNNER_TEMP/fixture" --ignore-scripts --no-audit --no-fund ssh2@1.17.0
+          if ($LASTEXITCODE) { throw 'Could not install the loopback SSH fixture.' }
+          $baseline = Join-Path $env:RUNNER_TEMP 'FineShell-v0.5.1.exe'
+          $fixture = Join-Path $env:RUNNER_TEMP 'fixture/node_modules/ssh2/lib/index.js'
+          ./scripts/windows-smoke/ota.ps1 -VerifiedInstaller $baseline -Baseline 0.5.1 -Target 0.6.2 -Ssh2Module $fixture -UseHostedRunnerWebView2Policy -RequireArm64:($env:WINDOWS_ARCH -eq 'arm64')
