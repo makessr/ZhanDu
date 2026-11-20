@@ -305,4 +305,6 @@ GitHub 仓库需要配置 Tauri 更新签名私钥 `TAURI_SIGNING_PRIVATE_KEY`�
 
 ## 开源许可
 
+客户端「关于」页可直接打开栈渡的 GitHub 仓库和许可证。
+
 栈渡由 makessr 独立维护，源自 Max0897 开发的 FineShell，沿用 Apache-2.0 许可证。[原作者 Max0897](https://github.com/Max0897) · [原项目 FineShell](https://github.com/Max0897/FineShell) · [许可证](LICENSE)
