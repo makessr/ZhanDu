@@ -33,7 +33,7 @@ if [[ "${1:-}" != '--session' ]]; then
     install -d -m 0700 -o desktop -g desktop /tmp/xfce-runtime
     desktop_id="${desktop_file##*/}"
     exec runuser -u desktop -- env XDG_RUNTIME_DIR=/tmp/xfce-runtime \
-        XDG_CURRENT_DESKTOP=XFCE XDG_SESSION_TYPE=x11 GDK_BACKEND=x11 \
+        LC_ALL=C.UTF-8 XDG_CURRENT_DESKTOP=XFCE XDG_SESSION_TYPE=x11 GDK_BACKEND=x11 \
         dbus-run-session -- xvfb-run -a -s '-screen 0 1440x1000x24' \
         bash "$0" --session "${desktop_id%.desktop}"
 fi

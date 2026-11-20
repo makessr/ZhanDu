@@ -144,7 +144,7 @@ v0.6.2 的 macOS 包使用临时签名，尚未通过 Apple 公证，首次打�
 
 ### Linux 安装
 
-Debian XFCE 环境使用对应架构的 `.deb`。可通过应用菜单启动栈渡，安装包里的桌面条目可能仍显示为 FineShell。
+Debian XFCE 环境使用对应架构的 `.deb`，并可通过应用菜单启动。应用窗口内显示为「栈渡」，使用 UTF-8 的桌面会话可以正确显示中文窗口标题。
 
 请使用 APT 安装 `.deb`，APT 会同时安装 FineShell 所需的 WebKitGTK 等系统依赖：
 
