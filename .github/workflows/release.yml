@@ -197,7 +197,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }} -- --timings
           generateReleaseNotes: false
           prerelease: ${{ contains(needs.validate.outputs.release_tag, '-') }}
           releaseId: ${{ needs.prepare.outputs.release_id }}
@@ -211,6 +211,15 @@ jobs:
           updaterJsonPreferNsis: true
           uploadUpdaterJson: true
           uploadUpdaterSignatures: true
+      - name: Upload Cargo build timings
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: cargo-timings-${{ matrix.platform }}-${{ matrix.rustTargets || 'native' }}
+          path: src-tauri/target/cargo-timings/cargo-timing.html
+          retention-days: 7
+          if-no-files-found: ignore
       - name: Verify macOS binary dependencies
         if: startsWith(matrix.platform, 'macos-')
         shell: bash
