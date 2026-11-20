@@ -71,6 +71,12 @@ v0.6.2 的正式 Debian 安装包已在 Debian 12（Bookworm）和 Debian 13（T
 
 同样的四个组合均通过应用内升级。从公开的 v0.5.1 安装包起步，在 XFCE 会话内确认更新，依次安装 v0.6.1 和 v0.6.2。每次确认软件包版本、架构、应用自动重启后的可见窗口和本地配置目录中的测试标记。精简 Debian 镜像需提供 `ca-certificates`，供应用验证更新地址的 TLS 证书。本次使用容器与虚拟显示，实体机上的图形驱动及系统提权交互仍待验证。[四项应用内升级记录](https://github.com/makessr/ZhanDu/actions/runs/44662958965)
 
+## v0.6.3 正式升级验收
+
+v0.6.3 已在栈渡独立渠道公开。公开更新清单与签名草稿的 SHA-256 一致，七种更新包均可下载。[正式发布页](https://github.com/makessr/ZhanDu/releases/tag/v0.6.3)
+
+从公开的 v0.6.2 安装包起步，Windows x64 和 ARM64、macOS Apple Silicon 和 Intel，以及 Debian 12、13 XFCE 的 x64 和 ARM64 均通过应用内升级。各环境均检查重启后的版本和测试配置标记。Windows 双架构还能用原先保存的密码和加密私钥重新连接本地 SSH 测试主机。Debian 容器核对了更新后安装包的 CA 证书依赖。[八项正式渠道升级记录](https://github.com/makessr/ZhanDu/actions/runs/44673891037)
+
 ## Windows 桌面验收
 
 在安装了 WebView2、Node.js 26、Bun、Rust MSVC 工具链和 Windows 原生 Perl（如 Strawberry Perl）的测试机上运行。Perl 用于编译随 Windows 客户端构建的 OpenSSL。先在仓库安装 Bun 前端依赖和 `sync-server` 的 npm 依赖。为 SSH 测试另装 `ssh2`，传入其入口文件，测试会使用本地回环地址和合成凭据。
