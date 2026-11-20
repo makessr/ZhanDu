@@ -40,6 +40,8 @@ v0.6.2 的 macOS 包使用临时签名，尚未通过 Apple 公证，首次打�
 
 ### Linux 安装
 
+本次 Debian XFCE 应用内升级验收从 v0.5.1 起步，检查 v0.6.1 和 v0.6.2 的安装、重启和配置保留。
+
 栈渡 v0.6.2 已在 Debian 12 和 Debian 13 的 XFCE 会话中完成 x64 和 ARM64 安装启动验收。运行 `dpkg --print-architecture` 查看架构。`amd64` 下载文件名带 `linux_amd64` 的包，`arm64` 下载文件名带 `linux_arm64` 的包。安装后可从 XFCE 应用菜单启动。[Debian XFCE 验收记录](docs/release-pipeline.md#debian-xfce-安装验收)
 
 请使用 APT 安装 `.deb`，APT 会同时安装 FineShell 所需的 WebKitGTK 等系统依赖：

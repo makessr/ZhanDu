@@ -1,0 +1,45 @@
+name: Verify Debian XFCE public OTA
+
+on:
+  push:
+    branches: [test/debian-xfce-public-ota]
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    name: Debian ${{ matrix.debian }} / ${{ matrix.arch }}
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        debian: ['12', '13']
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Upgrade the public package twice through XFCE
+        env:
+          DEBIAN_VERSION: ${{ matrix.debian }}
+          ARCH: ${{ matrix.arch }}
+          DIGEST: ${{ matrix.arch == 'arm64' && '6c2cb8883983064f1fb38bf26941520493191557b7214a3cacd8150c627f891b' || '731e3a28a8d8e367145074975085ccb42b50adc933bd1cde4793da892f569d92' }}
+        run: |
+          set -Eeuo pipefail
+          artifact="FineShell_0.5.1_linux_$ARCH.deb"
+          pkg="$RUNNER_TEMP/$artifact"
+          curl -fsSL --retry 3 -o "$pkg" "https://github.com/makessr/FineShell/releases/download/v0.5.1/$artifact"
+          printf '%s  %s\n' "$DIGEST" "$pkg" | sha256sum --check
+          for release in FineShell:0.6.1 ZhanDu:0.6.2; do
+            repo="${release%:*}"
+            version="${release#*:}"
+            curl -fsSL --retry 3 "https://github.com/makessr/$repo/releases/latest/download/latest.json" |
+              jq -e --arg version "$version" '.version == $version'
+          done
+          docker run --rm --platform "linux/$ARCH" \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/scripts/linux-smoke/press-update.py,dst=/tmp/press-update.py,readonly" \
+            --mount "type=bind,src=$pkg,dst=/tmp/zhandu.deb,readonly" \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/scripts/linux-smoke/debian-xfce.sh,dst=/tmp/debian-xfce.sh,readonly" \
+            "debian:$DEBIAN_VERSION" bash /tmp/debian-xfce.sh "$DEBIAN_VERSION" "$ARCH"
