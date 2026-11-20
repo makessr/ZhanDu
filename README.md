@@ -231,6 +231,8 @@ bun run tauri build
 
 ## 开发与测试
 
+GitHub CI 运行前端构建、同步服务测试以及 Rust 测试和 Clippy。Rust 检查在 Ubuntu 24.04 运行器上通过 Ubuntu 官方 HTTPS 源安装 Tauri 依赖。
+
 ```bash
 # 前端单元测试、类型检查和生产构建
 bun run check
