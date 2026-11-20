@@ -15,6 +15,15 @@ html[data-appearance="dark"] {
 }
 
 body {
+  --workspace-page: #f1f5fa;
+  --workspace-surface: #ffffff;
+  --workspace-chrome: #eaf1f8;
+  --workspace-group: #edf3fa;
+  --workspace-border: #d6e0ed;
+  --workspace-ink: #182b46;
+  --workspace-muted: #52657d;
+  --workspace-accent: #215993;
+  --workspace-active: #dceafd;
   --fs-drop-overlay: rgb(255 255 255 / 94%);
   --fs-scrollbar-thumb: #c9cdd4;
   --fs-scrollbar-thumb-hover: #86909c;
@@ -24,6 +33,15 @@ body {
 }
 
 body[arco-theme="dark"] {
+  --workspace-page: #101a28;
+  --workspace-surface: #162234;
+  --workspace-chrome: #18273b;
+  --workspace-group: #1d2d44;
+  --workspace-border: #2a3e58;
+  --workspace-ink: #e4edf9;
+  --workspace-muted: #a9bad0;
+  --workspace-accent: #a3ccff;
+  --workspace-active: #283f60;
   --fs-drop-overlay: rgb(35 35 36 / 94%);
   --fs-scrollbar-thumb: rgb(255 255 255 / 26%);
   --fs-scrollbar-thumb-hover: rgb(255 255 255 / 40%);
@@ -200,8 +218,8 @@ code *,
   flex: 0 0 38px;
   display: flex;
   align-items: stretch;
-  border-bottom: 1px solid var(--color-border-2);
-  background: var(--color-bg-2);
+  border-bottom: 1px solid var(--workspace-border);
+  background: var(--workspace-chrome);
 }
 
 .application-titlebar-drag-region {
@@ -221,15 +239,15 @@ code *,
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: var(--color-text-2);
+  color: var(--workspace-ink);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 650;
   pointer-events: none;
 }
 
 .application-titlebar-brand img {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   object-fit: contain;
 }
 
@@ -256,24 +274,30 @@ code *,
   width: 30px;
   height: 30px;
   padding: 0;
-  border-radius: 4px;
+  border-radius: 6px;
   color: var(--color-text-2);
 }
 
-.application-titlebar-action-button .lucide {
-  width: 17px;
-  height: 17px;
-  stroke-width: 1.75;
+.workspace-icon {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  vertical-align: middle;
+  pointer-events: none;
 }
 
 .application-titlebar-action-button.arco-btn:not(.arco-btn-disabled):hover {
   color: var(--color-text-1);
-  background: var(--color-fill-2);
+  background: var(--workspace-active);
 }
 
-.application-titlebar-action-button.arco-btn.is-active {
-  color: rgb(var(--primary-6));
-  background: var(--color-primary-light-1);
+.application-titlebar-action-button.arco-btn[aria-pressed="true"] {
+  background: var(--workspace-active);
+}
+
+.application-titlebar-action-button.arco-btn-disabled .workspace-icon {
+  opacity: 0.4;
 }
 
 .application-titlebar-menu {
@@ -290,10 +314,9 @@ code *,
   gap: 8px;
 }
 
-.application-titlebar-menu-label .lucide {
+.application-titlebar-menu-label .workspace-icon {
   width: 16px;
   height: 16px;
-  stroke-width: 1.75;
 }
 
 .application-titlebar-menu-settings {
@@ -485,6 +508,7 @@ body.ai-sidebar-resizing::after {
   min-height: 0;
   padding: 16px;
   overflow: auto;
+  background: var(--workspace-surface);
 }
 
 .server-monitor {
@@ -575,6 +599,11 @@ body.ai-sidebar-resizing::after {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 11px;
+}
+
+.monitor-chart-heading .arco-typography:first-child {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .monitor-system-facts {

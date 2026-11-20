@@ -89,6 +89,11 @@ describe("ApplicationTitleBar", () => {
     const { onOpenQuickCommands } = renderTitleBar({
       hasActiveSession: false,
     });
+    const panelButtons = [
+      screen.getByRole("button", { name: "隐藏服务器监控" }),
+      screen.getByRole("button", { name: "隐藏文件管理" }),
+    ] as HTMLButtonElement[];
+    expect(panelButtons.every((button) => button.disabled)).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "打开应用菜单" }));
     const quickCommandItem = screen
       .getByText("快捷命令")
@@ -130,16 +135,20 @@ describe("ApplicationTitleBar", () => {
     expect(items[items.length - 1]?.textContent).toContain("设置");
   });
 
-  test("shows only the matching open icons while panels are hidden", () => {
+  test("shows the inactive tool icons while panels are hidden", () => {
     renderTitleBar({ serverMonitorCollapsed: true, sftpCollapsed: true });
     const monitorButton = screen.getByRole("button", {
       name: "显示服务器监控",
     });
     const sftpButton = screen.getByRole("button", { name: "显示文件管理" });
 
-    expect(monitorButton.querySelector(".lucide-panel-left-open")).toBeTruthy();
-    expect(monitorButton.querySelector(".lucide-panel-left-close")).toBeNull();
-    expect(sftpButton.querySelector(".lucide-panel-bottom-open")).toBeTruthy();
-    expect(sftpButton.querySelector(".lucide-panel-bottom-close")).toBeNull();
+    expect(monitorButton.getAttribute("aria-pressed")).toBe("false");
+    expect(sftpButton.getAttribute("aria-pressed")).toBe("false");
+    expect(monitorButton.querySelector("img")?.getAttribute("src")).toBe(
+      "/icons/kubai/monitor.svg",
+    );
+    expect(sftpButton.querySelector("img")?.getAttribute("src")).toBe(
+      "/icons/kubai/folder.svg",
+    );
   });
 });

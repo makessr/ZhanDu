@@ -9,21 +9,14 @@ import {
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
-  CircleHelp,
-  Command,
   Maximize,
-  Menu,
   Minimize,
   Minus,
-  PanelBottomClose,
-  PanelBottomOpen,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Settings,
   X,
 } from "lucide-react";
 import { isApplePlatform } from "../platform-utils";
 import { APP_DISPLAY_NAME } from "../application-brand";
+import WorkspaceIcon from "./WorkspaceIcon";
 
 interface ApplicationTitleBarProps {
   hasActiveSession: boolean;
@@ -114,12 +107,10 @@ export default function ApplicationTitleBar({
         data-tauri-drag-region
         onDoubleClick={applePlatform ? undefined : toggleMaximize}
       >
-        {!applePlatform && (
-          <div className="application-titlebar-brand">
-            <img alt="" src="/app-icon.png" />
-            <span>{APP_DISPLAY_NAME}</span>
-          </div>
-        )}
+        <div className="application-titlebar-brand">
+          <img alt="" src="/app-icon.png" />
+          <span>{APP_DISPLAY_NAME}</span>
+        </div>
       </div>
 
       <div className="application-titlebar-toolbar">
@@ -133,13 +124,8 @@ export default function ApplicationTitleBar({
               }
               aria-pressed={!serverMonitorCollapsed}
               className="application-titlebar-action-button"
-              icon={
-                serverMonitorCollapsed ? (
-                  <PanelLeftOpen aria-hidden="true" />
-                ) : (
-                  <PanelLeftClose aria-hidden="true" />
-                )
-              }
+              disabled={!hasActiveSession}
+              icon={<WorkspaceIcon name={serverMonitorCollapsed ? "monitor" : "activity"} />}
               onClick={onToggleServerMonitor}
               type="text"
             />
@@ -151,13 +137,8 @@ export default function ApplicationTitleBar({
               aria-label={sftpCollapsed ? "显示文件管理" : "隐藏文件管理"}
               aria-pressed={!sftpCollapsed}
               className="application-titlebar-action-button"
-              icon={
-                sftpCollapsed ? (
-                  <PanelBottomOpen aria-hidden="true" />
-                ) : (
-                  <PanelBottomClose aria-hidden="true" />
-                )
-              }
+              disabled={!hasActiveSession}
+              icon={<WorkspaceIcon name={sftpCollapsed ? "folder" : "folder-open"} />}
               onClick={onToggleSftp}
               type="text"
             />
@@ -176,13 +157,13 @@ export default function ApplicationTitleBar({
               >
                 <ArcoMenu.Item disabled={!hasActiveSession} key="quickCommands">
                   <span className="application-titlebar-menu-label">
-                    <Command aria-hidden="true" />
+                    <WorkspaceIcon name="terminal" />
                     <span>快捷命令</span>
                   </span>
                 </ArcoMenu.Item>
                 <ArcoMenu.Item key="shortcutGuide">
                   <span className="application-titlebar-menu-label">
-                    <CircleHelp aria-hidden="true" />
+                    <WorkspaceIcon name="keyboard" />
                     <span>快捷键</span>
                   </span>
                 </ArcoMenu.Item>
@@ -191,7 +172,7 @@ export default function ApplicationTitleBar({
                   key="settings"
                 >
                   <span className="application-titlebar-menu-label">
-                    <Settings aria-hidden="true" />
+                    <WorkspaceIcon name="settings" />
                     <span>设置</span>
                   </span>
                 </ArcoMenu.Item>
@@ -204,7 +185,7 @@ export default function ApplicationTitleBar({
               <Button
                 aria-label="打开应用菜单"
                 className="application-titlebar-action-button"
-                icon={<Menu aria-hidden="true" />}
+                icon={<WorkspaceIcon name="menu" />}
                 type="text"
               />
             </Tooltip>

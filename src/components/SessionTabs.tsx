@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Button, Dropdown, Input, Menu, Message, Modal, Popconfirm, Space, Tabs, Tooltip } from "@arco-design/web-react";
-import { IconHome } from "@arco-design/web-react/icon";
-import { Bot, Columns2, PanelsTopLeft } from "lucide-react";
+import WorkspaceIcon from "./WorkspaceIcon";
 import type { TerminalSession } from "../models";
 import { sessionTabName } from "../terminal-utils";
 import ContextMenu, { type ContextMenuItem } from "./ContextMenu";
@@ -172,8 +171,8 @@ function SessionTabs({
         role="tab"
         type="button"
       >
-        <IconHome />
-        <span>首页</span>
+        <WorkspaceIcon name="server-rack" />
+        <span>主机</span>
       </button>
       <Tabs
         activeTab={activeSessionId ?? HOME_TAB_ID}
@@ -193,8 +192,8 @@ function SessionTabs({
           key={HOME_TAB_ID}
           title={
             <span className="terminal-tab-label">
-              <IconHome />
-              <span className="terminal-tab-name">首页</span>
+              <WorkspaceIcon name="server-rack" />
+              <span className="terminal-tab-name">主机</span>
             </span>
           }
         />
@@ -260,7 +259,7 @@ function SessionTabs({
         <div className="terminal-workspaces-action">
           <Button aria-label="SSH 工作区" title="SSH 工作区" type="text"
             className="terminal-ai-action-button"
-            icon={<PanelsTopLeft aria-hidden="true" />} onClick={() => setWorkspaceOpen(true)} />
+            icon={<WorkspaceIcon name="layout-dashboard" />} onClick={() => setWorkspaceOpen(true)} />
         </div>
       )}
       <div className="terminal-split-action">
@@ -278,7 +277,7 @@ function SessionTabs({
             aria-label="终端布局"
             className="terminal-ai-action-button"
             disabled={!hasActiveSession || sessions.length < 2}
-            icon={<Columns2 aria-hidden="true" />}
+            icon={<WorkspaceIcon name="panel-bottom" />}
             title="终端布局"
             type="text"
           />
@@ -294,7 +293,7 @@ function SessionTabs({
                 aiAssistantVisible ? " is-active" : ""
               }`}
               disabled={!hasActiveSession}
-              icon={<Bot aria-hidden="true" />}
+              icon={<WorkspaceIcon name="bot" />}
               onClick={onToggleAiAssistant}
               type="text"
             />

@@ -28,11 +28,12 @@ function HostActions({
   return (
     <Space size="mini">
       <Button
+        className="host-connect-button"
         disabled={disabled}
         icon={<IconLink />}
         onClick={() => onConnect(host)}
         size="mini"
-        type="primary"
+        type="secondary"
       >
         连接
       </Button>

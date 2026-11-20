@@ -15,17 +15,12 @@ import {
   Typography,
 } from "@arco-design/web-react";
 import {
-  IconApps,
   IconDelete,
-  IconCommand,
   IconFolder,
-  IconHistory,
   IconInfoCircle,
   IconLaunch,
-  IconRobot,
-  IconThunderbolt,
-  IconTool,
 } from "@arco-design/web-react/icon";
+import WorkspaceIcon from "./WorkspaceIcon";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -857,7 +852,7 @@ function SettingsWindow() {
             key="general"
             title={
               <span className="settings-submenu-title">
-                <IconApps />
+                <WorkspaceIcon name="layout-dashboard" />
                 常规
               </span>
             }
@@ -871,7 +866,7 @@ function SettingsWindow() {
             key="connectionSecurity"
             title={
               <span className="settings-submenu-title">
-                <IconThunderbolt />
+                <WorkspaceIcon name="server" />
                 连接与安全
               </span>
             }
@@ -882,18 +877,18 @@ function SettingsWindow() {
             <Menu.Item key="knownHosts">已知主机</Menu.Item>
           </Menu.SubMenu>
           <Menu.Item key="quickCommands">
-            <IconCommand />
+            <WorkspaceIcon name="terminal" />
             快捷命令
           </Menu.Item>
           <Menu.Item key="ai">
-            <IconRobot />
+            <WorkspaceIcon name="bot" />
             AI 助手
           </Menu.Item>
           <Menu.SubMenu
             key="dataPrivacy"
             title={
               <span className="settings-submenu-title">
-                <IconHistory />
+                <WorkspaceIcon name="history" />
                 数据与隐私
               </span>
             }
@@ -905,7 +900,7 @@ function SettingsWindow() {
             <Menu.Item key="trash">回收站</Menu.Item>
           </Menu.SubMenu>
           <Menu.Item key="advanced">
-            <IconTool />
+            <WorkspaceIcon name="settings" />
             高级
           </Menu.Item>
           <Menu.Item key="about">

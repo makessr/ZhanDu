@@ -59,7 +59,7 @@ sudo apt --fix-broken install
 
 ## 界面预览
 
-所有截图均来自栈渡 v0.6.2 Windows 正式客户端。主机、文件、同步账号和诊断数据均为本地演示数据，AI 回复来自本地演示接口。
+截图来自栈渡 Windows 客户端。主机页和 SSH 工作区使用当前开发版，其余功能图来自 v0.6.2 正式版。主机、文件、同步账号和诊断数据均为本地演示数据，AI 回复来自本地演示接口。
 
 ### 主机同步
 
@@ -76,9 +76,11 @@ sudo apt --fix-broken install
 <details>
 <summary>主机管理与 SSH 分屏</summary>
 
-主机可按环境分组，支持搜索、连接历史和 OpenSSH 配置导入。
+主机可按环境分组，支持搜索、连接历史和 OpenSSH 配置导入。切到 SSH 会话后会显示监控、终端和 SFTP 文件区。
 
 ![栈渡主机列表，按环境分组](docs/screenshots/zhandu-hosts.png)
+
+![栈渡主机列表，深色主题](docs/screenshots/zhandu-hosts-dark.png)
 
 同一个工作区支持并排或上下显示两个 SSH 会话。
 
@@ -306,5 +308,7 @@ GitHub 仓库需要配置 Tauri 更新签名私钥 `TAURI_SIGNING_PRIVATE_KEY`�
 ## 开源许可
 
 客户端「关于」页可直接打开栈渡的 GitHub 仓库和许可证。
+
+桌面工作区的部分双色图标来自 [Kubai Icons](https://github.com/kubai087/kubai-icons)，随客户端离线提供，使用 [MIT 许可证](public/icons/kubai/LICENSE.txt)。主机页将连接列表、搜索排序和主机操作分开，界面包含浅色和深色主题。
 
 栈渡由 makessr 独立维护，源自 Max0897 开发的 FineShell，沿用 Apache-2.0 许可证。[原作者 Max0897](https://github.com/Max0897) · [原项目 FineShell](https://github.com/Max0897/FineShell) · [许可证](LICENSE)
