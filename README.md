@@ -123,7 +123,7 @@ SFTP 文件名筛选可从文件管理工具栏的搜索按钮打开，只筛选
 
 栈渡在独立仓库维护和发布。首次安装可直接下载栈渡 v0.6.2。 [栈渡安装包](https://github.com/makessr/ZhanDu/releases/latest) · [旧渠道 v0.6.1 切换版](https://github.com/makessr/FineShell/releases/tag/v0.6.1)
 
-已安装的 FineShell 或栈渡 v0.6.0 客户端先从旧渠道升级到 v0.6.1。重启后再检查更新，从栈渡独立渠道安装 v0.6.2。应用标识和本地凭据存储在两次升级中保持兼容。 [更新渠道迁移说明](docs/release-pipeline.md#从-fineshell-过渡到栈渡)
+如果你还在使用 FineShell v0.5.1 或栈渡 v0.6.0，可以在应用内直接升级到 v0.6.1。重启后再检查更新，从栈渡独立渠道安装 v0.6.2。应用标识和本地凭据存储在两次升级中保持兼容。 [更新渠道迁移说明](docs/release-pipeline.md#从-fineshell-过渡到栈渡)
 
 | 发布目标 | 安装包 |
 | --- | --- |
