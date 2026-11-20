@@ -76,7 +76,7 @@ sudo apt --fix-broken install
 <details>
 <summary>主机管理与 SSH 分屏</summary>
 
-主机可按环境分组，支持搜索、连接历史和 OpenSSH 配置导入。切到 SSH 会话后会显示监控、终端和 SFTP 文件区。
+主机可按环境分组。在列表上方搜索和排序，在右上角新增主机、导入 OpenSSH 配置或查看连接历史。切到 SSH 会话后会显示监控、终端和 SFTP 文件区。
 
 ![栈渡主机列表，按环境分组](docs/screenshots/zhandu-hosts.png)
 

@@ -19,7 +19,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: var(--workspace-icon-label-gap);
   border: 0;
   border-right: 1px solid var(--color-border-2);
   border-left: 1px solid var(--color-border-2);

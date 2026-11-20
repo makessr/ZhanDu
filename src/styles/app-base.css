@@ -24,6 +24,7 @@ body {
   --workspace-muted: #52657d;
   --workspace-accent: #215993;
   --workspace-active: #dceafd;
+  --workspace-icon-label-gap: 8px;
   --fs-drop-overlay: rgb(255 255 255 / 94%);
   --fs-scrollbar-thumb: #c9cdd4;
   --fs-scrollbar-thumb-hover: #86909c;
@@ -287,6 +288,10 @@ code *,
   pointer-events: none;
 }
 
+.arco-btn > .workspace-icon + span {
+  margin-inline-start: var(--workspace-icon-label-gap);
+}
+
 .application-titlebar-action-button.arco-btn:not(.arco-btn-disabled):hover {
   color: var(--color-text-1);
   background: var(--workspace-active);
@@ -311,7 +316,7 @@ code *,
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
+  gap: var(--workspace-icon-label-gap);
 }
 
 .application-titlebar-menu-label .workspace-icon {

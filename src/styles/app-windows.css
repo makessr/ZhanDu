@@ -81,17 +81,17 @@
 }
 
 .settings-sidebar .workspace-icon {
-  margin-right: 8px;
+  margin-inline-end: var(--workspace-icon-label-gap);
 }
 
 .settings-submenu-title {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--workspace-icon-label-gap);
 }
 
 .settings-sidebar .settings-submenu-title .workspace-icon {
-  margin-right: 0;
+  margin-inline-end: 0;
 }
 
 .settings-about-menu-label {
@@ -988,6 +988,10 @@
 
 .host-connect-button.arco-btn:not(.arco-btn-disabled):hover {
   background: var(--workspace-active);
+}
+
+.host-connect-button.arco-btn > svg + span {
+  margin-inline-start: 6px;
 }
 
 .host-tree-table .arco-table-body {
