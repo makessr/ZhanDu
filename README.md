@@ -231,7 +231,7 @@ bun run tauri build
 
 ## 开发与测试
 
-GitHub CI 运行前端构建、同步服务测试以及 Rust 测试和 Clippy。Rust 检查（Ubuntu 24.04）和 Linux 发布构建（Ubuntu 22.04 的 x64、ARM64）共用 Ubuntu 官方 HTTPS 软件源配置，分别安装各自的依赖。
+GitHub CI 运行前端构建、同步服务测试以及 Rust 测试和 Clippy。Rust 检查（Ubuntu 24.04）和 Linux 发布构建（Ubuntu 22.04 的 x64、ARM64）共用 Ubuntu 官方 HTTPS 软件源配置，分别安装各自的依赖。 本验收分支在两种架构的 Ubuntu 22.04 运行器上演练发布依赖安装。
 
 ```bash
 # 前端单元测试、类型检查和生产构建
