@@ -134,7 +134,11 @@ SFTP 文件名筛选可从文件管理工具栏的搜索按钮打开，只筛选
 
 从 v0.2.0 升级到 v0.3.0 时，请退出 FineShell，下载与当前架构和安装方式一致的安装包，再覆盖安装。v0.2.0 和 v0.3.0 的应用内更新会拒绝本仓库的下载地址。
 
-macOS 发布包使用临时签名，Apple Developer ID 签名和公证状态以发布说明为准。
+### macOS 安装
+
+Apple Silicon 下载文件名带 `darwin_aarch64` 的 DMG，Intel 下载带 `darwin_x64` 的 DMG。打开映像后，把 `FineShell.app` 拖到「应用程序」，再打开应用。客户端内显示为「栈渡」。
+
+v0.6.2 的 macOS 包使用临时签名，尚未通过 Apple 公证，首次打开可能被 Gatekeeper 阻止。如果确认安装包来自项目的正式发布页且完整性已校验，可以在第一次尝试打开后，到「系统设置 → 隐私与安全性」检查是否有针对此应用的「仍要打开」按钮。[Apple 的首次打开说明](https://support.apple.com/zh-cn/102445)
 
 ### Linux 安装
 

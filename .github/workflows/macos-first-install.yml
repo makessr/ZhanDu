@@ -1,0 +1,90 @@
+name: Verify macOS v0.6.2 first install
+
+on:
+  push:
+    branches: [test/macos-v062-first-install]
+
+permissions:
+  contents: read
+
+jobs:
+  first-install:
+    name: macOS ${{ matrix.arch }} first install
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            arch: arm64
+            artifact: FineShell_0.6.2_darwin_aarch64.dmg
+            digest: 1aefbc605cc6c790131c2c5266579cd968003e1efe932db7aa576656f731c94b
+          - runner: macos-15-intel
+            arch: x86_64
+            artifact: FineShell_0.6.2_darwin_x64.dmg
+            digest: b49e98dca7662a2a6e3bf83fb744c7dda566369f07b6607f5082b8da2f9cd580
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Download and verify the official DMG
+        env:
+          ARTIFACT: ${{ matrix.artifact }}
+          DIGEST: ${{ matrix.digest }}
+        run: |
+          set -Eeuo pipefail
+          cd "$RUNNER_TEMP"
+          url="https://github.com/makessr/ZhanDu/releases/download/v0.6.2/$ARTIFACT"
+          curl -fsSL --retry 3 -o "$ARTIFACT" "$url"
+          printf '%s  %s\n' "$DIGEST" "$ARTIFACT" | shasum -a 256 --check
+      - name: Verify bundle integrity, assess Gatekeeper, and launch a clean copy
+        env:
+          ARTIFACT: ${{ matrix.artifact }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -Eeuo pipefail
+          sw_vers
+          test "$(uname -m)" = "$ARCH"
+          work="$(mktemp -d "$RUNNER_TEMP/zhandu-dmg.XXXXXX")"
+          mount="$work/mount"
+          mkdir "$mount"
+          hdiutil attach "$RUNNER_TEMP/$ARTIFACT" -mountpoint "$mount" -nobrowse -readonly
+          trap 'hdiutil detach "$mount"' EXIT
+
+          app="$work/Applications/FineShell.app"
+          mkdir -p "$work/Applications"
+          ditto "$mount/FineShell.app" "$app"
+          plist="$app/Contents/Info.plist"
+          executable="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$plist")"
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist")"
+          identifier="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist")"
+          test "$version" = 0.6.2
+          test "$identifier" = com.fineshell.app
+          test "$(lipo -archs "$app/Contents/MacOS/$executable")" = "$ARCH"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          signature="$(codesign --display --verbose=2 "$app" 2>&1)"
+          printf '%s\n' "$signature"
+          grep -Fxq 'Signature=adhoc' <<< "$signature"
+
+          test ! -e "$HOME/Library/WebKit/$identifier"
+          swiftc scripts/macos-smoke/verify-window.swift -o "$work/verify-window"
+          open -n "$app"
+          "$work/verify-window" "$app"
+
+          # Use a separate copy so the launch test cannot grant an exception to this app.
+          assessed_app="$work/Downloaded/FineShell.app"
+          mkdir -p "$work/Downloaded"
+          ditto "$mount/FineShell.app" "$assessed_app"
+          stamp="$(printf '%08x' "$(date +%s)")"
+          xattr -w com.apple.quarantine "0081;$stamp;ZhanDuReleaseAcceptance;" "$assessed_app"
+          xattr -p com.apple.quarantine "$assessed_app"
+          spctl --status
+          if assessment="$(spctl --assess --type execute --verbose=4 "$assessed_app" 2>&1)"; then
+            printf 'Gatekeeper accepted the quarantined copy:\n%s\n' "$assessment"
+          else
+            status=$?
+            printf 'Gatekeeper returned %s for the quarantined copy:\n%s\n' "$status" "$assessment"
+            test "$status" -eq 3
+            grep -F ': rejected' <<< "$assessment"
+          fi
