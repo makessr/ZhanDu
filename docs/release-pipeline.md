@@ -59,6 +59,10 @@ GitHub Actions 需要配置仓库密钥 `TAURI_SIGNING_PRIVATE_KEY`，用于生�
 
 ## 草稿产物验收
 
+每次发布构建会在 GitHub Actions 运行的 Artifacts 中提供各架构的 `cargo-timings-*` 报告，保留七天。用报告对比各 Rust crate 的编译耗时，并用任务步骤的时间核对缓存恢复、前端依赖安装和安装包生成耗时。
+
+Windows ARM64 的实测比较了三套独立运行器。恢复 Bun 软件包缓存并安装依赖的两次耗时约 90 秒和 123 秒，直接安装约 100 秒。发布流程继续使用冻结锁文件安装依赖。[Windows ARM64 缓存对照](https://github.com/makessr/ZhanDu/actions/runs/44758275558)
+
 在 GitHub Actions 打开 `Audit release assets`，选择 `main` 分支运行。
 
 | 输入 | 填写方式 |
