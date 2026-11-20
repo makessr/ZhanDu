@@ -1,0 +1,91 @@
+name: Verify public macOS and Linux channel migration
+
+on:
+  push:
+    branches: [test/public-unix-migration-ota]
+
+permissions:
+  contents: read
+
+jobs:
+  upgrade:
+    name: ${{ matrix.platform }} ${{ matrix.arch }} public OTA
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            platform: Linux
+            arch: amd64
+            artifact: FineShell_0.6.0_linux_amd64.deb
+            digest: e4d01aba42b32b433d6b147392384dbdb4210e1a6dc550a82c34a1624ed2e3f3
+          - runner: ubuntu-22.04-arm
+            platform: Linux
+            arch: arm64
+            artifact: FineShell_0.6.0_linux_arm64.deb
+            digest: ae3e19d1fbbf5caea658f75ae6ec878381d0dbb568d3fe96569d254aaabd5eac
+          - runner: macos-latest
+            platform: macOS
+            arch: arm64
+            artifact: FineShell_0.6.0_darwin_aarch64.dmg
+            digest: 5ae13deaeca9ab805e50c0d9072eddbbe704c5fb3c71ec8e8407dbcabb553721
+          - runner: macos-15-intel
+            platform: macOS
+            arch: x86_64
+            artifact: FineShell_0.6.0_darwin_x64.dmg
+            digest: 8323257bb49a95766909a5fedf9b528b8f43982f705231e8cbc99a236cde655c
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Verify public release manifests and baseline installer
+        shell: bash
+        env:
+          ARTIFACT: ${{ matrix.artifact }}
+          DIGEST: ${{ matrix.digest }}
+        run: |
+          set -Eeuo pipefail
+          cd "$RUNNER_TEMP"
+          for release in FineShell:0.6.1 ZhanDu:0.6.2; do
+            repo="${release%:*}"
+            version="${release#*:}"
+            url="https://github.com/makessr/$repo/releases/download/v$version"
+            curl -fsSL --retry 3 "https://github.com/makessr/$repo/releases/latest/download/latest.json" |
+              jq -e --arg version "$version" --arg url "$url/" '
+                .version == $version and
+                (.platforms | length > 0 and all(.[]; (.url | startswith($url)) and (.signature | length > 0)))
+              '
+          done
+          curl -fsSL --retry 3 -o "$ARTIFACT" "https://github.com/makessr/FineShell/releases/download/v0.6.0/$ARTIFACT"
+          printf '%s  %s\n' "$DIGEST" "$ARTIFACT" | shasum -a 256 --check
+      - name: Install Linux baseline and desktop test dependencies
+        if: runner.os == 'Linux'
+        env:
+          ARCH: ${{ matrix.arch }}
+          ARTIFACT: ${{ matrix.artifact }}
+        run: |
+          set -Eeuo pipefail
+          package="$RUNNER_TEMP/$ARTIFACT"
+          test "$(dpkg --print-architecture)" = "$ARCH"
+          test "$(dpkg-deb -f "$package" Architecture)" = "$ARCH"
+          sudo apt-get -o Acquire::Retries=3 update -qq
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends "$package" xvfb xauth xdotool x11-utils dbus-x11 at-spi2-core python3-pyatspi
+      - name: Upgrade twice through the Linux desktop
+        if: runner.os == 'Linux'
+        env:
+          ARCH: ${{ matrix.arch }}
+          ARTIFACT: ${{ matrix.artifact }}
+        run: |
+          set -Eeuo pipefail
+          test "$(id -u)" -ne 0
+          sudo -n true
+          name="$(dpkg-deb -f "$RUNNER_TEMP/$ARTIFACT" Package)"
+          xvfb-run -a -s '-screen 0 1440x1000x24' dbus-run-session -- bash scripts/linux-smoke/ota.sh "$name" "$ARCH"
+      - name: Upgrade twice through the macOS desktop
+        if: runner.os == 'macOS'
+        env:
+          ARCH: ${{ matrix.arch }}
+          ARTIFACT: ${{ matrix.artifact }}
+        run: bash scripts/macos-smoke/ota.sh "$RUNNER_TEMP/$ARTIFACT" "$ARCH"

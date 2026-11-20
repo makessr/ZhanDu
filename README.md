@@ -260,6 +260,8 @@ SFTP 大目录预览会分批显示最先读取的项目，最多预览 1,024 �
 
 `scripts/windows-smoke/` 提供两个 PowerShell 入口。同步验收从两套空白 WebView2 配置和独立的 Windows 凭据库命名空间开始。它启动本机的同步和 SSH/SFTP 测试服务，验证登录后自动同步，并以同步得到的 SSH 密码和私钥打开终端、读取 SFTP 目录。OTA 验收从已验签的上一个 Windows x64 NSIS 安装包出发，使用应用内更新并检查本地配置是否保留。运行方法见 [发布流水线](docs/release-pipeline.md#windows-桌面验收)。
 
+macOS 和 Linux 的跨仓库升级验收使用独立 GitHub Actions 运行器，覆盖从 FineShell v0.6.0 经 v0.6.1 升级到栈渡 v0.6.2。
+
 ## 版本发布
 
 开发过程中将变更记录到 `CHANGELOG.md` 顶部的 `Unreleased` 区域。发布时在 GitHub Actions 中运行 `Prepare Release` 并选择版本级别，工作流会统一升级版本、整理更新日志并创建发布 PR。合并发布 PR 后会按仓库变量 `FINESHELL_RELEASE_PLATFORMS` 构建对应平台的安装包，并发布签名后的 OTA 更新清单。
