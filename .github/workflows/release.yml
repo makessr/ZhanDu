@@ -134,7 +134,7 @@ jobs:
               "repos/$GITHUB_REPOSITORY/releases" \
               -F tag_name="$RELEASE_TAG" \
               -F target_commitish="$GITHUB_SHA" \
-              -F name="FineShell $RELEASE_TAG" \
+              -F name="栈渡 $RELEASE_TAG" \
               -F body="" \
               -F draft=true \
               -F prerelease="$prerelease" \
@@ -188,6 +188,22 @@ jobs:
         with:
           key: ${{ matrix.rustCacheKey }}
           workspaces: src-tauri -> target
+      - name: Identify Windows ARM64 OpenSSL cache
+        id: openssl
+        if: matrix.platform == 'windows-11-arm'
+        shell: pwsh
+        run: ./scripts/windows-openssl-cache.ps1 -Mode key
+      - name: Restore Windows ARM64 OpenSSL libraries
+        id: openssl_restore
+        if: matrix.platform == 'windows-11-arm'
+        uses: actions/cache/restore@v5
+        with:
+          key: ${{ steps.openssl.outputs.key }}
+          path: ${{ steps.openssl.outputs.path }}
+      - name: Select Windows ARM64 OpenSSL build
+        if: matrix.platform == 'windows-11-arm'
+        shell: pwsh
+        run: ./scripts/windows-openssl-cache.ps1 -Mode use
       - name: Install frontend dependencies
         run: bun install --frozen-lockfile
       - name: Build installers and upload release assets
@@ -205,13 +221,24 @@ jobs:
           releaseAssetNamePattern: "[name]_[version]_[platform]_[arch][setup][ext]"
           releaseBody: ${{ steps.release_notes.outputs.body }}
           releaseDraft: true
-          releaseName: FineShell ${{ needs.validate.outputs.release_tag }}
+          releaseName: 栈渡 ${{ needs.validate.outputs.release_tag }}
           retryAttempts: 2
           tagName: ${{ needs.validate.outputs.release_tag }}
           tauriScript: bun tauri
           updaterJsonPreferNsis: true
           uploadUpdaterJson: true
           uploadUpdaterSignatures: true
+      - name: Collect Windows ARM64 OpenSSL libraries
+        id: openssl_collect
+        if: matrix.platform == 'windows-11-arm' && steps.openssl_restore.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: ./scripts/windows-openssl-cache.ps1 -Mode save
+      - name: Save Windows ARM64 OpenSSL libraries
+        if: steps.openssl_collect.outputs.saved == 'true'
+        uses: actions/cache/save@v5
+        with:
+          key: ${{ steps.openssl.outputs.key }}
+          path: ${{ steps.openssl.outputs.path }}
       - name: Upload Cargo build timings
         if: ${{ !cancelled() }}
         continue-on-error: true

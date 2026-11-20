@@ -61,13 +61,27 @@ function keyChange(
 ) {
   const host = configuration.hosts.find(({ id }) => id === hostId);
   if (!host) throw new Error("所选主机已被删除");
+  const oldReference = host.authMethod === "privateKey"
+    ? host.sshKeyId
+      ? configuration.sshKeys.find(({ id }) => id === host.sshKeyId)?.privateKeyPath
+      : host.privateKeyPath
+    : undefined;
   const replacement = { ...host, authMethod: "privateKey" as const, sshKeyId: keyId, privateKeyPath: undefined };
   const [candidate, proxy, jump] = resolveWorkspaceConnection(replacement, configuration);
   const { address, port, username, authMethod, privateKeyPath, connectTimeoutSeconds, keepAliveIntervalSeconds } = candidate;
   const request = { hostId: keyId, address, port, username, authMethod, privateKeyPath, connectTimeoutSeconds,
     keepAliveIntervalSeconds, expectedFingerprint: host.hostFingerprint, proxy, jumpHost: jumpHostRequest(jump) };
-  const original = [host.authMethod, host.sshKeyId, host.privateKeyPath];
-  return { host, replacement, request, snapshot: JSON.stringify([request, original]) };
+  const original = [host.authMethod, host.sshKeyId, oldReference];
+  return { host, replacement, request, oldReference, snapshot: JSON.stringify([request, original]) };
+}
+
+interface SshPrivateKeyIdentity {
+  publicKey: string;
+  fingerprint: string;
+}
+
+function readKeyIdentity(reference: string) {
+  return invoke<SshPrivateKeyIdentity>("ssh_private_key_identity", { reference }).catch(() => undefined);
 }
 
 function createSshKeyId() {
@@ -385,6 +399,11 @@ function SshKeySettings() {
         result = await verify(result.fingerprint);
         if (result.status !== "connected") throw new Error("验证期间主机指纹已变化，请重试");
       }
+      const replacingKey = change.host.authMethod !== "password" && change.host.sshKeyId !== keyId;
+      const [oldKey, newKey] = replacingKey ? await Promise.all([
+        change.oldReference ? readKeyIdentity(change.oldReference) : undefined,
+        change.request.privateKeyPath ? readKeyIdentity(change.request.privateKeyPath) : undefined,
+      ]) : [];
       await updateConfiguration((current) => {
         const latest = keyChange(current, hostId, keyId);
         if (latest.snapshot !== change.snapshot) {
@@ -402,14 +421,29 @@ function SshKeySettings() {
       setInstallKey(null);
       await notifyMainWindow();
       await refresh();
-      if (change.host.authMethod !== "password" && change.host.sshKeyId !== keyId) {
-        Modal.info({
-          title: "新密钥已验证并启用",
-          content: "确认没有其他设备或主机需要旧公钥后，可以从服务器的 authorized_keys 手动移除旧公钥。",
-        });
-      } else {
+      if (!replacingKey) {
         Message.success("新密钥已验证，主机已切换为密钥登录");
+        return;
       }
+      if (oldKey && newKey && oldKey.fingerprint === newKey.fingerprint) {
+        Message.success("新密钥已验证，与原配置使用同一把公钥");
+        return;
+      }
+      Modal.info({
+        title: "新密钥已验证并启用",
+        content: oldKey && newKey ? (
+          <Space direction="vertical">
+            <Typography.Text>
+              确认没有其他设备需要旧公钥后，在服务器的 authorized_keys 中按下方指纹核对条目，再手动移除。
+            </Typography.Text>
+            <Typography.Text copyable>{oldKey.fingerprint}</Typography.Text>
+            <Button onClick={() => void writeText(oldKey.publicKey)
+              .then(() => Message.success("旧公钥已复制")).catch((error) => Message.error(String(error)))}>
+              复制旧公钥
+            </Button>
+          </Space>
+        ) : "当前无法识别旧公钥。请先在服务器核对旧条目的指纹，再手动撤销。",
+      });
     } catch (error) {
       Message.error(String(error));
     } finally {
@@ -666,6 +700,7 @@ function SshKeySettings() {
               <>
                 <Select
                   aria-label="选择要使用密钥的主机"
+                  disabled={acting}
                   onChange={setInstallHostId}
                   options={hosts.map((host) => ({
                     label: `${host.name}（${host.username}@${host.address}）`,

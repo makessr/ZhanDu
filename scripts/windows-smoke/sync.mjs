@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { once } from "node:events";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -201,6 +201,11 @@ try {
   assert.ok(!received.keys.some((key) => key.id === standaloneKeyId), "Unlinked keys stay on device A");
   const receivedKey = received.keys.find((key) => key.id === generatedKeyId);
   assert.equal(await invoke(b, "managed_ssh_key_public", { reference: receivedKey.privateKeyPath }), generated.publicKey);
+  const keyFingerprint = "SHA256:" + createHash("sha256").update(Buffer.from(generated.publicKey.split(" ")[1], "base64"))
+    .digest("base64").replace(/=+$/, "");
+  assert.deepEqual(await invoke(b, "ssh_private_key_identity", { reference: receivedKey.privateKeyPath }), {
+    publicKey: generated.publicKey, fingerprint: keyFingerprint,
+  });
   const check = { ...common, hostId: generatedKeyId, username: "fineshell-generated", authMethod: "privateKey",
     privateKeyPath: receivedKey.privateKeyPath };
   const initialPublicKeyCount = fixture.counts.publickey;
@@ -328,8 +333,12 @@ try {
   assert.equal((await evaluate(b, configuration)).hosts.find(({ id }) => id === hosts[2].id).sshKeyId, generatedKeyId);
   fixture.allowPublicKey(hosts[2].username, replacementPublicKey);
   await click(setupB, "已安装，验证并启用", ".arco-modal button");
-  await until("Show manual old key removal guidance", () => evaluate(setupB, () =>
-    document.body.innerText.includes("新密钥已验证并启用")));
+  await until("Show old key identity and copy action", () => evaluate(setupB, (fingerprint) => {
+    const modal = [...document.querySelectorAll(".arco-modal")]
+      .find((item) => item.textContent.includes("新密钥已验证并启用"));
+    return modal?.textContent.includes(fingerprint) &&
+      [...modal.querySelectorAll("button")].some((button) => button.textContent.trim() === "复制旧公钥");
+  }, keyFingerprint));
   assert.notEqual((await evaluate(b, configuration)).hosts.find(({ id }) => id === hosts[2].id).sshKeyId, generatedKeyId);
   console.log("未安装的新密钥未替换原配置，授权后验证成功并提示手动撤销旧公钥。");
 } finally {

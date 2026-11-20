@@ -1,0 +1,112 @@
+name: Verify public OTA
+
+on:
+  workflow_dispatch:
+    inputs:
+      baseline:
+        description: 起始正式版（例如 0.8.0）
+        type: string
+        required: true
+      target:
+        description: 目标正式版（当前公开更新频道）
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  BASELINE: ${{ inputs.baseline }}
+  TARGET: ${{ inputs.target }}
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  windows:
+    name: Windows ${{ matrix.arch }} upgrade
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-latest
+          - arch: arm64
+            runner: windows-11-arm
+    env:
+      ARCH: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '26'
+          architecture: ${{ matrix.arch }}
+      - name: Verify installer and update from inside the app
+        shell: pwsh
+        run: |
+          if ($env:RUNNER_ARCH -ne $env:ARCH) { throw 'Unexpected runner architecture' }
+          $baseline = Join-Path $env:RUNNER_TEMP 'baseline.exe'
+          node scripts/download-ota-baseline.mjs $env:BASELINE $env:TARGET "windows-$env:ARCH" $baseline
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm install --prefix "$env:RUNNER_TEMP/fixture" --ignore-scripts --no-audit --no-fund ssh2@1.17.0
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $fixture = Join-Path $env:RUNNER_TEMP 'fixture/node_modules/ssh2/lib/index.js'
+          ./scripts/windows-smoke/ota.ps1 -VerifiedInstaller $baseline -Baseline $env:BASELINE -Target $env:TARGET -Ssh2Module $fixture -UseHostedRunnerWebView2Policy -RequireArm64:($env:ARCH -eq 'arm64')
+
+  macos:
+    name: macOS ${{ matrix.arch }} upgrade
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-latest
+          - arch: x86_64
+            runner: macos-15-intel
+    env:
+      ARCH: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '26'
+      - name: Verify installer and update from inside the app
+        shell: bash
+        run: |
+          node scripts/download-ota-baseline.mjs "$BASELINE" "$TARGET" "macos-$ARCH" "$RUNNER_TEMP/baseline.dmg"
+          bash scripts/macos-smoke/ota.sh "$RUNNER_TEMP/baseline.dmg" "$ARCH" "$BASELINE" "$TARGET"
+
+  debian:
+    name: Debian ${{ matrix.debian }} XFCE / ${{ matrix.arch }}
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        debian: ['12', '13']
+        arch: [amd64, arm64]
+    env:
+      ARCH: ${{ matrix.arch }}
+      DEBIAN_VERSION: ${{ matrix.debian }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '26'
+      - name: Verify installer and update inside XFCE
+        shell: bash
+        run: |
+          node scripts/download-ota-baseline.mjs "$BASELINE" "$TARGET" "linux-$ARCH" "$RUNNER_TEMP/baseline.deb"
+          docker run --rm --platform "linux/$ARCH" \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/scripts/linux-smoke/press-update.py,dst=/tmp/press-update.py,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/baseline.deb,dst=/tmp/zhandu.deb,readonly" \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/scripts/linux-smoke/debian-xfce.sh,dst=/tmp/debian-xfce.sh,readonly" \
+            "debian:$DEBIAN_VERSION" bash /tmp/debian-xfce.sh "$DEBIAN_VERSION" "$ARCH" "$BASELINE" "$TARGET"
