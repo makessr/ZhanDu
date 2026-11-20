@@ -38,7 +38,12 @@ function Test-OpenSslLayout([string]$Path) {
 }
 
 $build = Join-Path $TargetDirectory "$target/release/build"
-$install = Get-ChildItem -LiteralPath $build -Directory -Filter 'openssl-sys-*' -ErrorAction SilentlyContinue |
+# Cargo 1.100 stores build scripts in build/<package>/<unit-id>.
+$packages = @(
+    Get-ChildItem -LiteralPath (Join-Path $build 'openssl-sys') -Directory -ErrorAction SilentlyContinue
+    Get-ChildItem -LiteralPath $build -Directory -Filter 'openssl-sys-*' -ErrorAction SilentlyContinue
+)
+$install = $packages |
     ForEach-Object { Join-Path $_.FullName 'out/openssl-build/install' } |
     Where-Object { Test-OpenSslLayout $_ } |
     Select-Object -First 1
