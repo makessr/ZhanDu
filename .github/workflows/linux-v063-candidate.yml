@@ -1,0 +1,81 @@
+name: Verify v0.6.3 Linux candidate from source
+
+on:
+  push:
+    branches: [test/linux-v063-candidate]
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Build and install Linux v0.6.3 / ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-22.04
+          - arch: arm64
+            runner: ubuntu-22.04-arm
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install Linux release dependencies
+        timeout-minutes: 8
+        shell: bash
+        run: |
+          bash scripts/install-tauri-linux-dependencies.sh \
+            libayatana-appindicator3-dev librsvg2-dev libwebkit2gtk-4.1-dev patchelf xdg-utils
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - name: Build the unsigned Linux candidate from source
+        shell: bash
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          bun install --frozen-lockfile
+          bun run release:check -- v0.6.3 "$GITHUB_REPOSITORY"
+          test "$(dpkg --print-architecture)" = "$ARCH"
+          bun run tauri build --bundles deb --ci --no-sign \
+            --config '{"bundle":{"createUpdaterArtifacts":false}}'
+          shopt -s nullglob
+          candidates=(src-tauri/target/release/bundle/deb/*.deb)
+          test "${#candidates[@]}" = 1
+          candidate="${candidates[0]}"
+          test "$(dpkg-deb -f "$candidate" Version)" = 0.6.3
+          test "$(dpkg-deb -f "$candidate" Architecture)" = "$ARCH"
+          dpkg-deb -f "$candidate" Depends | tr ',' '\n' | grep -Fx 'ca-certificates'
+          sha256sum "$candidate"
+          cp "$candidate" "$RUNNER_TEMP/zhandu-v063.deb"
+      - name: Install the candidate on Debian 12 and 13
+        shell: bash
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          for version in 12 13; do
+            docker run --rm --platform "linux/$ARCH" \
+              --env DEBIAN_FRONTEND=noninteractive \
+              --mount "type=bind,src=$RUNNER_TEMP/zhandu-v063.deb,dst=/tmp/zhandu.deb,readonly" \
+              "debian:$version-slim" bash -Eeuo pipefail -c '
+                test ! -s /etc/ssl/certs/ca-certificates.crt
+                apt-get -o Acquire::Retries=3 update -qq
+                apt-get -o Acquire::Retries=3 install -y --no-install-recommends /tmp/zhandu.deb
+                test "$(dpkg-query -W -f="\${Version}" fine-shell)" = 0.6.3
+                test "$(dpkg-query -W -f="\${Architecture}" fine-shell)" = "$2"
+                test -s /etc/ssl/certs/ca-certificates.crt
+                linked="$(ldd /usr/bin/fineshell)"
+                if grep -F "not found" <<< "$linked"; then exit 1; fi
+                apt-get -o Acquire::Retries=3 install -y --no-install-recommends curl
+                curl -fsSL --retry 3 -o /dev/null https://github.com/makessr/ZhanDu/releases/latest/download/latest.json
+                printf "Debian %s / %s installed v0.6.3, resolved shared libraries and reached the update feed.\n" "$1" "$2"
+              ' bash "$version" "$ARCH"
+          done
