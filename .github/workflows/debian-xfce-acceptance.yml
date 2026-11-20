@@ -1,0 +1,38 @@
+name: Verify Debian XFCE v0.6.2
+
+on:
+  push:
+    branches: [test/debian-xfce-v062]
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    name: Debian ${{ matrix.debian }} / ${{ matrix.arch }}
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        debian: ['12', '13']
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Verify and install the public package in XFCE
+        env:
+          DEBIAN_VERSION: ${{ matrix.debian }}
+          ARCH: ${{ matrix.arch }}
+          DIGEST: ${{ matrix.arch == 'arm64' && '97903c1ed788e5e1086c35ec81cbcda6e306919267499e0f2cc058ce6b21333f' || '2ae243bfe625c5a4a92d233d549985bb2cbd194706f6213da65c2f50e05b29d1' }}
+        run: |
+          set -Eeuo pipefail
+          artifact="FineShell_0.6.2_linux_$ARCH.deb"
+          pkg="$RUNNER_TEMP/$artifact"
+          curl -fsSL --retry 3 -o "$pkg" "https://github.com/makessr/ZhanDu/releases/download/v0.6.2/$artifact"
+          printf '%s  %s\n' "$DIGEST" "$pkg" | sha256sum --check
+          docker run --rm --platform "linux/$ARCH" \
+            --mount "type=bind,src=$pkg,dst=/tmp/zhandu.deb,readonly" \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/scripts/linux-smoke/debian-xfce.sh,dst=/tmp/debian-xfce.sh,readonly" \
+            "debian:$DEBIAN_VERSION" bash /tmp/debian-xfce.sh "$DEBIAN_VERSION" "$ARCH"
