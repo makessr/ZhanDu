@@ -479,6 +479,7 @@ function SettingsWindow() {
                     }
                     options={[
                       { label: "1,000 行", value: 1_000 },
+                      { label: "2,000 行", value: 2_000 },
                       { label: "5,000 行", value: 5_000 },
                       { label: "10,000 行", value: 10_000 },
                       { label: "50,000 行", value: 50_000 },

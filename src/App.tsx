@@ -84,13 +84,16 @@ const ServerMonitorPanel = lazy(
 const loadAiAssistantPanel = () => import("./components/AiAssistantPanel");
 const AiAssistantPanel = lazy(loadAiAssistantPanel);
 const TerminalView = lazy(() => import("./components/TerminalView"));
+const SERVER_MONITOR_COLLAPSED_KEY = "fineshell:server-monitor-collapsed";
 
 function App() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
   const [quickCommands, setQuickCommands] = useState<QuickCommandRecord[]>([]);
   const [quickCommandDrawerVisible, setQuickCommandDrawerVisible] =
     useState(false);
-  const [serverMonitorCollapsed, setServerMonitorCollapsed] = useState(false);
+  const [serverMonitorCollapsed, setServerMonitorCollapsed] = useState(
+    () => localStorage.getItem(SERVER_MONITOR_COLLAPSED_KEY) === "true",
+  );
   const [sftpCollapsed, setSftpCollapsed] = useState(false);
   const [aiSidebarWidth, setAiSidebarWidth] = useState(
     AI_SIDEBAR_DEFAULT_WIDTH,
@@ -128,6 +131,11 @@ function App() {
   const [terminalFontSizeOffset, setTerminalFontSizeOffset] = useState(0);
   const mainSplitRef = useRef<HTMLElement | null>(null);
   const handleSessionsClosed = useCallback((closingIds: Set<string>) => {
+    setTerminalRecentOutputs((current) =>
+      Object.fromEntries(
+        Object.entries(current).filter(([sessionId]) => !closingIds.has(sessionId)),
+      ),
+    );
     setAiRemoteFileContexts((currentContexts) =>
       Object.fromEntries(
         Object.entries(currentContexts).filter(
@@ -665,6 +673,7 @@ function App() {
               }
               refreshIntervalSeconds={settings.monitorRefreshIntervalSeconds}
               session={activeSession}
+              visible={!serverMonitorCollapsed}
             />
           </Suspense>
         ) : (
@@ -704,6 +713,9 @@ function App() {
           <Suspense fallback={null}>
             <TerminalView
               active={session.id === activeSessionId}
+              collectRecentOutput={
+                session.id === activeSessionId && aiAssistantVisible
+              }
               focusRequest={
                 session.id === activeSessionId ? terminalFocusRequest : 0
               }
@@ -833,9 +845,11 @@ function App() {
           onOpenQuickCommands={() => setQuickCommandDrawerVisible(true)}
           onOpenSettings={() => openAuxiliaryWindow("settings")}
           onOpenShortcutGuide={() => openAuxiliaryWindow("shortcuts")}
-          onToggleServerMonitor={() =>
-            setServerMonitorCollapsed((collapsed) => !collapsed)
-          }
+          onToggleServerMonitor={() => {
+            const collapsed = !serverMonitorCollapsed;
+            setServerMonitorCollapsed(collapsed);
+            localStorage.setItem(SERVER_MONITOR_COLLAPSED_KEY, String(collapsed));
+          }}
           onToggleSftp={() => setSftpCollapsed((collapsed) => !collapsed)}
           serverMonitorCollapsed={serverMonitorCollapsed}
           sftpCollapsed={sftpCollapsed}

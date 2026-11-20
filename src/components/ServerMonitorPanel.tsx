@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Alert,
   Button,
@@ -25,8 +33,6 @@ import {
   IconRobot,
 } from "@arco-design/web-react/icon";
 import { diagnosticInvoke as invoke } from "../diagnostics";
-import type { ITooltipLineActual } from "@visactor/vchart";
-import { AreaChart, BarChart } from "@visactor/react-vchart";
 import type {
   ServerMonitorHistoryPoint,
   ServerMonitorSnapshot,
@@ -45,7 +51,6 @@ import {
   formatMonitorRate,
   formatNetworkEndpoint,
   formatUptime,
-  normalizeMonitorPercent,
 } from "../monitor-utils";
 import ServerProcessDrawer from "./ServerProcessDrawer";
 import PortForwardDrawer from "./PortForwardDrawer";
@@ -55,7 +60,19 @@ import ConnectionStatusOverlay from "./ConnectionStatusOverlay";
 import { isTerminalSessionOperational } from "../terminal-utils";
 import { useResolvedAppearance } from "../hooks/useResolvedAppearance";
 
+const loadCharts = () => import("./ServerMonitorCharts");
+const UtilizationChart = lazy(() =>
+  loadCharts().then(({ UtilizationChart }) => ({ default: UtilizationChart })),
+);
+const ResourceTrendChart = lazy(() =>
+  loadCharts().then(({ ResourceTrendChart }) => ({ default: ResourceTrendChart })),
+);
+const NetworkTrendChart = lazy(() =>
+  loadCharts().then(({ NetworkTrendChart }) => ({ default: NetworkTrendChart })),
+);
+
 interface ServerMonitorPanelProps {
+  visible: boolean;
   refreshIntervalSeconds: number;
   session: TerminalSession | null;
   onReconnect: () => void;
@@ -66,29 +83,6 @@ interface ServerMonitorPanelProps {
   onPortForwardStatusChange: (status: PortForwardStatus) => void;
   onSendToAi: (sessionId: string, request: AiHandoffRequest) => void;
 }
-
-function enforcePercentTooltipContent(content?: ITooltipLineActual[]) {
-  return content?.map((line) => {
-    const value = normalizeMonitorPercent(line.value as unknown);
-    if (value === undefined || value === line.value) {
-      return line;
-    }
-    return {
-      ...line,
-      value,
-    };
-  });
-}
-
-const PERCENT_TOOLTIP_CONTENT = {
-  content: [{ key: { field: "metric" }, value: { field: "displayValue" } }],
-  updateContent: enforcePercentTooltipContent,
-};
-
-const PERCENT_TOOLTIP = {
-  dimension: PERCENT_TOOLTIP_CONTENT,
-  mark: PERCENT_TOOLTIP_CONTENT,
-};
 
 type ConnectionFilter = "all" | "listening" | "connected";
 
@@ -118,15 +112,8 @@ function connectionStateColor(state: string) {
   return "gray";
 }
 
-function tooltipMetric(datum?: Record<string, unknown>) {
-  return String(datum?.metric ?? "占用率");
-}
-
-function tooltipRate(datum?: Record<string, unknown>) {
-  return formatMonitorRate(Number(datum?.value));
-}
-
 function ServerMonitorPanel({
+  visible,
   refreshIntervalSeconds,
   session,
   onReconnect,
@@ -135,9 +122,14 @@ function ServerMonitorPanel({
   onSendToAi,
 }: ServerMonitorPanelProps) {
   const appearance = useResolvedAppearance();
-  const chartTextColor = appearance === "dark" ? "#c9cdd4" : "#4e5969";
   const chartSecondaryTextColor =
     appearance === "dark" ? "rgba(255, 255, 255, 0.45)" : "#86909c";
+  const [chartsVisible, setChartsVisible] = useState(false);
+  const [windowVisible, setWindowVisible] = useState(() => !document.hidden);
+  const pendingSnapshotRef = useRef<{
+    sessionId: string;
+    request: Promise<ServerMonitorSnapshot>;
+  }>();
   const [snapshot, setSnapshot] = useState<ServerMonitorSnapshot | null>(null);
   const [history, setHistory] = useState<ServerMonitorHistoryPoint[]>([]);
   const [error, setError] = useState<string>();
@@ -207,19 +199,32 @@ function ServerMonitorPanel({
   }, [resetMonitorState, session?.id, session?.status]);
 
   useEffect(() => {
+    const updateVisibility = () => setWindowVisible(!document.hidden);
+    document.addEventListener("visibilitychange", updateVisibility);
+    return () => document.removeEventListener("visibilitychange", updateVisibility);
+  }, []);
+
+  useEffect(() => {
     const sessionId = session?.id;
-    if (!sessionId || !isTerminalSessionOperational(session.status)) {
+    if (
+      !visible ||
+      !windowVisible ||
+      !sessionId ||
+      !isTerminalSessionOperational(session.status)
+    ) {
       return;
     }
 
     let disposed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const collect = async () => {
+      const pending = pendingSnapshotRef.current;
+      const request = pending?.sessionId === sessionId
+        ? pending.request
+        : invoke<ServerMonitorSnapshot>("ssh_monitor_snapshot", { sessionId });
+      pendingSnapshotRef.current = { sessionId, request };
       try {
-        const next = await invoke<ServerMonitorSnapshot>(
-          "ssh_monitor_snapshot",
-          { sessionId },
-        );
+        const next = await request;
         if (disposed) return;
         setSnapshot(next);
         onSnapshotChange(sessionId, next);
@@ -228,6 +233,9 @@ function ServerMonitorPanel({
       } catch (collectionError) {
         if (!disposed) setError(commandErrorMessage(collectionError));
       } finally {
+        if (pendingSnapshotRef.current?.request === request) {
+          pendingSnapshotRef.current = undefined;
+        }
         if (!disposed) {
           timer = setTimeout(collect, refreshIntervalSeconds * 1_000);
         }
@@ -239,7 +247,14 @@ function ServerMonitorPanel({
       disposed = true;
       if (timer) clearTimeout(timer);
     };
-  }, [onSnapshotChange, refreshIntervalSeconds, session?.id, session?.status]);
+  }, [
+    onSnapshotChange,
+    refreshIntervalSeconds,
+    session?.id,
+    session?.status,
+    visible,
+    windowVisible,
+  ]);
 
   const runPing = async (target = pingTarget) => {
     if (!session) return;
@@ -361,46 +376,6 @@ function ServerMonitorPanel({
             { metric: "磁盘", value: 0, displayValue: "-" },
           ],
     [monitorSnapshot],
-  );
-  const trendData = useMemo(
-    () =>
-      monitorHistory.flatMap((point) => {
-        const time = new Date(point.collectedAt).toLocaleTimeString("zh-CN", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        });
-        return [
-          {
-            metric: "CPU",
-            time,
-            value: Math.round(point.cpuUsagePercent),
-            displayValue: formatMonitorPercent(point.cpuUsagePercent),
-          },
-          {
-            metric: "内存",
-            time,
-            value: Math.round(point.memoryUsagePercent),
-            displayValue: formatMonitorPercent(point.memoryUsagePercent),
-          },
-        ];
-      }),
-    [monitorHistory],
-  );
-  const networkTrendData = useMemo(
-    () =>
-      monitorHistory.flatMap((point) => {
-        const time = new Date(point.collectedAt).toLocaleTimeString("zh-CN", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        });
-        return [
-          { metric: "下载", time, value: point.networkReceiveBytesPerSecond },
-          { metric: "上传", time, value: point.networkTransmitBytesPerSecond },
-        ];
-      }),
-    [monitorHistory],
   );
   const latestHistoryPoint = monitorHistory[monitorHistory.length - 1];
   const filteredConnections = useMemo(() => {
@@ -581,37 +556,20 @@ function ServerMonitorPanel({
             </span>
           ))}
         </div>
-        <BarChart
-          animation={false}
-          axes={[
-            {
-              orient: "left",
-              type: "band",
-              label: { style: { fill: chartTextColor, fontSize: 11 } },
-              tick: { visible: false },
-            },
-            {
-              max: 100,
-              min: 0,
-              orient: "bottom",
-              type: "linear",
-              label: { visible: false },
-              tick: { visible: false },
-            },
-          ]}
-          bar={{ style: { cornerRadius: 2 } }}
-          className="monitor-chart"
-          color={["#165dff", "#00b42a", "#f7ba1e"]}
-          data={[{ id: "utilization", values: utilizationData }]}
-          direction="horizontal"
-          height={105}
-          padding={{ bottom: 8, left: 0, right: 0, top: 4 }}
-          seriesField="metric"
-          theme={appearance}
-          tooltip={PERCENT_TOOLTIP}
-          xField="value"
-          yField="metric"
-        />
+        <Button
+          aria-expanded={chartsVisible}
+          disabled={!connected}
+          onClick={() => setChartsVisible((current) => !current)}
+          size="mini"
+          type="text"
+        >
+          {chartsVisible ? "隐藏图表" : "显示图表"}
+        </Button>
+        {visible && windowVisible && connected && chartsVisible && (
+          <Suspense fallback={null}>
+            <UtilizationChart utilizationData={utilizationData} />
+          </Suspense>
+        )}
       </div>
 
       <div className="monitor-chart-section">
@@ -623,49 +581,11 @@ function ServerMonitorPanel({
               : "磁盘 - / -"}
           </Typography.Text>
         </div>
-        <AreaChart
-          animation={false}
-          area={{ style: { fillOpacity: 0.12 } }}
-          axes={[
-            {
-              orient: "bottom",
-              type: "band",
-              label: { visible: false },
-              tick: { visible: false },
-            },
-            {
-              max: 100,
-              min: 0,
-              orient: "left",
-              type: "linear",
-              label: {
-                formatMethod: (value) => `${value}%`,
-                style: { fill: chartSecondaryTextColor, fontSize: 10 },
-              },
-              tick: { visible: false },
-            },
-          ]}
-          className="monitor-chart"
-          color={["#165dff", "#00b42a"]}
-          data={[{ id: "resource-trend", values: trendData }]}
-          height={128}
-          legends={{
-            orient: "top",
-            position: "start",
-            item: {
-              label: { style: { fill: chartTextColor, fontSize: 10 } },
-            },
-          }}
-          line={{ style: { lineWidth: 2 } }}
-          padding={{ bottom: 6, left: 0, right: 0, top: 22 }}
-          point={{ style: { size: 2 }, visible: monitorHistory.length < 2 }}
-          seriesField="metric"
-          stack={false}
-          theme={appearance}
-          tooltip={PERCENT_TOOLTIP}
-          xField="time"
-          yField="value"
-        />
+        {visible && windowVisible && connected && chartsVisible && (
+          <Suspense fallback={null}>
+            <ResourceTrendChart monitorHistory={monitorHistory} />
+          </Suspense>
+        )}
       </div>
 
       <div className="monitor-chart-section">
@@ -699,51 +619,11 @@ function ServerMonitorPanel({
             </strong>
           </span>
         </div>
-        <AreaChart
-          animation={false}
-          area={{ style: { fillOpacity: 0.12 } }}
-          axes={[
-            {
-              orient: "bottom",
-              type: "band",
-              label: { visible: false },
-              tick: { visible: false },
-            },
-            {
-              orient: "left",
-              type: "linear",
-              label: { visible: false },
-              tick: { visible: false },
-            },
-          ]}
-          className="monitor-chart"
-          color={["#165dff", "#f77234"]}
-          data={[{ id: "network-trend", values: networkTrendData }]}
-          height={128}
-          legends={{
-            orient: "top",
-            position: "start",
-            item: {
-              label: { style: { fill: chartTextColor, fontSize: 10 } },
-            },
-          }}
-          line={{ style: { lineWidth: 2 } }}
-          padding={{ bottom: 6, left: 0, right: 0, top: 22 }}
-          point={{ style: { size: 2 }, visible: monitorHistory.length < 2 }}
-          seriesField="metric"
-          stack={true}
-          theme={appearance}
-          tooltip={{
-            dimension: {
-              content: [{ key: tooltipMetric, value: tooltipRate }],
-            },
-            mark: {
-              content: [{ key: tooltipMetric, value: tooltipRate }],
-            },
-          }}
-          xField="time"
-          yField="value"
-        />
+        {visible && windowVisible && connected && chartsVisible && (
+          <Suspense fallback={null}>
+            <NetworkTrendChart monitorHistory={monitorHistory} />
+          </Suspense>
+        )}
       </div>
       <Drawer
         className="network-diagnostics-drawer"

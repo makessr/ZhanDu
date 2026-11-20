@@ -1,5 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
-import { render } from "@testing-library/react";
+import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { HostRecord, TerminalSession } from "../models";
 
 mock.module("@visactor/react-vchart", () => ({
@@ -31,10 +32,64 @@ function session(status: TerminalSession["status"]): TerminalSession {
 }
 
 describe("ServerMonitorPanel", () => {
+  test("pauses hidden monitoring and loads charts only on request", async () => {
+    const collect = mock(() => Promise.resolve({
+      collectedAt: Date.now(),
+      hostname: "test-host",
+      loadAverage: [0, 0, 0],
+      cpuUsagePercent: 5,
+    }));
+    mockIPC((command) => {
+      if (command === "ssh_monitor_snapshot") return collect();
+    });
+    let hidden = false;
+    const originalHidden = Object.getOwnPropertyDescriptor(document, "hidden");
+    Object.defineProperty(document, "hidden", {
+      configurable: true,
+      get: () => hidden,
+    });
+    const props = {
+      onPortForwardStatusChange: () => undefined,
+      onReconnect: () => undefined,
+      onSendToAi: () => undefined,
+      onSnapshotChange: () => undefined,
+      refreshIntervalSeconds: 30,
+      session: session("connected"),
+    };
+    const view = render(<ServerMonitorPanel {...props} visible={false} />);
+    try {
+      expect(collect).toHaveBeenCalledTimes(0);
+      view.rerender(<ServerMonitorPanel {...props} visible />);
+      expect(await screen.findByText("test-host")).not.toBeNull();
+      expect(collect).toHaveBeenCalledTimes(1);
+      expect(screen.queryByTestId("bar-chart")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "显示图表" }));
+      expect(await screen.findByTestId("bar-chart")).not.toBeNull();
+      await act(async () => {
+        hidden = true;
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      expect(screen.queryByTestId("bar-chart")).toBeNull();
+      expect(collect).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        hidden = false;
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      expect(collect).toHaveBeenCalledTimes(2);
+      expect(await screen.findByTestId("bar-chart")).not.toBeNull();
+    } finally {
+      view.unmount();
+      if (originalHidden) Object.defineProperty(document, "hidden", originalHidden);
+      else Reflect.deleteProperty(document, "hidden");
+      clearMocks();
+    }
+  });
+
   test("clears monitor data and uses muted placeholders when disconnected", () => {
     const onSnapshotChange = mock(() => undefined);
     const { container } = render(
       <ServerMonitorPanel
+        visible
         onPortForwardStatusChange={() => undefined}
         onReconnect={() => undefined}
         onSendToAi={() => undefined}
@@ -56,6 +111,7 @@ describe("ServerMonitorPanel", () => {
     const onSnapshotChange = mock(() => undefined);
     const { container } = render(
       <ServerMonitorPanel
+        visible
         onPortForwardStatusChange={() => undefined}
         onReconnect={() => undefined}
         onSendToAi={() => undefined}

@@ -2,6 +2,7 @@ import {
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -75,6 +76,7 @@ import ConnectionStatusOverlay from "./ConnectionStatusOverlay";
 import ContextMenu, { type ContextMenuItem } from "./ContextMenu";
 
 interface TerminalViewProps {
+  collectRecentOutput: boolean;
   active: boolean;
   focusRequest: number;
   onFontZoom: (action: TerminalFontZoomAction) => void;
@@ -163,6 +165,7 @@ async function writeClipboard(value: string) {
 }
 
 function TerminalView({
+  collectRecentOutput,
   active,
   focusRequest,
   onFontZoom,
@@ -206,6 +209,7 @@ function TerminalView({
     () => undefined,
   );
   const recentOutputChangeRef = useRef(onRecentOutputChange);
+  const collectRecentOutputRef = useRef(collectRecentOutput);
   const selectionChangeRef = useRef(onSelectionChange);
   const currentDirectoryChangeRef = useRef(onCurrentDirectoryChange);
   const settingsRef = useRef(settings);
@@ -234,7 +238,24 @@ function TerminalView({
   fontZoomRef.current = onFontZoom;
   currentDirectoryChangeRef.current = onCurrentDirectoryChange;
   recentOutputChangeRef.current = onRecentOutputChange;
+  collectRecentOutputRef.current = collectRecentOutput;
   selectionChangeRef.current = onSelectionChange;
+
+  const emitRecentOutput = useCallback(() => {
+    const terminal = terminalRef.current;
+    if (!terminal || !collectRecentOutputRef.current) return;
+    const buffer = terminal.buffer.active;
+    const start = Math.max(0, buffer.length - 100);
+    let output = "";
+    for (let index = start; index < buffer.length; index += 1) {
+      const line = buffer.getLine(index);
+      if (!line) continue;
+      const value = line.translateToString(true);
+      if (line.isWrapped) output += value;
+      else output += `${output ? "\n" : ""}${value}`;
+    }
+    recentOutputChangeRef.current(output.trimEnd());
+  }, []);
 
   useEffect(() => {
     if (!isTauri() || !settings.terminalLoggingEnabled) {
@@ -600,23 +621,12 @@ function TerminalView({
     let unlisten: (() => void) | undefined;
     let unlistenConfiguration: (() => void) | undefined;
     let recentOutputTimer: ReturnType<typeof setTimeout> | undefined;
-    const emitRecentOutput = () => {
-      recentOutputTimer = undefined;
-      const buffer = terminal.buffer.active;
-      const start = Math.max(0, buffer.length - 100);
-      let output = "";
-      for (let index = start; index < buffer.length; index += 1) {
-        const line = buffer.getLine(index);
-        if (!line) continue;
-        const value = line.translateToString(true);
-        if (line.isWrapped) output += value;
-        else output += `${output ? "\n" : ""}${value}`;
-      }
-      recentOutputChangeRef.current(output.trimEnd());
-    };
     const scheduleRecentOutput = () => {
-      if (recentOutputTimer) return;
-      recentOutputTimer = setTimeout(emitRecentOutput, 200);
+      if (disposed || !collectRecentOutputRef.current || recentOutputTimer) return;
+      recentOutputTimer = setTimeout(() => {
+        recentOutputTimer = undefined;
+        emitRecentOutput();
+      }, 200);
     };
     void listenProtocolEvent("ssh-output", ({ payload }) => {
       if (payload.sessionId === session.id) {
@@ -631,7 +641,10 @@ function TerminalView({
         }
         if (data.length > 0) {
           terminalLoggerRef.current?.append(data);
-          terminal.write(data, scheduleRecentOutput);
+          terminal.write(
+            data,
+            collectRecentOutputRef.current ? scheduleRecentOutput : undefined,
+          );
         }
       }
     }).then((stopListening) => {
@@ -675,7 +688,11 @@ function TerminalView({
       fitAddonRef.current = null;
       searchAddonRef.current = null;
     };
-  }, [session.id]);
+  }, [emitRecentOutput, session.id]);
+
+  useEffect(() => {
+    if (collectRecentOutput) terminalRef.current?.write("", emitRecentOutput);
+  }, [collectRecentOutput, emitRecentOutput, session.id]);
 
   useEffect(() => {
     const container = containerRef.current;
