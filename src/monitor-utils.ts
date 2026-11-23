@@ -7,7 +7,7 @@ export function appendMonitorHistory(
   history: ServerMonitorHistoryPoint[],
   snapshot: ServerMonitorSnapshot,
   collectedAt = Date.now(),
-  limit = 24,
+  limit = 48,
 ) {
   const previous = history[history.length - 1];
   const elapsedSeconds = previous

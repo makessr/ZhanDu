@@ -1,5 +1,8 @@
 import QuickCommandEditorModal from "./QuickCommandEditorModal";
-import { upsertQuickCommand } from "../configuration-mutations";
+import { addQuickCommandGroup, upsertQuickCommand } from "../configuration-mutations";
+import type { FineShellConfiguration } from "../config-database";
+import { emitProtocolEventTo } from "../tauri-protocol";
+import { isTauri } from "@tauri-apps/api/core";
 import { WorkspaceToolSurface } from "./WorkspaceToolPanel";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -33,7 +36,8 @@ interface QuickCommandDrawerProps {
   onAfterClose?: () => void;
   onCancel?: () => void;
   onSend: (command: string, execute: boolean, sessionId?: string) => Promise<void>;
-  onCommandsChange?: (commands: QuickCommandRecord[]) => void;
+  onLibraryChange?: (configuration: FineShellConfiguration) => void;
+  savedGroups: string[];
   targets?: { label: string; value: string }[];
   visible: boolean;
   embedded?: boolean;
@@ -59,17 +63,6 @@ function groupQuickCommands(commands: QuickCommandRecord[]) {
   }));
 }
 
-const COMMAND_GROUPS_KEY = "zhandu.quick-command-groups";
-
-function loadCommandGroups(): string[] {
-  try {
-    const stored: unknown = JSON.parse(localStorage.getItem(COMMAND_GROUPS_KEY) ?? "[]");
-    return Array.isArray(stored) ? stored.filter((name) => typeof name === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
 function QuickCommandDrawer({
   canSend,
   commands,
@@ -79,11 +72,11 @@ function QuickCommandDrawer({
   visible,
   embedded,
   onEdit,
-  onCommandsChange,
+  onLibraryChange,
+  savedGroups,
   targets = [],
 }: QuickCommandDrawerProps) {
   const [query, setQuery] = useState("");
-  const [savedGroups, setSavedGroups] = useState(loadCommandGroups);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [groupName, setGroupName] = useState<string | null>(null);
   const [creatingCommand, setCreatingCommand] = useState(false);
@@ -198,21 +191,33 @@ function QuickCommandDrawer({
     }
   };
 
-  function saveGroup() {
+  function applyLibraryChange(configuration: FineShellConfiguration) {
+    onLibraryChange?.(configuration);
+    if (isTauri()) {
+      void Promise.allSettled([
+        emitProtocolEventTo("main", "configuration:changed"),
+        emitProtocolEventTo("settings", "configuration:changed"),
+      ]);
+    }
+  }
+
+  async function saveGroup() {
     const name = groupName?.trim();
     if (!name) {
       Message.warning("请输入分组名称");
       return;
     }
+    if (saving) return;
     if (!groups.some(([group]) => group === name)) {
-      const next = [...savedGroups, name];
+      setSaving(true);
       try {
-        localStorage.setItem(COMMAND_GROUPS_KEY, JSON.stringify(next));
-      } catch {
-        Message.error("无法保存分组");
+        applyLibraryChange(await addQuickCommandGroup(name));
+      } catch (error) {
+        Message.error(String(error));
         return;
+      } finally {
+        setSaving(false);
       }
-      setSavedGroups(next);
     }
     setSelectedGroup(name);
     setGroupName(null);
@@ -223,7 +228,7 @@ function QuickCommandDrawer({
     try {
       const record = quickCommandFromForm(values);
       const configuration = await upsertQuickCommand(record);
-      onCommandsChange?.(configuration.quickCommands);
+      applyLibraryChange(configuration);
       setSelectedGroup(record.group ?? "");
       setCreatingCommand(false);
       Message.success("快捷命令已添加");
@@ -379,8 +384,8 @@ function QuickCommandDrawer({
         />
       )}
       {visible && groupName !== null && (
-        <Modal onCancel={() => setGroupName(null)} onOk={saveGroup} title="新建命令分组" visible>
-          <Input aria-label="分组名称" autoFocus maxLength={60} onChange={setGroupName} onPressEnter={saveGroup} value={groupName} />
+        <Modal confirmLoading={saving} onCancel={() => setGroupName(null)} onOk={() => void saveGroup()} title="新建命令分组" visible>
+          <Input aria-label="分组名称" autoFocus maxLength={60} onChange={setGroupName} onPressEnter={() => void saveGroup()} value={groupName} />
         </Modal>
       )}
       {pendingCommand && (

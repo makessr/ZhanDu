@@ -45,9 +45,10 @@ const DATABASE_VERSION = 1;
 const CONFIGURATION_STORE = "configuration";
 const CONFIGURATION_ID = "primary";
 const HOSTS_STORAGE_KEY = "fineshell.hosts";
+const LEGACY_COMMAND_GROUPS_KEY = "zhandu.quick-command-groups";
 const HISTORY_STORAGE_KEY = "fineshell.connection-history";
 
-export const CONFIGURATION_SCHEMA_VERSION = 18;
+export const CONFIGURATION_SCHEMA_VERSION = 19;
 export const CONFIGURATION_EXPORT_VERSION = 15;
 export const MAX_CONFIGURATION_BACKUPS = 10;
 export const TRASH_RETENTION_DAYS = 30;
@@ -63,6 +64,7 @@ export interface ConfigurationBackup {
   proxies: ProxyRecord[];
   sshKeys: SshKeyRecord[];
   quickCommands: QuickCommandRecord[];
+  quickCommandGroups?: string[];
   hostSort: HostSortMode;
   sftpLocations: SftpLocationRecord[];
   knownHosts?: KnownHostRecord[];
@@ -84,6 +86,7 @@ export interface FineShellConfiguration {
   proxies: ProxyRecord[];
   sshKeys: SshKeyRecord[];
   quickCommands: QuickCommandRecord[];
+  quickCommandGroups: string[];
   hostSort: HostSortMode;
   sftpLocations: SftpLocationRecord[];
   knownHosts: KnownHostRecord[];
@@ -105,6 +108,7 @@ export interface FineShellConfigurationExport {
   proxies: ProxyRecord[];
   sshKeys: SshKeyRecord[];
   quickCommands: QuickCommandRecord[];
+  quickCommandGroups?: string[];
   hostSort: HostSortMode;
   sftpLocations: SftpLocationRecord[];
   knownHosts: KnownHostRecord[];
@@ -196,6 +200,14 @@ function sanitizeSshKey(value: unknown): SshKeyRecord | undefined {
     privateKeyPath: normalizedPath,
     ...(source === "managed" ? { source } : {}),
   };
+}
+
+export function sanitizeQuickCommandGroups(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.flatMap((item) => {
+    const name = stringValue(item)?.trim().slice(0, 60);
+    return name ? [name] : [];
+  }))];
 }
 
 export function sanitizeQuickCommand(
@@ -518,6 +530,7 @@ function sanitizeBackup(value: unknown): ConfigurationBackup | undefined {
     proxies: sanitizeList(value.proxies, sanitizeProxy),
     sshKeys: sanitizeList(value.sshKeys, sanitizeSshKey),
     quickCommands: sanitizeList(value.quickCommands, sanitizeQuickCommand),
+    ...(Array.isArray(value.quickCommandGroups) && { quickCommandGroups: sanitizeQuickCommandGroups(value.quickCommandGroups) }),
     hostSort: sanitizeHostSortMode(value.hostSort),
     sftpLocations: sanitizeList(value.sftpLocations, sanitizeSftpLocation),
     knownHosts: Array.isArray(value.knownHosts)
@@ -588,6 +601,7 @@ export function migrateLegacyConfiguration(
     proxies: [],
     sshKeys: [],
     quickCommands: [],
+    quickCommandGroups: [],
     hostSort: "manual",
     sftpLocations: [],
     knownHosts: deriveKnownHostRecords(hosts, history, now),
@@ -625,6 +639,7 @@ function normalizeConfiguration(value: unknown): FineShellConfiguration {
     proxies: sanitizeList(value.proxies, sanitizeProxy),
     sshKeys: sanitizeList(value.sshKeys, sanitizeSshKey),
     quickCommands: sanitizeList(value.quickCommands, sanitizeQuickCommand),
+    quickCommandGroups: sanitizeQuickCommandGroups(value.quickCommandGroups),
     hostSort: sanitizeHostSortMode(value.hostSort),
     sftpLocations: sanitizeList(value.sftpLocations, sanitizeSftpLocation),
     knownHosts: Array.isArray(value.knownHosts)
@@ -665,6 +680,7 @@ export function createBackup(
     proxies: configuration.proxies,
     sshKeys: configuration.sshKeys,
     quickCommands: configuration.quickCommands,
+    quickCommandGroups: configuration.quickCommandGroups,
     hostSort: configuration.hostSort,
     sftpLocations: configuration.sftpLocations,
     knownHosts: configuration.knownHosts,
@@ -684,7 +700,7 @@ export function serializeConfigurationExport(
     | "sftpLocations"
     | "knownHosts"
     | "settings"
-  >,
+  > & Partial<Pick<FineShellConfiguration, "quickCommandGroups">>,
   now = new Date().toISOString(),
 ) {
   const settings = sanitizeAppSettings(configuration.settings);
@@ -704,6 +720,7 @@ export function serializeConfigurationExport(
       configuration.quickCommands,
       sanitizeQuickCommand,
     ),
+    ...(configuration.quickCommandGroups && { quickCommandGroups: sanitizeQuickCommandGroups(configuration.quickCommandGroups) }),
     hostSort: configuration.hostSort,
     sftpLocations: sanitizeList(
       configuration.sftpLocations,
@@ -746,6 +763,7 @@ export function parseConfigurationExport(contents: string) {
     proxies: sanitizeList(value.proxies, sanitizeProxy),
     sshKeys: sanitizeList(value.sshKeys, sanitizeSshKey),
     quickCommands: sanitizeList(value.quickCommands, sanitizeQuickCommand),
+    ...(Array.isArray(value.quickCommandGroups) && { quickCommandGroups: sanitizeQuickCommandGroups(value.quickCommandGroups) }),
     hostSort: sanitizeHostSortMode(value.hostSort),
     sftpLocations: sanitizeList(value.sftpLocations, sanitizeSftpLocation),
     knownHosts: Array.isArray(value.knownHosts)
@@ -803,40 +821,36 @@ async function readConfigurationRecord(database: IDBDatabase) {
   return value;
 }
 
-async function writeConfigurationRecord(
-  database: IDBDatabase,
-  configuration: FineShellConfiguration,
-) {
-  const transaction = database.transaction(CONFIGURATION_STORE, "readwrite");
-  const completed = transactionDone(transaction);
-  transaction.objectStore(CONFIGURATION_STORE).put(configuration);
-  await completed;
-}
-
 async function initializeConfiguration() {
   const database = await openDatabase();
-  const stored = await readConfigurationRecord(database);
-  if (stored) {
-    const normalized = normalizeConfiguration(stored);
-    await writeConfigurationRecord(database, normalized);
-    return;
-  }
-
   let legacyHosts: string | null = null;
   let legacyHistory: string | null = null;
+  let legacyCommandGroups: string | null = null;
   try {
     legacyHosts = localStorage.getItem(HOSTS_STORAGE_KEY);
     legacyHistory = localStorage.getItem(HISTORY_STORAGE_KEY);
+    legacyCommandGroups = localStorage.getItem(LEGACY_COMMAND_GROUPS_KEY);
   } catch {
-    // Restricted webviews may deny localStorage access; an empty database is valid.
+    // Restricted webviews may deny localStorage access.
   }
 
-  const migrated = migrateLegacyConfiguration(legacyHosts, legacyHistory);
-  await writeConfigurationRecord(database, migrated);
+  const transaction = database.transaction(CONFIGURATION_STORE, "readwrite");
+  const completed = transactionDone(transaction);
+  const store = transaction.objectStore(CONFIGURATION_STORE);
+  const stored = await requestResult(store.get(CONFIGURATION_ID));
+  const configuration = stored
+    ? normalizeConfiguration(stored)
+    : migrateLegacyConfiguration(legacyHosts, legacyHistory);
+  if (!Array.isArray(stored?.quickCommandGroups)) {
+    configuration.quickCommandGroups = sanitizeQuickCommandGroups(parseLegacyList(legacyCommandGroups));
+  }
+  store.put(configuration);
+  await completed;
 
   try {
     localStorage.removeItem(HOSTS_STORAGE_KEY);
     localStorage.removeItem(HISTORY_STORAGE_KEY);
+    localStorage.removeItem(LEGACY_COMMAND_GROUPS_KEY);
   } catch {
     // The database migration has completed even if legacy cache cleanup is denied.
   }

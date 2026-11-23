@@ -90,6 +90,7 @@ function configuration(seed, includeBase = false) {
           store.put({ ...current, ...seed });
         } else {
           result = { hosts: current.hosts ?? [], keys: current.sshKeys ?? [], synced: !!current.hostSyncBase,
+            quickCommands: current.quickCommands ?? [], quickCommandGroups: current.quickCommandGroups ?? [],
             ...(includeBase && { base: JSON.parse(current.hostSyncBase) }) };
         }
       };
@@ -141,7 +142,7 @@ try {
   for (const view of [a, b]) {
     assert.equal(await invoke(view, "host_sync_account"), null, "Use two fresh isolated test profiles");
     const initial = await until("Initialized desktop configuration", () => evaluate(view, configuration));
-    assert.deepEqual(initial, { hosts: [], keys: [], synced: false });
+    assert.deepEqual(initial, { hosts: [], keys: [], synced: false, quickCommands: [], quickCommandGroups: [] });
   }
   await sampleDesktop("空闲窗口");
   fixture = await startSshFixture(ssh2, directory);
@@ -172,11 +173,17 @@ try {
   ];
   await invoke(a, "store_host_password", { hostId: "smoke-password", password: fixture.password });
   await invoke(a, "store_private_key_passphrase", { hostId: "smoke-key-file", passphrase: fixture.keyPassphrase });
-  await evaluate(a, configuration, { hosts, sshKeys: [
+  const shortcut = { id: "sync-command", name: "Synced command", group: "Commands", command: "printf {{message:sync}}", description: "Windows smoke fixture" };
+  const emptyGroup = "Legacy empty group";
+  await evaluate(a, configuration, { hosts, schemaVersion: 18, quickCommands: [shortcut], quickCommandGroups: null, sshKeys: [
     { id: "smoke-key-file", name: "Smoke identity", privateKeyPath: fixture.deviceKeyFile, source: "file" },
     { id: generatedKeyId, name: "Generated identity", privateKeyPath: generated.reference, source: "managed" },
     { id: standaloneKeyId, name: "Standalone identity", privateKeyPath: standalone.reference, source: "managed" },
   ] });
+
+  await evaluate(a, (name) => localStorage.setItem("zhandu.quick-command-groups", JSON.stringify([name, name])), emptyGroup);
+  await devTools(a, "Page.reload", { ignoreCache: true });
+  await until("Legacy empty group migration", async () => (await evaluate(a, configuration)).quickCommandGroups.includes(emptyGroup));
 
   const setupA = await settings(a, portA);
   const setupB = await settings(b, portB);
@@ -198,6 +205,24 @@ try {
       state.keys.some((key) => key.privateKeyPath === "managed://smoke-key-file") &&
       state.keys.some((key) => key.id === generatedKeyId) && state;
   });
+  assert.deepEqual(received.quickCommands, [shortcut]);
+  assert.deepEqual(received.quickCommandGroups, [emptyGroup]);
+  const storedLibrary = await evaluate(b, configuration, null, true);
+  assert.ok(!JSON.stringify(storedLibrary.base).includes(shortcut.command));
+  assert.ok(!JSON.stringify(storedLibrary.base).includes(emptyGroup));
+  const edited = { ...shortcut, command: "printf {{message:updated}}", group: "Moved" };
+  await evaluate(b, configuration, { quickCommands: [edited], quickCommandGroups: [emptyGroup, "New empty group"] });
+  await until("Device A receives command edit and empty group", async () => {
+    const state = await evaluate(a, configuration);
+    return state.quickCommands[0]?.command === edited.command && state.quickCommands[0]?.group === edited.group &&
+      state.quickCommandGroups.includes("New empty group");
+  }, 60_000);
+  await evaluate(a, configuration, { quickCommands: [] });
+  await until("Device B receives command deletion while keeping empty groups", async () => {
+    const state = await evaluate(b, configuration);
+    return state.quickCommands.length === 0 && state.quickCommandGroups.includes("New empty group");
+  }, 60_000);
+  console.log("快捷命令模板、分组迁移、空分组、双向修改和删除同步通过。");
   assert.ok(!received.keys.some((key) => key.id === standaloneKeyId), "Unlinked keys stay on device A");
   const receivedKey = received.keys.find((key) => key.id === generatedKeyId);
   assert.equal(await invoke(b, "managed_ssh_key_public", { reference: receivedKey.privateKeyPath }), generated.publicKey);
@@ -299,9 +324,9 @@ try {
   await until("Device B unlocks with its saved key after email recovery", async () =>
     (await invoke(b, "host_sync_devices", { accountId: peer.accountId })).length === 1);
   await assert.rejects(invoke(a, "host_sync_devices", { accountId: peer.accountId }), /请重新登录/);
-  const { hosts: syncedHosts, keys, base } = await evaluate(b, configuration, null, true);
+  const { hosts: syncedHosts, keys, base, quickCommands, quickCommandGroups } = await evaluate(b, configuration, null, true);
   const resumed = await invoke(b, "host_sync_exchange", {
-    accountId: peer.accountId, base, configuration: { hosts: syncedHosts, keys, proxies: [] },
+    accountId: peer.accountId, base, configuration: { hosts: syncedHosts, keys, proxies: [], quickCommands, quickCommandGroups },
   });
   assert.equal(resumed.conflicts?.length ?? 0, 0);
   assert.ok(resumed.inspection?.revision, "Recovered device received a verified sync revision");

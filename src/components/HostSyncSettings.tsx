@@ -373,7 +373,10 @@ export default function HostSyncSettings() {
             <Typography.Title heading={6}>解决同步冲突</Typography.Title>
             {status.conflicts.map((conflict) => (
               <fieldset key={conflict.id}>
-                <legend>{String(conflict.local?.name ?? conflict.cloud?.name ?? conflict.id)}</legend>
+                <legend>
+                  {conflict.id.startsWith("quickCommands/") ? "快捷命令 · " : ""}
+                  {String(conflict.local?.name ?? conflict.cloud?.name ?? conflict.id)}
+                </legend>
                 {conflict.credentialChanged && <Typography.Text>两端凭据有差异</Typography.Text>}
                 {(["local", "cloud"] as const).map((side) => (
                   <div key={side}>
@@ -431,7 +434,7 @@ export default function HostSyncSettings() {
     <form onSubmit={recovering ? submitRecovery : submit}>
       <Space direction="vertical" size="medium" style={{ width: "100%" }}>
         <Typography.Paragraph>
-          登录后自动同步已保存的主机、分组和相关凭据。新设备首次登录时用主密码或旧恢复密钥解锁。
+          登录后自动同步已保存的主机、相关凭据、快捷命令和命令分组。新设备首次登录时用主密码或旧恢复密钥解锁。
         </Typography.Paragraph>
         {status?.signInRequired && <Alert type="warning" content={status.message} />}
         <label>

@@ -710,11 +710,13 @@ body[arco-theme="dark"] .monitor-network-download-rate { color: #6bdbb2; }
 .monitor-network-bars {
   position: absolute;
   inset: 0;
+  justify-content: flex-end;
+  overflow: hidden;
   gap: 1px;
 }
 
 .monitor-network-sample {
-  flex: 1;
+  flex: 0 0 3px;
   min-width: 0;
   height: 100%;
   justify-content: center;
@@ -1184,13 +1186,6 @@ body[arco-theme="dark"] .monitor-resource-fill {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.monitor-system-details summary {
-  width: fit-content;
-  color: var(--workspace-ink);
-  cursor: pointer;
-  font-size: 12px;
-}
-.monitor-system-details[open] .monitor-system-facts { margin-top: 4px; }
 .monitor-compact .monitor-system-facts { gap: 2px; }
 .monitor-compact .monitor-chart-section { padding-top: 5px; }
 .monitor-compact .monitor-resource-trend { padding-top: 2px; }
@@ -1201,8 +1196,6 @@ body[arco-theme="dark"] .monitor-resource-fill {
 .monitor-latency-bar { background: var(--workspace-accent); }
 .monitor-compact .monitor-latency { flex-direction: column; gap: 3px; }
 .monitor-compact .monitor-network-chart { height: 46px; }
-.monitor-network-bars { justify-content: flex-start; }
-.monitor-network-sample { max-width: calc((100% - 23px) / 24); }
 .monitor-process-preview {
   width: 100%;
   border: 1px solid var(--workspace-border);

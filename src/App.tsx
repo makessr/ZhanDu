@@ -19,7 +19,6 @@ import {
   IconRefresh,
 } from "@arco-design/web-react/icon";
 import type {
-  QuickCommandRecord,
   ServerMonitorSnapshot,
   TerminalSession,
 } from "./models";
@@ -32,7 +31,7 @@ import { resolveWorkspaceConnection } from "./terminal-workspaces";
 import AppWorkspaceLayout from "./components/AppWorkspaceLayout";
 import ApplicationTitleBar from "./components/ApplicationTitleBar";
 export { default as CollapsibleSplitTrigger } from "./components/CollapsibleSplitTrigger";
-import { loadConfiguration } from "./config-database";
+import { loadConfiguration, type FineShellConfiguration } from "./config-database";
 import {
   DEFAULT_APP_SETTINGS,
   sanitizeAppSettings,
@@ -92,7 +91,13 @@ const SERVER_MONITOR_COLLAPSED_KEY = "fineshell:server-monitor-collapsed";
 function App() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
   const savedAppearanceRef = useRef<AppSettings["appearanceMode"]>();
-  const [quickCommands, setQuickCommands] = useState<QuickCommandRecord[]>([]);
+  const [commandLibrary, setCommandLibrary] = useState<Pick<FineShellConfiguration, "quickCommands" | "quickCommandGroups">>({
+    quickCommands: [],
+    quickCommandGroups: [],
+  });
+  const applyCommandLibrary = useCallback(({ quickCommands, quickCommandGroups }: FineShellConfiguration) => {
+    setCommandLibrary({ quickCommands, quickCommandGroups });
+  }, []);
   const [workspaceTool, setWorkspaceTool] = useState<WorkspaceTool>("files");
   const [workspaceToolTarget, setWorkspaceToolTarget] = useState<HTMLDivElement | null>(null);
   const [editingQuickCommands, setEditingQuickCommands] = useState(false);
@@ -343,7 +348,7 @@ function App() {
         setAppearanceMode(configuration.settings.appearanceMode, {
           persist: true,
         });
-        setQuickCommands(configuration.quickCommands);
+        applyCommandLibrary(configuration);
       })
       .catch((error) => {
         if (!disposed) {
@@ -430,7 +435,7 @@ function App() {
       void loadConfiguration()
         .then((configuration) => {
           if (disposed) return;
-          setQuickCommands(configuration.quickCommands);
+          applyCommandLibrary(configuration);
           syncKnownHostFingerprints(configuration.knownHosts);
         })
         .catch((error) => {
@@ -449,7 +454,7 @@ function App() {
       disposed = true;
       unlisten?.();
     };
-  }, [syncKnownHostFingerprints]);
+  }, [applyCommandLibrary, syncKnownHostFingerprints]);
 
   useEffect(() => {
     if (!isTauri()) return;
@@ -833,10 +838,11 @@ function App() {
           )}
           <QuickCommandDrawer
             canSend={Boolean(activeSession && isTerminalSessionOperational(activeSession.status))}
-            commands={quickCommands}
+            commands={commandLibrary.quickCommands}
+            savedGroups={commandLibrary.quickCommandGroups}
             embedded
             key={activeSessionId}
-            onCommandsChange={setQuickCommands}
+            onLibraryChange={applyCommandLibrary}
             onEdit={() => setEditingQuickCommands(true)}
             onSend={sendQuickCommand}
             targets={sessions

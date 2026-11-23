@@ -874,9 +874,7 @@ function ServerMonitorPanel({
           <Button onClick={() => void writeText(session.host.address).catch((error) => Message.error(commandErrorMessage(error)))} size="mini" type="text">复制</Button>
         </div>
       )}
-      <details className="monitor-system-details" open={onSelectTool ? undefined : true}>
-        <summary>系统信息</summary>
-      <dl className="monitor-system-facts">
+      <dl aria-label="系统信息" className="monitor-system-facts">
         <div>
           <dt>系统</dt>
           <dd>{monitorSnapshot?.operatingSystem || "-"}</dd>
@@ -890,7 +888,6 @@ function ServerMonitorPanel({
           <dd>{monitorSnapshot?.kernel || "-"}</dd>
         </div>
       </dl>
-      </details>
       <dl className="monitor-system-facts monitor-runtime-facts">
         <div>
           <dt>运行时间</dt>

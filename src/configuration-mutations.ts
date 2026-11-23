@@ -9,6 +9,7 @@ import {
   createBackup,
   MAX_CONFIGURATION_BACKUPS,
   sanitizeQuickCommand,
+  sanitizeQuickCommandGroups,
   sanitizeSftpLocation,
   TRASH_RETENTION_DAYS,
   updateConfiguration,
@@ -102,7 +103,7 @@ export function importConfiguration(
     | "sftpLocations"
     | "knownHosts"
     | "settings"
-  >,
+  > & Partial<Pick<FineShellConfiguration, "quickCommandGroups">>,
 ) {
   return updateConfiguration((current) => ({
     ...current,
@@ -111,6 +112,7 @@ export function importConfiguration(
     proxies: imported.proxies,
     sshKeys: imported.sshKeys,
     quickCommands: imported.quickCommands,
+    quickCommandGroups: imported.quickCommandGroups ?? current.quickCommandGroups,
     hostSort: imported.hostSort,
     sftpLocations: imported.sftpLocations,
     knownHosts: imported.knownHosts,
@@ -150,6 +152,7 @@ export function restoreConfigurationBackup(backupId: string) {
       proxies: backup.proxies,
       sshKeys: backup.sshKeys,
       quickCommands: backup.quickCommands,
+      quickCommandGroups: backup.quickCommandGroups ?? current.quickCommandGroups,
       hostSort: backup.hostSort,
       sftpLocations: backup.sftpLocations,
       knownHosts:
@@ -348,6 +351,13 @@ export function deleteSshKey(sshKeyId: string) {
       history: current.history.filter((record) => record.sshKeyId !== sshKeyId),
     };
   });
+}
+
+export function addQuickCommandGroup(name: string) {
+  return updateConfiguration((current) => ({
+    ...current,
+    quickCommandGroups: sanitizeQuickCommandGroups([...current.quickCommandGroups, name]),
+  }));
 }
 
 export function upsertQuickCommand(command: QuickCommandRecord) {

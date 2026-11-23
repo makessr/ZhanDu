@@ -12,7 +12,7 @@ import {
   credentialReferenceId,
   type CredentialProbeResult,
 } from "./credential-registry";
-import type { HostRecord, ProxyRecord, SshKeyRecord } from "./models";
+import type { HostRecord, ProxyRecord, QuickCommandRecord, SshKeyRecord } from "./models";
 import {
   commandErrorMessage,
   emitProtocolEventTo,
@@ -31,6 +31,8 @@ interface HostSyncConfiguration {
   hosts: HostRecord[];
   keys: SshKeyRecord[];
   proxies: ProxyRecord[];
+  quickCommands: QuickCommandRecord[];
+  quickCommandGroups: string[];
 }
 
 interface AppliedConfiguration extends HostSyncConfiguration {
@@ -237,6 +239,8 @@ function project(config: FineShellConfiguration): HostSyncConfiguration {
     hosts: config.hosts.map(({ lastConnectedAt, hostFingerprint, ...host }) => host),
     keys: config.sshKeys.filter((key) => keys.has(key.id)),
     proxies: config.proxies.filter((proxy) => proxies.has(proxy.id)),
+    quickCommands: config.quickCommands,
+    quickCommandGroups: config.quickCommandGroups,
   };
 }
 
@@ -313,7 +317,7 @@ async function synchronize(
   let received: AppliedConfiguration | undefined;
   if (expectedLocal) {
     if (JSON.stringify(project(await loadConfiguration())) !== expected) {
-      throw new Error("本机连接配置刚发生变化，将在下一次同步时重试");
+      throw new Error("本机同步配置刚发生变化，将在下一次同步时重试");
     }
     received = await invoke<AppliedConfiguration>("host_sync_apply", {
       accountId: account.accountId,
@@ -357,6 +361,8 @@ async function synchronize(
         .map((host) => restoreLocalFields(host, local.get(host.id))),
       sshKeys: mergeOrder(latest.sshKeys, received.keys, true),
       proxies: mergeOrder(latest.proxies, received.proxies, true),
+      quickCommands: mergeOrder(latest.quickCommands, received.quickCommands, false),
+      quickCommandGroups: received.quickCommandGroups,
       credentialReferences: [...references.values()],
       trash: [
         ...deleted,
@@ -365,7 +371,7 @@ async function synchronize(
       hostSyncBase: encoded,
     };
   });
-  if (!committed) throw new Error("本机连接配置刚发生变化，将在下一次同步时重试");
+  if (!committed) throw new Error("本机同步配置刚发生变化，将在下一次同步时重试");
   if (changed) {
     await Promise.allSettled([
       emitProtocolEventTo("main", "configuration:changed"),
