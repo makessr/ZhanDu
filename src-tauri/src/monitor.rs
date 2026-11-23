@@ -50,6 +50,51 @@ fi
 ss -H -tunap 2>/dev/null | awk 'BEGIN { OFS="\t" } NR <= 500 { process=""; for (i=7; i<=NF; i++) process=process (i == 7 ? "" : " ") $i; print $1, $2, $5, $6, process } END { if (NR > 500) print "__FINESHELL_TRUNCATED__" }'
 "#;
 
+const COMMAND_NAMES_SCRIPT: &str = r#"
+printf '%s\n' "$HOME"
+old_ifs=$IFS
+IFS=:
+set -f
+set -- $PATH
+set +f
+IFS=$old_ifs
+count=0
+for dir do
+  case "$dir" in /*) ;; *) continue ;; esac
+  for file in "$dir"/*; do
+    [ -f "$file" ] && [ -x "$file" ] || continue
+    printf '%s\n' "${file##*/}"
+    count=$((count + 1))
+    [ "$count" -lt 4096 ] || exit 0
+  done
+done
+"#;
+
+pub(crate) fn collect_command_names(session: &Session) -> Result<(String, Vec<String>), String> {
+    let (output, exit) = execute_remote_command(session, COMMAND_NAMES_SCRIPT, "读取远程命令列表")?;
+    if exit != 0 {
+        return Err("远程命令列表读取失败".to_string());
+    }
+    let mut lines = output.lines();
+    let home = lines
+        .next()
+        .filter(|line| line.starts_with('/') && !line.chars().any(char::is_control))
+        .unwrap_or_default();
+    let names = lines
+        .filter(|line| {
+            !line.is_empty()
+                && line.len() <= 128
+                && line
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"._+-".contains(&b))
+        })
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .map(str::to_owned)
+        .collect();
+    Ok((home.to_owned(), names))
+}
+
 const PROCESS_LIST_COMMAND: &str = r#"
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
 LC_ALL=C
@@ -786,7 +831,7 @@ mod tests {
         parse_service_inspection, parse_trace_output, process_list_error, process_signal_command,
         validate_ping_target, validate_service_name, NetworkConnection, NetworkConnectionsResult,
         NetworkPingResult, NetworkRouteHop, NetworkTraceResult, ServerMonitorSnapshot,
-        ServerProcess, ServerProcessListResult, ServiceInspectionResult,
+        ServerProcess, ServerProcessListResult, ServiceInspectionResult, SwapUsage,
     };
 
     #[test]

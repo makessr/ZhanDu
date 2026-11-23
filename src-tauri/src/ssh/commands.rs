@@ -99,6 +99,14 @@ pub(crate) async fn ssh_monitor_snapshot(
 }
 
 #[tauri::command]
+pub(crate) async fn ssh_command_names(
+    manager: State<'_, SshSessionManager>,
+    session_id: String,
+) -> Result<(String, Vec<String>), String> {
+    manager.command_names(&session_id).await
+}
+
+#[tauri::command]
 pub(crate) async fn ssh_ping(
     manager: State<'_, SshSessionManager>,
     session_id: String,

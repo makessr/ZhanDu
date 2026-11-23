@@ -49,6 +49,23 @@ body[arco-theme="dark"] {
   --fs-scrollbar-thumb-active: rgb(255 255 255 / 56%);
 }
 
+.terminal-wallpaper {
+  isolation: isolate;
+}
+
+.terminal-wallpaper::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  pointer-events: none;
+  background-image: var(--terminal-wallpaper-image);
+  background-size: var(--terminal-wallpaper-size);
+  background-repeat: var(--terminal-wallpaper-repeat);
+  background-position: center;
+  opacity: var(--terminal-wallpaper-opacity);
+}
+
 * {
   box-sizing: border-box;
   scrollbar-color: var(--fs-scrollbar-thumb) transparent;

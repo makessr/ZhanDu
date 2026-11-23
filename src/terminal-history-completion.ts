@@ -54,6 +54,10 @@ export class TerminalHistoryCompletionAddon implements ITerminalAddon {
     return this.suggestionValue;
   }
 
+  public get isPromptReady() {
+    return this.promptReady;
+  }
+
   public activate(terminal: Terminal) {
     if (this.terminal) {
       throw new Error("TerminalHistoryCompletionAddon is already active");

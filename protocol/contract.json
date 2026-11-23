@@ -85,6 +85,7 @@
     "ssh_write": true,
     "ssh_resize": true,
     "ssh_monitor_snapshot": true,
+    "ssh_command_names": true,
     "ssh_ping": true,
     "ssh_network_connections": true,
     "ssh_trace_route": true,

@@ -3,9 +3,29 @@ import {
   DEFAULT_APP_SETTINGS,
   appSettingsEqual,
   sanitizeAppSettings,
+  terminalFontCss,
 } from "./app-settings";
 
 describe("app settings", () => {
+  test("saves supported terminal appearance settings and rejects external image URLs", () => {
+    const settings = sanitizeAppSettings({
+      terminalCustomFontNames: '"Cascadia Mono", 思源黑体, url(http://host)',
+      terminalFontWeight: "600",
+      terminalBackgroundImage: "data:image/webp;base64,YWJj",
+      terminalBackgroundMode: "tile",
+      terminalBackgroundOpacity: 42,
+      terminalCommandBarVisible: false,
+    });
+    expect(terminalFontCss(settings)).toStartWith('"Cascadia Mono", "思源黑体"');
+    expect(settings).toMatchObject({
+      terminalFontWeight: "600",
+      terminalBackgroundImage: "data:image/webp;base64,YWJj",
+      terminalBackgroundMode: "tile",
+      terminalBackgroundOpacity: 42,
+      terminalCommandBarVisible: false,
+    });
+    expect(sanitizeAppSettings({ terminalBackgroundImage: "https://example.invalid/image.png" }).terminalBackgroundImage).toBe("");
+  });
   test("uses defaults for missing or unsupported values", () => {
     expect(
       sanitizeAppSettings({

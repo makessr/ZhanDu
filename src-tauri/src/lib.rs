@@ -173,6 +173,7 @@ pub fn run() {
             ssh::ssh_write,
             ssh::ssh_resize,
             ssh::ssh_monitor_snapshot,
+            ssh::ssh_command_names,
             ssh::ssh_ping,
             ssh::ssh_network_connections,
             ssh::ssh_trace_route,

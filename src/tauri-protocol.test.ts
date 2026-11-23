@@ -37,7 +37,7 @@ describe("Tauri shared protocol", () => {
     expect(contract.events["host-sync:request"]).toBe(true);
     expect(contract.commands.sftp_list_preview).toBe(true);
     expect(contract.commands.read_ghostty_themes).toBe(true);
-    expect(Object.keys(contract.commands)).toHaveLength(125);
+    expect(Object.keys(contract.commands)).toHaveLength(126);
     expect(Object.keys(contract.events)).toHaveLength(12);
   });
 
