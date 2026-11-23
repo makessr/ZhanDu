@@ -37,6 +37,10 @@ printf '\ndisk_kib='
 NR > 1 && match($0, /[[:blank:]]+[0-9]+[[:blank:]]+[0-9]+[[:blank:]]+-?[0-9]+[[:blank:]]+[0-9]+%[[:blank:]]+/) {
     path = substr($0, RSTART + RLENGTH)
     if (substr(path, 1, 1) != "/") next
+    if (path ~ /^\/(var\/lib\/docker|run\/docker|var\/run\/docker)\// ||
+        path ~ /\/overlay2\/[^/]+\/merged$/ ||
+        path ~ /\/docker\/(overlay2|overlayfs|containers|buildkit|volumes|containerd|plugins)\// ||
+        path ~ /\/io\.containerd\.runtime\.v2\.task\/moby\//) next
     raw = substr($0, RSTART, RLENGTH)
     sub(/^[[:blank:]]+/, "", raw)
     split(raw, sizes, /[[:blank:]]+/)
@@ -621,6 +625,39 @@ pub(crate) fn parse_process_list(output: &str) -> ServerProcessListResult {
     }
 }
 
+fn is_docker_mount(path: &str) -> bool {
+    if ["/var/lib/docker/", "/run/docker/", "/var/run/docker/"]
+        .iter()
+        .any(|prefix| path.starts_with(prefix))
+    {
+        return true;
+    }
+    if path.contains("/io.containerd.runtime.v2.task/moby/") {
+        return true;
+    }
+    if let Some((_, parent)) = path.rsplit_once("/overlay2/") {
+        if let Some((layer, "merged")) = parent.split_once('/') {
+            if !layer.is_empty() {
+                return true;
+            }
+        }
+    }
+    path.split_once("/docker/").is_some_and(|(_, relative)| {
+        relative.split_once('/').is_some_and(|(directory, _)| {
+            matches!(
+                directory,
+                "overlay2"
+                    | "overlayfs"
+                    | "containers"
+                    | "buildkit"
+                    | "volumes"
+                    | "containerd"
+                    | "plugins"
+            )
+        })
+    })
+}
+
 pub(crate) fn parse_monitor_output(output: &str) -> Result<ServerMonitorSnapshot, String> {
     let values = output
         .lines()
@@ -676,13 +713,16 @@ pub(crate) fn parse_monitor_output(output: &str) -> Result<ServerMonitorSnapshot
     let mut disk_mounts: Vec<_> = output
         .lines()
         .filter_map(|line| line.strip_prefix("disk_mount="))
-        .take(64)
         .filter_map(|line| {
             let mut fields = line.splitn(3, ',');
             let available_kib: u64 = fields.next()?.parse().ok()?;
             let total_kib: u64 = fields.next()?.parse().ok()?;
             let path = fields.next()?;
-            if !path.starts_with('/') || path.len() > 4096 || path.chars().any(char::is_control) {
+            if !path.starts_with('/')
+                || path.len() > 4096
+                || path.chars().any(char::is_control)
+                || is_docker_mount(path)
+            {
                 return None;
             }
             Some(DiskMountUsage {
@@ -691,6 +731,7 @@ pub(crate) fn parse_monitor_output(output: &str) -> Result<ServerMonitorSnapshot
                 total_bytes: total_kib.saturating_mul(1024),
             })
         })
+        .take(64)
         .collect();
     if disk_mounts.is_empty() && disk_total_kib > 0 {
         let available = values
@@ -951,6 +992,11 @@ disk_kib=104857600,52428800,52428800
 disk_mount=52428800,104857600,/
 disk_mount=488448,497664,/boot/efi
 disk_mount=1024,2048,/srv/my files,2026
+disk_mount=1024,2048,/var/lib/docker/overlay2/container-layer/merged
+disk_mount=1024,2048,/srv/custom/overlay2/other-layer/merged
+disk_mount=1024,2048,/run/docker/netns/test
+disk_mount=1024,2048,/mnt/docker/volumes/test/_data
+disk_mount=1024,2048,/var/lib/docker
 load_average=0.42,0.35,0.30
 network_bytes=15728640,6291456
 network_interface=eth0,10485760,4194304
@@ -990,6 +1036,11 @@ network_interface=invalid,nan,100
                     },
                     DiskMountUsage {
                         path: "/srv/my files,2026".into(),
+                        available_bytes: 1_048_576,
+                        total_bytes: 2_097_152
+                    },
+                    DiskMountUsage {
+                        path: "/var/lib/docker".into(),
                         available_bytes: 1_048_576,
                         total_bytes: 2_097_152
                     },
