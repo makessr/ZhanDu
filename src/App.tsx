@@ -310,6 +310,8 @@ function App() {
           delete next[sessionId];
           return next;
         }
+        // Prompt hooks report the current directory even when it hasn't changed.
+        if (current[sessionId]?.path === path) return current;
         return {
           ...current,
           [sessionId]: {
