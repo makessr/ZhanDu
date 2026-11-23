@@ -40,7 +40,6 @@ export function MonitorLatencyChart({ history }: { history: ServerMonitorHistory
   const peak = Math.max(1, ...samples.map((point) => point.sshLatencyMs ?? 0));
   return (
     <div aria-label="SSH 延迟趋势" className="monitor-network-chart monitor-latency-chart" role="img">
-      <span className="monitor-network-scale">{formatLatency(peak)}</span>
       <div className="monitor-network-bars">
         {samples.map(({ collectedAt, sshLatencyMs }) => (
           <div className="monitor-network-sample" key={collectedAt} title={formatLatency(sshLatencyMs)}>

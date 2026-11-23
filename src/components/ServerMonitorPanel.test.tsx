@@ -39,10 +39,11 @@ describe("ServerMonitorPanel", () => {
       hostname: "test-host",
       loadAverage: [0, 0, 0],
       cpuUsagePercent: 5,
-      memoryUsagePercent: 46,
+      memoryUsagePercent: 60,
+      diskUsagePercent: 32,
       memoryUsedBytes: 2 ** 30,
       memoryTotalBytes: 2 ** 31,
-      swap: { usagePercent: 0, usedBytes: 1_048_576, totalBytes: 2 ** 32 },
+      swap: { usagePercent: 80, usedBytes: 1_048_576, totalBytes: 2 ** 32 },
       sshLatencyMs: 16.72,
       networkReceiveBytes: 800,
       networkTransmitBytes: 400,
@@ -77,7 +78,9 @@ describe("ServerMonitorPanel", () => {
       expect(collect).toHaveBeenCalledTimes(1);
       expect(screen.getByRole("meter", { name: "CPU" }).getAttribute("aria-valuenow")).toBe("5");
       expect(screen.getByRole("meter", { name: "内存" }).getAttribute("aria-valuetext")).toContain("1.0 GB / 2.0 GB");
-      expect(screen.getByRole("meter", { name: "交换" }).getAttribute("aria-valuenow")).toBe("0");
+      expect(screen.getByRole("meter", { name: "CPU" }).getAttribute("data-usage-level")).toBe("low");
+      expect(screen.getByRole("meter", { name: "内存" }).getAttribute("data-usage-level")).toBe("medium");
+      expect(screen.getByRole("meter", { name: "交换" }).getAttribute("data-usage-level")).toBe("high");
       expect(screen.getByLabelText("SSH 延迟").textContent).toBe("16.7 ms");
       expect(screen.getByText("/boot/efi")).not.toBeNull();
       expect(screen.getByText("477 MB / 486 MB")).not.toBeNull();

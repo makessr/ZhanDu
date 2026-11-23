@@ -1,5 +1,5 @@
 {
-  "version": 50,
+  "version": 51,
   "commands": {
     "ip_region_status": true,
     "ip_region_update": true,
@@ -143,6 +143,7 @@
     "configuration:changed": true,
     "host-sync:request": true,
     "settings:changed": true,
+    "appearance:preview": true,
     "menu-select-all": true
   },
   "agentTaskStatuses": {

@@ -46,7 +46,7 @@ import {
   readApplicationUpdateNotice,
   type ApplicationUpdateNotice,
 } from "../app-updater";
-import { emitProtocolEventTo } from "../tauri-protocol";
+import { emitProtocolEventTo, listenProtocolEvent } from "../tauri-protocol";
 import TerminalThemeLibrary from "./TerminalThemeLibrary";
 import TerminalBackgroundSettings from "./TerminalBackgroundSettings";
 import { resolveDefaultTerminalLogDirectory } from "../terminal-logging";
@@ -227,8 +227,35 @@ function SettingsWindow() {
   }, [savedSettings.diagnosticLogLevel]);
 
   useEffect(() => {
-    if (!loading) setAppearanceMode(settings.appearanceMode);
-  }, [loading, settings.appearanceMode]);
+    if (loading) return;
+    setAppearanceMode(settings.appearanceMode);
+    if (isTauri()) {
+      const preview = settings.appearanceMode === savedSettings.appearanceMode
+        ? null
+        : settings.appearanceMode;
+      void emitProtocolEventTo("main", "appearance:preview", preview).catch(() => undefined);
+    }
+  }, [loading, savedSettings.appearanceMode, settings.appearanceMode]);
+
+  useEffect(() => {
+    if (!isTauri()) return;
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void listenProtocolEvent("appearance:preview", ({ payload }) => {
+      if (payload === null) {
+        setSettings((current) => current.appearanceMode === savedSettings.appearanceMode
+          ? current
+          : { ...current, appearanceMode: savedSettings.appearanceMode });
+      }
+    }).then((stop) => {
+      if (disposed) stop();
+      else unlisten = stop;
+    });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [savedSettings.appearanceMode]);
 
   const updateSetting = <Key extends keyof AppSettings>(
     key: Key,

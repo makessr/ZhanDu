@@ -80,6 +80,12 @@ export function ResourceTrendChart({ monitorHistory }: { monitorHistory: ServerM
             value: Math.round(point.memoryUsagePercent),
             displayValue: formatMonitorPercent(point.memoryUsagePercent),
           },
+          {
+            metric: "磁盘",
+            time,
+            value: Math.round(point.diskUsagePercent),
+            displayValue: formatMonitorPercent(point.diskUsagePercent),
+          },
         ];
       }),
     [monitorHistory],
@@ -109,7 +115,7 @@ export function ResourceTrendChart({ monitorHistory }: { monitorHistory: ServerM
         },
       ]}
       className="monitor-chart"
-      color={["#165dff", "#00b42a"]}
+      color={["#165dff", "#00b42a", "#d68025"]}
       data={[{ id: "resource-trend", values: trendData }]}
       height={128}
       legends={{

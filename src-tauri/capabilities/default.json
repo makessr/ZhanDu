@@ -5,6 +5,7 @@
   "windows": ["main", "settings", "shortcut-guide"],
   "permissions": [
     "core:default",
+    "core:app:allow-set-app-theme",
     "core:window:allow-close",
     "core:window:allow-is-maximized",
     "core:window:allow-minimize",

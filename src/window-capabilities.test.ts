@@ -18,6 +18,7 @@ describe("window capabilities", () => {
     );
     expect(defaultCapability.permissions).toEqual(
       expect.arrayContaining([
+        "core:app:allow-set-app-theme",
         "core:window:allow-close",
         "core:window:allow-is-maximized",
         "core:window:allow-minimize",

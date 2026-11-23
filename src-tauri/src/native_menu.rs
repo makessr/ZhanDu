@@ -8,9 +8,9 @@ use tauri::{
         AboutMetadata, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu, HELP_SUBMENU_ID,
         WINDOW_SUBMENU_ID,
     },
-    Emitter, RunEvent,
+    RunEvent,
 };
-use tauri::{AppHandle, Manager, Runtime, Window, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, Runtime, Window, WindowEvent};
 #[cfg(not(target_os = "windows"))]
 use tauri::{WebviewUrl, WebviewWindowBuilder};
 
@@ -254,6 +254,19 @@ pub fn handle_window_event<R: Runtime>(window: &Window<R>, event: &WindowEvent) 
                         "error": error.to_string(),
                         "label": window.label(),
                     })),
+                );
+            }
+            if window.label() == SETTINGS_WINDOW_LABEL {
+                let app = window.app_handle();
+                let _ = app.emit_to(
+                    MAIN_WINDOW_LABEL,
+                    "appearance:preview",
+                    serde_json::Value::Null,
+                );
+                let _ = app.emit_to(
+                    SETTINGS_WINDOW_LABEL,
+                    "appearance:preview",
+                    serde_json::Value::Null,
                 );
             }
             if let Some(main_window) = window.app_handle().get_webview_window(MAIN_WINDOW_LABEL) {

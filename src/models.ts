@@ -232,6 +232,7 @@ export interface ServerMonitorHistoryPoint {
   sshLatencyMs?: number;
   cpuUsagePercent: number;
   memoryUsagePercent: number;
+  diskUsagePercent: number;
   networkReceiveBytes: number;
   networkTransmitBytes: number;
   networkReceiveBytesPerSecond: number;

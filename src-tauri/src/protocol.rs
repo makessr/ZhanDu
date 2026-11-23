@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-pub(crate) const PROTOCOL_VERSION: u16 = 50;
+pub(crate) const PROTOCOL_VERSION: u16 = 51;
 
 pub(crate) const SSH_OUTPUT_EVENT: &str = "ssh-output";
 pub(crate) const SSH_STATUS_EVENT: &str = "ssh-status";
@@ -169,6 +169,7 @@ mod tests {
             AGENT_TASK_EVENT,
             "configuration:changed",
             "settings:changed",
+            "appearance:preview",
             MENU_SELECT_ALL_EVENT,
         ] {
             assert_eq!(

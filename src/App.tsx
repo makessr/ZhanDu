@@ -38,7 +38,7 @@ import {
   sanitizeAppSettings,
   type AppSettings,
 } from "./app-settings";
-import { setAppearanceMode } from "./appearance";
+import { readAppearanceModeHint, setAppearanceMode } from "./appearance";
 import {
   type AiContextSource,
   type AiContextSourceId,
@@ -91,6 +91,7 @@ const SERVER_MONITOR_COLLAPSED_KEY = "fineshell:server-monitor-collapsed";
 
 function App() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
+  const savedAppearanceRef = useRef<AppSettings["appearanceMode"]>();
   const [quickCommands, setQuickCommands] = useState<QuickCommandRecord[]>([]);
   const [workspaceTool, setWorkspaceTool] = useState<WorkspaceTool>("files");
   const [workspaceToolTarget, setWorkspaceToolTarget] = useState<HTMLDivElement | null>(null);
@@ -338,6 +339,7 @@ function App() {
       .then((configuration) => {
         if (disposed) return;
         setSettings(configuration.settings);
+        savedAppearanceRef.current = configuration.settings.appearanceMode;
         setAppearanceMode(configuration.settings.appearanceMode, {
           persist: true,
         });
@@ -452,21 +454,23 @@ function App() {
   useEffect(() => {
     if (!isTauri()) return;
     let disposed = false;
-    let unlisten: (() => void) | undefined;
+    const listeners: Array<() => void> = [];
+    const keepListener = (stop: () => void) => {
+      if (disposed) stop();
+      else listeners.push(stop);
+    };
+    void listenProtocolEvent("appearance:preview", ({ payload }) => {
+      setAppearanceMode(payload ?? savedAppearanceRef.current ?? readAppearanceModeHint());
+    }).then(keepListener);
     void listenProtocolEvent("settings:changed", ({ payload }) => {
       const nextSettings = sanitizeAppSettings(payload);
       setSettings(nextSettings);
+      savedAppearanceRef.current = nextSettings.appearanceMode;
       setAppearanceMode(nextSettings.appearanceMode, { persist: true });
-    }).then((stopListening) => {
-      if (disposed) {
-        stopListening();
-      } else {
-        unlisten = stopListening;
-      }
-    });
+    }).then(keepListener);
     return () => {
       disposed = true;
-      unlisten?.();
+      listeners.forEach((stop) => stop());
     };
   }, []);
 

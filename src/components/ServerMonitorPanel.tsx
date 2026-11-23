@@ -909,14 +909,12 @@ function ServerMonitorPanel({
       </dl>
 
       <div className="monitor-chart-section">
-        <div className="monitor-chart-heading">
-          <Typography.Text bold>资源占用</Typography.Text>
-        </div>
         <div className="monitor-resource-meters">
           {resourceMeters.map(({ label, usage, bytes }) => {
             const percent = typeof usage === "number" && Number.isFinite(usage)
-              ? Math.min(100, Math.max(0, usage))
+              ? Math.round(Math.min(100, Math.max(0, usage)))
               : undefined;
+            const level = percent === undefined ? undefined : percent >= 80 ? "high" : percent >= 60 ? "medium" : "low";
             const value = percent === undefined ? "—" : formatMonitorPercent(percent);
             const amount = bytes?.map(formatMonitorBytes).join(" / ");
             const text = amount ? `${value}  ${amount}` : value;
@@ -928,6 +926,7 @@ function ServerMonitorPanel({
                   aria-valuenow={percent}
                   aria-valuetext={percent === undefined ? undefined : text}
                   className="monitor-resource-track"
+                  data-usage-level={level}
                   role={percent === undefined ? undefined : "meter"}
                   title={text}
                 >
@@ -957,10 +956,12 @@ function ServerMonitorPanel({
           )) : <tr><td colSpan={3}>暂无进程摘要</td></tr>}</tbody>
         </table>
       )}
-      <div className="monitor-chart-section monitor-resource-trend" hidden={!chartsVisible}>
-        <div className="monitor-chart-heading">
-          <Typography.Text bold>资源趋势</Typography.Text>
-        </div>
+      <div
+        aria-label="CPU、内存和磁盘使用率趋势"
+        className="monitor-chart-section monitor-resource-trend"
+        hidden={!chartsVisible}
+        role="group"
+      >
         {visible && windowVisible && connected && chartsVisible && (
           <Suspense fallback={null}>
             <ResourceTrendChart monitorHistory={monitorHistory} />
@@ -969,14 +970,11 @@ function ServerMonitorPanel({
       </div>
 
       <div className="monitor-chart-section">
-        <div className="monitor-chart-heading">
-          <Typography.Text bold>网络流量</Typography.Text>
-          <Typography.Text type="secondary">
+        <Typography.Text className="monitor-network-total" type="secondary">
             {monitorSnapshot
               ? `累计 ↓ ${formatMonitorBytes(selectedInterface?.receiveBytes ?? monitorSnapshot.networkReceiveBytes)} / ↑ ${formatMonitorBytes(selectedInterface?.transmitBytes ?? monitorSnapshot.networkTransmitBytes)}`
               : "累计 ↓ - / ↑ -"}
-          </Typography.Text>
-        </div>
+        </Typography.Text>
         <div className="monitor-network-summary">
           <span className="monitor-network-upload-rate" title="上传速率" aria-label="上传速率">
             ↑ {monitorSnapshot ? formatMonitorRate(rates.transmit) : "—"}
