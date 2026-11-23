@@ -163,7 +163,7 @@ describe("ServerMonitorPanel", () => {
     const monitor = container.querySelector(".server-monitor");
     expect(monitor?.classList.contains("is-unavailable")).toBe(true);
     expect(container.querySelector(".monitor-system-facts")?.textContent).toBe(
-      "系统-主机名-内核-运行时间-负载-",
+      "系统-主机名-内核-",
     );
     expect(onSnapshotChange).toHaveBeenCalledWith("session-1", null);
   });

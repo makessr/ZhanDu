@@ -109,6 +109,10 @@ interface BrowserState {
 type DirectoryLoadReason = "manual" | "initial" | "terminal";
 
 interface SftpPanelProps {
+  filesVisible?: boolean;
+  transfersVisible?: boolean;
+  onShowTransfers?: () => void;
+  onShowFiles?: () => void;
   confirmFileDelete: boolean;
   externalEditorName: string;
   externalEditorPath: string;
@@ -162,6 +166,10 @@ function ExternalEditStatusIcon({ edit }: { edit: ExternalEditPayload }) {
 }
 
 function SftpPanel({
+  filesVisible = true,
+  transfersVisible,
+  onShowTransfers,
+  onShowFiles,
   confirmFileDelete,
   externalEditorName,
   externalEditorPath,
@@ -720,6 +728,7 @@ function SftpPanel({
   }
 
   function locateTransferInPanel(transfer: TransferActivityRecord) {
+    onShowFiles?.();
     if (!session || !transfer.remotePath) return;
     pendingLocatePathRef.current = transfer.remotePath;
     setNameFilter(null);
@@ -1112,201 +1121,205 @@ function SftpPanel({
   }
 
   return (
-    <section
-      aria-label="文件管理"
-      className="panel sftp-panel"
-      onPointerDownCapture={focusFilePanelForShortcut}
-      ref={panelRef}
-      tabIndex={-1}
-    >
-      <SftpToolbar
-        aiFileReadProgress={aiFileReadProgress}
-        bookmarks={currentLocation.bookmarks}
-        clipboardEntryCount={currentClipboard?.entries.length ?? 0}
-        connected={Boolean(connected)}
-        currentPath={browser?.path ?? "/"}
-        currentPathBookmarked={currentPathBookmarked}
-        history={currentLocation.history}
-        inputPath={browser?.inputPath ?? "/"}
-        loading={browser?.status === "loading"}
-        nameFilterOpen={nameFilter !== null}
-        onClearHistory={clearPathHistory}
-        onCreate={openCreateDialog}
-        onInputPathChange={(value) =>
-          session && updateBrowser(session.id, { inputPath: value })
-        }
-        onNavigate={navigateToPath}
-        onOpenTransfers={() => setTransferDrawerVisible(true)}
-        onPaste={() => {
-          if (browser && currentClipboard) {
-            void requestPaste(browser.path, currentClipboard);
+    <>
+      <section
+        hidden={!filesVisible}
+        aria-label="文件管理"
+        className="panel sftp-panel"
+        onPointerDownCapture={focusFilePanelForShortcut}
+        ref={panelRef}
+        tabIndex={-1}
+      >
+        <SftpToolbar
+          aiFileReadProgress={aiFileReadProgress}
+          bookmarks={currentLocation.bookmarks}
+          clipboardEntryCount={currentClipboard?.entries.length ?? 0}
+          connected={Boolean(connected)}
+          currentPath={browser?.path ?? "/"}
+          currentPathBookmarked={currentPathBookmarked}
+          history={currentLocation.history}
+          inputPath={browser?.inputPath ?? "/"}
+          loading={browser?.status === "loading"}
+          nameFilterOpen={nameFilter !== null}
+          onClearHistory={clearPathHistory}
+          onCreate={openCreateDialog}
+          onInputPathChange={(value) =>
+            session && updateBrowser(session.id, { inputPath: value })
           }
-        }}
-        onRefresh={() => {
-          if (session && browser) {
-            void loadDirectory(session.id, browser.path);
+          onNavigate={navigateToPath}
+          onOpenTransfers={onShowTransfers ?? (() => setTransferDrawerVisible(true))}
+          onPaste={() => {
+            if (browser && currentClipboard) {
+              void requestPaste(browser.path, currentClipboard);
+            }
+          }}
+          onRefresh={() => {
+            if (session && browser) {
+              void loadDirectory(session.id, browser.path);
+            }
+          }}
+          onRemoveBookmark={removePathBookmark}
+          onToggleBookmark={toggleCurrentPathBookmark}
+          onToggleNameFilter={() =>
+            setNameFilter((current) => (current === null ? "" : null))
           }
-        }}
-        onRemoveBookmark={removePathBookmark}
-        onToggleBookmark={toggleCurrentPathBookmark}
-        onToggleNameFilter={() =>
-          setNameFilter((current) => (current === null ? "" : null))
-        }
-        onUp={() => {
-          if (session && browser) {
-            void loadDirectory(session.id, remoteParentPath(browser.path));
-          }
-        }}
-        onUpload={() => void chooseUploadFiles()}
-        operationLoading={operationLoading}
-        pathSuggestions={pathSuggestions}
-        ready={ready}
-        transferActivityCount={transferActivityCount}
-      />
+          onUp={() => {
+            if (session && browser) {
+              void loadDirectory(session.id, remoteParentPath(browser.path));
+            }
+          }}
+          onUpload={() => void chooseUploadFiles()}
+          operationLoading={operationLoading}
+          pathSuggestions={pathSuggestions}
+          ready={ready}
+          transferActivityCount={transferActivityCount}
+        />
 
-      {nameFilter !== null && (
-        <div className="sftp-name-filter">
-          <Input
-            allowClear
-            aria-label="当前目录文件名"
-            autoFocus
-            onChange={setNameFilter}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                setNameFilter(null);
-                panelRef.current?.focus({ preventScroll: true });
-              }
-            }}
-            placeholder="筛选当前目录"
-            size="small"
-            value={nameFilter}
-          />
-        </div>
-      )}
-      {showingPreview && (
-        <div className="sftp-directory-preview-status" role="status">
-          正在读取目录，完成后即可操作文件
-        </div>
-      )}
-      {ready && browser?.followError && (
-        <div className="sftp-directory-preview-status sftp-follow-status" role="status">
-          <span>
-            无法跟随到 <bdi>{browser.followError.path}</bdi>，已保留当前目录。
-          </span>
-          <span>{browser.followError.message}</span>
-        </div>
-      )}
-
-      <>
-        <ContextMenu
-          menuClassName="sftp-context-menu"
-          resolveItems={resolveEntryContextMenu}
-        >
-          <div
-            className={`sftp-table-container${virtualized ? " sftp-table-container-virtualized" : ""}${fileDropActive ? " sftp-table-container-drop-active" : ""}`}
-            ref={dropZoneRef}
-          >
-            {fileDropActive && (
-              <div className="sftp-file-drop-overlay">
-                <IconUpload />
-                <span>
-                  释放以上传文件或文件夹到
-                  {fileDropTargetPath
-                    ? `“${localFileName(fileDropTargetPath)}”`
-                    : `“${browser?.path ?? "/"}”`}
-                </span>
-              </div>
-            )}
-            <Table
-              border={false}
-              className="sftp-table"
-              columns={columns}
-              data={displayedEntries}
-              loading={Boolean(connected && busy && !showingPreview)}
-              noDataElement={
-                <Empty
-                  description={ready ? emptyDirectoryMessage : "暂无文件"}
-                />
-              }
-              onRow={(entry) => ({
-                "data-sftp-entry-id": entry.id,
-                "data-sftp-entry-kind": entry.kind,
-                "data-sftp-entry-path": entry.path,
-                onDoubleClick: () => {
-                  if (!ready) return;
-                  if (entry.kind === "directory") {
-                    openDirectory(entry);
-                  } else if (entry.kind === "file") {
-                    void openTextEditor(entry);
-                  }
-                },
-              })}
-              pagination={false}
-              ref={tableRef}
-              rowKey="id"
-              rowClassName={(entry) =>
-                [
-                  cutEntryPaths.has(entry.path) ? "sftp-row-cut" : "",
-                  remoteDropTargetPath === entry.path
-                    ? "sftp-row-drop-target"
-                    : "",
-                  fileDropTargetPath === entry.path
-                    ? "sftp-row-drop-target"
-                    : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")
-              }
-              rowSelection={
-                ready
-                  ? {
-                      checkAll: true,
-                      columnWidth: 42,
-                      onChange: (keys) =>
-                        setSelectedEntryKeys(keys.map((key) => String(key))),
-                      selectedRowKeys: selectedEntryKeys,
-                      type: "checkbox",
-                    }
-                  : undefined
-              }
-              size="small"
-              scroll={virtualized ? { y: virtualBodyHeight } : undefined}
-              virtualized={virtualized}
-            />
-            {remoteDragPreview && (
-              <div
-                className="sftp-remote-drag-preview"
-                style={{
-                  left: remoteDragPreview.x + 12,
-                  top: remoteDragPreview.y + 12,
-                }}
-              >
-                {remoteDragPreview.kind === "directory" ? (
-                  <IconFolder />
-                ) : (
-                  <IconFile />
-                )}
-                <span>{remoteDragPreview.label}</span>
-                {remoteDragPreview.count > 1 && (
-                  <span className="sftp-remote-drag-count">
-                    {remoteDragPreview.count}
-                  </span>
-                )}
-              </div>
-            )}
-            {connectionUnavailable && (
-              <ConnectionStatusOverlay
-                description={connectionDescription}
-                onReconnect={
-                  sftpUnavailable ? () => void retryConnection() : onReconnect
+        {nameFilter !== null && (
+          <div className="sftp-name-filter">
+            <Input
+              allowClear
+              aria-label="当前目录文件名"
+              autoFocus
+              onChange={setNameFilter}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  setNameFilter(null);
+                  panelRef.current?.focus({ preventScroll: true });
                 }
-                reconnecting={reconnecting}
-              />
-            )}
+              }}
+              placeholder="筛选当前目录"
+              size="small"
+              value={nameFilter}
+            />
           </div>
-        </ContextMenu>
-      </>
+        )}
+        {showingPreview && (
+          <div className="sftp-directory-preview-status" role="status">
+            正在读取目录，完成后即可操作文件
+          </div>
+        )}
+        {ready && browser?.followError && (
+          <div className="sftp-directory-preview-status sftp-follow-status" role="status">
+            <span>
+              无法跟随到 <bdi>{browser.followError.path}</bdi>，已保留当前目录。
+            </span>
+            <span>{browser.followError.message}</span>
+          </div>
+        )}
+
+        <>
+          <ContextMenu
+            menuClassName="sftp-context-menu"
+            resolveItems={resolveEntryContextMenu}
+          >
+            <div
+              className={`sftp-table-container${virtualized ? " sftp-table-container-virtualized" : ""}${fileDropActive ? " sftp-table-container-drop-active" : ""}`}
+              ref={dropZoneRef}
+            >
+              {fileDropActive && (
+                <div className="sftp-file-drop-overlay">
+                  <IconUpload />
+                  <span>
+                    释放以上传文件或文件夹到
+                    {fileDropTargetPath
+                      ? `“${localFileName(fileDropTargetPath)}”`
+                      : `“${browser?.path ?? "/"}”`}
+                  </span>
+                </div>
+              )}
+              <Table
+                border={false}
+                className="sftp-table"
+                columns={columns}
+                data={displayedEntries}
+                loading={Boolean(connected && busy && !showingPreview)}
+                noDataElement={
+                  <Empty
+                    description={ready ? emptyDirectoryMessage : "暂无文件"}
+                  />
+                }
+                onRow={(entry) => ({
+                  "data-sftp-entry-id": entry.id,
+                  "data-sftp-entry-kind": entry.kind,
+                  "data-sftp-entry-path": entry.path,
+                  onDoubleClick: () => {
+                    if (!ready) return;
+                    if (entry.kind === "directory") {
+                      openDirectory(entry);
+                    } else if (entry.kind === "file") {
+                      void openTextEditor(entry);
+                    }
+                  },
+                })}
+                pagination={false}
+                ref={tableRef}
+                rowKey="id"
+                rowClassName={(entry) =>
+                  [
+                    cutEntryPaths.has(entry.path) ? "sftp-row-cut" : "",
+                    remoteDropTargetPath === entry.path
+                      ? "sftp-row-drop-target"
+                      : "",
+                    fileDropTargetPath === entry.path
+                      ? "sftp-row-drop-target"
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")
+                }
+                rowSelection={
+                  ready
+                    ? {
+                        checkAll: true,
+                        columnWidth: 42,
+                        onChange: (keys) =>
+                          setSelectedEntryKeys(keys.map((key) => String(key))),
+                        selectedRowKeys: selectedEntryKeys,
+                        type: "checkbox",
+                      }
+                    : undefined
+                }
+                size="small"
+                scroll={virtualized ? { y: virtualBodyHeight } : undefined}
+                virtualized={virtualized}
+              />
+              {remoteDragPreview && (
+                <div
+                  className="sftp-remote-drag-preview"
+                  style={{
+                    left: remoteDragPreview.x + 12,
+                    top: remoteDragPreview.y + 12,
+                  }}
+                >
+                  {remoteDragPreview.kind === "directory" ? (
+                    <IconFolder />
+                  ) : (
+                    <IconFile />
+                  )}
+                  <span>{remoteDragPreview.label}</span>
+                  {remoteDragPreview.count > 1 && (
+                    <span className="sftp-remote-drag-count">
+                      {remoteDragPreview.count}
+                    </span>
+                  )}
+                </div>
+              )}
+              {connectionUnavailable && (
+                <ConnectionStatusOverlay
+                  description={connectionDescription}
+                  onReconnect={
+                    sftpUnavailable ? () => void retryConnection() : onReconnect
+                  }
+                  reconnecting={reconnecting}
+                />
+              )}
+            </div>
+          </ContextMenu>
+        </>
+      </section>
       <SftpTransferDrawer
+        embedded={transfersVisible !== undefined}
         externalEdits={currentExternalEdits}
         onCancelTransfer={(transfer) => void cancelTransfer(transfer)}
         onClearFinished={clearFinishedTransfers}
@@ -1319,7 +1332,7 @@ function SftpPanel({
         onResumeTransfer={(transfer) => void resumeTransfer(transfer)}
         onRetryTransfer={(transfer) => void retryTransfer(transfer)}
         transfers={currentTransfers}
-        visible={transferDrawerVisible}
+        visible={transfersVisible ?? transferDrawerVisible}
       />
       <TextEditorDialog
         byteLength={textEditorByteLength}
@@ -1390,7 +1403,7 @@ function SftpPanel({
         onConfirm={() => void renameEntry()}
         onNameChange={setRenameName}
       />
-    </section>
+    </>
   );
 }
 

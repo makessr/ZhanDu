@@ -1,7 +1,7 @@
+import { WorkspaceToolSurface } from "./WorkspaceToolPanel";
 import { useMemo, useState } from "react";
 import {
   Button,
-  Drawer,
   Empty,
   Message,
   Table,
@@ -41,6 +41,7 @@ type RuntimeForwardRule = (
 interface PortForwardDrawerProps {
   session: TerminalSession;
   visible: boolean;
+  embedded?: boolean;
   onCancel: () => void;
   onStatusChange: (status: PortForwardStatus) => void;
 }
@@ -62,6 +63,7 @@ const STATUS_META = {
 function PortForwardDrawer({
   session,
   visible,
+  embedded,
   onCancel,
   onStatusChange,
 }: PortForwardDrawerProps) {
@@ -222,7 +224,8 @@ function PortForwardDrawer({
   ];
 
   return (
-    <Drawer
+    <WorkspaceToolSurface
+      embedded={embedded}
       className="port-forward-drawer"
       footer={null}
       onCancel={onCancel}
@@ -259,7 +262,7 @@ function PortForwardDrawer({
         rowKey={(rule) => statusKey(rule.kind, rule.id)}
         size="small"
       />
-    </Drawer>
+    </WorkspaceToolSurface>
   );
 }
 

@@ -52,6 +52,7 @@ describe("window capabilities", () => {
     });
     expect(windowsMainWindow).toMatchObject({ decorations: false });
     expect(windowsSettingsWindow).not.toHaveProperty("decorations", false);
+    expect(windowsSettingsWindow).toMatchObject({ parent: "main", skipTaskbar: true });
     expect(linuxMainWindow).toMatchObject({ decorations: false });
   });
 

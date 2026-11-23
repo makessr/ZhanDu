@@ -1,3 +1,4 @@
+import { WorkspaceToolPanel, type WorkspaceTool } from "./components/WorkspaceToolPanel";
 import {
   lazy,
   Suspense,
@@ -78,6 +79,7 @@ import {
   promptStartupApplicationUpdate,
 } from "./app-window-actions";
 import { useTerminalSessions } from "./hooks/useTerminalSessions";
+const QuickCommandSettings = lazy(() => import("./components/QuickCommandSettings"));
 const ServerMonitorPanel = lazy(
   () => import("./components/ServerMonitorPanel"),
 );
@@ -89,8 +91,9 @@ const SERVER_MONITOR_COLLAPSED_KEY = "fineshell:server-monitor-collapsed";
 function App() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
   const [quickCommands, setQuickCommands] = useState<QuickCommandRecord[]>([]);
-  const [quickCommandDrawerVisible, setQuickCommandDrawerVisible] =
-    useState(false);
+  const [workspaceTool, setWorkspaceTool] = useState<WorkspaceTool>("files");
+  const [workspaceToolTarget, setWorkspaceToolTarget] = useState<HTMLDivElement | null>(null);
+  const [editingQuickCommands, setEditingQuickCommands] = useState(false);
   const [serverMonitorCollapsed, setServerMonitorCollapsed] = useState(
     () => localStorage.getItem(SERVER_MONITOR_COLLAPSED_KEY) === "true",
   );
@@ -505,9 +508,14 @@ function App() {
     terminalSelections,
   ]);
 
+  const openWorkspaceTool = useCallback((tool: WorkspaceTool) => {
+    setWorkspaceTool(tool);
+    setSftpCollapsed(false);
+  }, []);
+
   useEffect(() => {
     if (!activeSessionId) {
-      setQuickCommandDrawerVisible(false);
+      setWorkspaceTool("files");
       closeAiSidebar();
       return;
     }
@@ -520,13 +528,13 @@ function App() {
       ) {
         event.preventDefault();
         event.stopPropagation();
-        setQuickCommandDrawerVisible(true);
+        openWorkspaceTool("commands");
       }
     };
     window.addEventListener("keydown", handleQuickCommandShortcut, true);
     return () =>
       window.removeEventListener("keydown", handleQuickCommandShortcut, true);
-  }, [activeSessionId, closeAiSidebar]);
+  }, [activeSessionId, closeAiSidebar, openWorkspaceTool]);
 
   async function sendQuickCommand(command: string, execute: boolean) {
     if (!activeSession || !isTerminalSessionOperational(activeSession.status)) {
@@ -537,7 +545,7 @@ function App() {
       sessionId: activeSession.id,
       data: Array.from(new TextEncoder().encode(input)),
     });
-    setQuickCommandDrawerVisible(false);
+    setTerminalFocusRequest((current) => current + 1);
     Message.success(execute ? "命令已发送" : "命令已填入终端");
   }
 
@@ -665,6 +673,12 @@ function App() {
             }
           >
             <ServerMonitorPanel
+              tool={sftpCollapsed ? undefined : workspaceTool}
+              toolTarget={workspaceToolTarget}
+              ipRegionEnabled={settings.ipRegionEnabled}
+              ipRegionIpv6={settings.ipRegionIpv6}
+              onOpenSettings={() => openAuxiliaryWindow("settings")}
+              onSelectTool={openWorkspaceTool}
               onReconnect={() => reconnectSession(activeSession)}
               onSendToAi={(sessionId, request) =>
                 void handoffContext(sessionId, request)
@@ -758,49 +772,64 @@ function App() {
         sessionContextMenuItems={sessionContextMenuItems}
         sessions={sessions}
       />
-      <QuickCommandDrawer
-        canSend={Boolean(
-          activeSession && isTerminalSessionOperational(activeSession.status),
-        )}
-        commands={quickCommands}
-        onAfterClose={() => setTerminalFocusRequest((current) => current + 1)}
-        onCancel={() => setQuickCommandDrawerVisible(false)}
-        onSend={sendQuickCommand}
-        visible={quickCommandDrawerVisible}
-      />
     </section>
   );
 
   const sftpPanel = (
-    <SftpPanel
-      confirmFileDelete={settings.confirmFileDelete}
-      externalEditorName={settings.externalEditorName}
-      externalEditorPath={settings.externalEditorPath}
-      sftpUploadRetryAttempts={settings.sftpUploadRetryAttempts}
-      onCurrentPathChange={updateSftpCurrentPath}
-      onReconnect={() => {
-        if (activeSession) reconnectSession(activeSession);
-      }}
-      onSendFilesToAi={async (sessionId, files) => {
-        await handoffRemoteFiles(sessionId, files);
-      }}
-      onSendSelectionToAi={async (sessionId, currentDirectory, entries) => {
-        await handoffContext(
-          sessionId,
-          createSftpSelectionAiHandoff(currentDirectory, entries),
-        );
-      }}
-      refreshRequest={
-        activeSessionId ? (sftpRefreshRequests[activeSessionId] ?? 0) : 0
-      }
-      session={activeSession}
-      showHiddenFiles={settings.showHiddenFiles}
-      terminalDirectory={
-        activeSessionId
-          ? terminalCurrentDirectories[activeSessionId]
-          : undefined
-      }
-    />
+    <WorkspaceToolPanel activeTool={workspaceTool} onSelect={openWorkspaceTool}>
+      <SftpPanel
+        filesVisible={workspaceTool === "files" && !sftpCollapsed}
+        transfersVisible={workspaceTool === "transfers" && !sftpCollapsed}
+        onShowFiles={() => openWorkspaceTool("files")}
+        onShowTransfers={() => openWorkspaceTool("transfers")}
+        confirmFileDelete={settings.confirmFileDelete}
+        externalEditorName={settings.externalEditorName}
+        externalEditorPath={settings.externalEditorPath}
+        sftpUploadRetryAttempts={settings.sftpUploadRetryAttempts}
+        onCurrentPathChange={updateSftpCurrentPath}
+        onReconnect={() => {
+          if (activeSession) reconnectSession(activeSession);
+        }}
+        onSendFilesToAi={async (sessionId, files) => {
+          await handoffRemoteFiles(sessionId, files);
+        }}
+        onSendSelectionToAi={async (sessionId, currentDirectory, entries) => {
+          await handoffContext(
+            sessionId,
+            createSftpSelectionAiHandoff(currentDirectory, entries),
+          );
+        }}
+        refreshRequest={
+          activeSessionId ? (sftpRefreshRequests[activeSessionId] ?? 0) : 0
+        }
+        session={activeSession}
+        showHiddenFiles={settings.showHiddenFiles}
+        terminalDirectory={
+          activeSessionId
+            ? terminalCurrentDirectories[activeSessionId]
+            : undefined
+        }
+      />
+      <div className="workspace-tool-slot" hidden={!["tunnels", "processes", "network"].includes(workspaceTool)} ref={setWorkspaceToolTarget} />
+      {workspaceTool === "commands" && !sftpCollapsed && (
+        editingQuickCommands ? (
+          <div className="workspace-tool-surface">
+            <button className="workspace-tool-back" onClick={() => setEditingQuickCommands(false)} type="button">返回快捷命令</button>
+            <Suspense fallback={null}><QuickCommandSettings /></Suspense>
+          </div>
+        ) : (
+          <QuickCommandDrawer
+            canSend={Boolean(activeSession && isTerminalSessionOperational(activeSession.status))}
+            commands={quickCommands}
+            embedded
+            key={activeSessionId}
+            onEdit={() => setEditingQuickCommands(true)}
+            onSend={sendQuickCommand}
+            visible
+          />
+        )
+      )}
+    </WorkspaceToolPanel>
   );
 
   const aiAssistantPanel = aiAssistantMounted ? (
@@ -844,7 +873,7 @@ function App() {
       applicationTitleBar={
         <ApplicationTitleBar
           hasActiveSession={Boolean(activeSession)}
-          onOpenQuickCommands={() => setQuickCommandDrawerVisible(true)}
+          onOpenQuickCommands={() => openWorkspaceTool("commands")}
           onOpenSettings={() => openAuxiliaryWindow("settings")}
           onOpenShortcutGuide={() => openAuxiliaryWindow("shortcuts")}
           onToggleServerMonitor={() => {

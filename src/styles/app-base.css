@@ -981,3 +981,97 @@ body[arco-theme="dark"] .monitor-resource-fill {
 .port-forward-runtime-tabs > .arco-tabs-content {
   display: none;
 }
+
+.workspace-tools {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+}
+.workspace-tool-tabs { flex: 0 0 auto; }
+.workspace-tool-tabs > .arco-tabs-content { display: none; }
+.workspace-tool-tabs .arco-tabs-header-nav { padding-inline: 8px; }
+.workspace-tool-body { flex: 1; min-height: 0; position: relative; }
+.workspace-tool-body [hidden] { display: none; }
+.workspace-tool-slot, .workspace-tool-surface { height: 100%; min-height: 0; }
+.workspace-tool-surface { overflow: auto; padding: 6px 10px; }
+.workspace-tool-actions { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+.workspace-network-diagnostics { padding: 8px 0; }
+.workspace-network-diagnostics summary { cursor: pointer; }
+.workspace-tool-back { margin-bottom: 8px; }
+
+.workspace-tool-body > .sftp-panel { height: 100%; }
+.workspace-network-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.workspace-network-tools > .arco-input-wrapper { max-width: 300px; }
+.workspace-tool-surface .quick-command-drawer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ip-region-settings { display: grid; gap: 10px; }
+.ip-region-data-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.server-monitor-content:has(.monitor-compact) { padding: 8px; }
+.monitor-compact { gap: 6px; }
+.monitor-address, .monitor-latency-heading {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 12px;
+}
+.monitor-address > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.monitor-system-details summary {
+  width: fit-content;
+  color: var(--workspace-ink);
+  cursor: pointer;
+  font-size: 12px;
+}
+.monitor-system-details[open] .monitor-system-facts { margin-top: 4px; }
+.monitor-compact .monitor-system-facts { gap: 2px; }
+.monitor-compact .monitor-chart-section { padding-top: 5px; }
+.monitor-compact .monitor-resource-meters { gap: 3px; }
+.monitor-compact .monitor-resource-track { height: 17px; }
+.monitor-compact .monitor-network-summary { margin-block: 2px 3px; }
+.monitor-latency-chart { width: 100%; }
+.monitor-latency-bar { background: var(--workspace-accent); }
+.monitor-compact .monitor-latency { flex-direction: column; gap: 3px; }
+.monitor-compact .monitor-network-chart { height: 46px; }
+.monitor-network-bars { justify-content: flex-start; }
+.monitor-network-sample { max-width: calc((100% - 23px) / 24); }
+.monitor-resource-trend[hidden] { display: none; }
+.monitor-process-preview {
+  width: 100%;
+  border: 1px solid var(--workspace-border);
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 11px;
+  color: var(--workspace-ink);
+  font-variant-numeric: tabular-nums;
+}
+.monitor-process-preview :is(th, td) {
+  overflow: hidden;
+  padding: 2px 4px;
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.monitor-process-preview th { background: var(--workspace-chrome); }
+.monitor-process-preview th:first-child { width: 57px; }
+.monitor-process-preview th:nth-child(2) { width: 42px; }
+.monitor-compact .monitor-disk-table :is(th, td) { padding-block: 2px; }

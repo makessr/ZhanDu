@@ -61,6 +61,8 @@ export interface AppSettings {
   externalEditorPath: string;
   externalEditorName: string;
   monitorRefreshIntervalSeconds: number;
+  ipRegionEnabled: boolean;
+  ipRegionIpv6: boolean;
   defaultConnectTimeoutSeconds: number;
   defaultKeepAliveIntervalSeconds: number;
   defaultAutoReconnect: boolean;
@@ -111,6 +113,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   externalEditorPath: "",
   externalEditorName: "",
   monitorRefreshIntervalSeconds: 15,
+  ipRegionEnabled: false,
+  ipRegionIpv6: false,
   defaultConnectTimeoutSeconds: 10,
   defaultKeepAliveIntervalSeconds: 15,
   defaultAutoReconnect: true,
@@ -310,6 +314,8 @@ export function sanitizeAppSettings(value: unknown): AppSettings {
     ),
     externalEditorPath: stringValue(settings.externalEditorPath),
     externalEditorName: stringValue(settings.externalEditorName),
+    ipRegionEnabled: settings.ipRegionEnabled === true,
+    ipRegionIpv6: settings.ipRegionIpv6 === true,
     monitorRefreshIntervalSeconds: numberValue(
       settings.monitorRefreshIntervalSeconds,
       DEFAULT_APP_SETTINGS.monitorRefreshIntervalSeconds,

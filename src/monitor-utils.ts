@@ -35,6 +35,7 @@ export function appendMonitorHistory(
     ...history,
     {
       collectedAt,
+      ...(snapshot.sshLatencyMs !== undefined && { sshLatencyMs: snapshot.sshLatencyMs }),
       cpuUsagePercent: snapshot.cpuUsagePercent,
       memoryUsagePercent: snapshot.memoryUsagePercent,
       networkReceiveBytes: snapshot.networkReceiveBytes,

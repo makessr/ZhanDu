@@ -1,8 +1,8 @@
+import { WorkspaceToolSurface } from "./WorkspaceToolPanel";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Button,
-  Drawer,
   Empty,
   Input,
   Message,
@@ -42,6 +42,7 @@ interface ServerProcessDrawerProps {
   onSendToAi: (request: AiHandoffRequest) => void;
   session: TerminalSession;
   visible: boolean;
+  embedded?: boolean;
 }
 
 const PROCESS_TABLE_WIDTH = 1024;
@@ -74,6 +75,7 @@ function ServerProcessDrawer({
   onSendToAi,
   session,
   visible,
+  embedded,
 }: ServerProcessDrawerProps) {
   const [result, setResult] = useState<ServerProcessListResult | null>(null);
   const [query, setQuery] = useState("");
@@ -304,7 +306,8 @@ function ServerProcessDrawer({
   );
 
   return (
-    <Drawer
+    <WorkspaceToolSurface
+      embedded={embedded}
       bodyStyle={{ padding: 0 }}
       className="server-process-drawer"
       footer={null}
@@ -388,7 +391,7 @@ function ServerProcessDrawer({
         size="small"
         tableLayoutFixed
       />
-    </Drawer>
+    </WorkspaceToolSurface>
   );
 }
 

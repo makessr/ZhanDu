@@ -14,8 +14,6 @@ import { useResolvedAppearance } from "../hooks/useResolvedAppearance";
 import type { ServerMonitorHistoryPoint } from "../models";
 import {
   formatMonitorPercent,
-  formatMonitorRate,
-  monitorNetworkRates,
   normalizeMonitorPercent,
 } from "../monitor-utils";
 
@@ -131,38 +129,5 @@ export function ResourceTrendChart({ monitorHistory }: { monitorHistory: ServerM
       xField="time"
       yField="value"
     />
-  );
-}
-
-export function NetworkTrendChart({
-  monitorHistory,
-  interfaceName,
-}: {
-  monitorHistory: ServerMonitorHistoryPoint[];
-  interfaceName: string;
-}) {
-  const bars = monitorHistory.map((point) => ({
-    time: point.collectedAt,
-    ...monitorNetworkRates(point, interfaceName),
-  }));
-  const maxRate = Math.max(1, ...bars.map(({ receive, transmit }) => Math.max(receive, transmit)));
-  return (
-    <div className="monitor-network-chart" role="img" aria-label="上传和下载速率趋势">
-      {bars.some(({ receive, transmit }) => receive || transmit) && (
-        <span className="monitor-network-scale">{formatMonitorRate(maxRate)}</span>
-      )}
-      <div className="monitor-network-bars">
-        {bars.map(({ time, receive, transmit }) => (
-          <div
-            className="monitor-network-sample"
-            key={time}
-            title={`${new Date(time).toLocaleTimeString("zh-CN")}  ↑ ${formatMonitorRate(transmit)}  ↓ ${formatMonitorRate(receive)}`}
-          >
-            <span className="monitor-network-upload" style={{ height: `${transmit / maxRate * 100}%` }} />
-            <span className="monitor-network-download" style={{ height: `${receive / maxRate * 100}%` }} />
-          </div>
-        ))}
-      </div>
-    </div>
   );
 }

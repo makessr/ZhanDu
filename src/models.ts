@@ -229,6 +229,7 @@ export interface NetworkInterfaceCounters {
 
 export interface ServerMonitorHistoryPoint {
   collectedAt: number;
+  sshLatencyMs?: number;
   cpuUsagePercent: number;
   memoryUsagePercent: number;
   networkReceiveBytes: number;

@@ -1,8 +1,8 @@
+import { WorkspaceToolSurface } from "./WorkspaceToolPanel";
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Button,
-  Drawer,
   Empty,
   Input,
   Message,
@@ -24,10 +24,12 @@ import {
 interface QuickCommandDrawerProps {
   canSend: boolean;
   commands: QuickCommandRecord[];
-  onAfterClose: () => void;
-  onCancel: () => void;
+  onAfterClose?: () => void;
+  onCancel?: () => void;
   onSend: (command: string, execute: boolean) => Promise<void>;
   visible: boolean;
+  embedded?: boolean;
+  onEdit?: () => void;
 }
 
 interface CommandGroup {
@@ -56,6 +58,8 @@ function QuickCommandDrawer({
   onCancel,
   onSend,
   visible,
+  embedded,
+  onEdit,
 }: QuickCommandDrawerProps) {
   const [query, setQuery] = useState("");
   const [pendingCommand, setPendingCommand] =
@@ -153,7 +157,8 @@ function QuickCommandDrawer({
 
   return (
     <>
-      <Drawer
+      <WorkspaceToolSurface
+      embedded={embedded}
         afterClose={onAfterClose}
         bodyStyle={{ padding: 0 }}
         className="quick-command-drawer"
@@ -164,6 +169,7 @@ function QuickCommandDrawer({
         width={480}
       >
         <div className="quick-command-drawer-toolbar">
+          {onEdit && <Button onClick={onEdit} size="small">管理快捷命令</Button>}
           <Input.Search
             allowClear
             onChange={setQuery}
@@ -239,7 +245,7 @@ function QuickCommandDrawer({
             <Empty description={query ? "没有匹配的快捷命令" : "暂无快捷命令"} />
           )}
         </div>
-      </Drawer>
+      </WorkspaceToolSurface>
       {pendingCommand && (
         <Modal
           className="quick-command-parameter-modal"

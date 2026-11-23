@@ -1,3 +1,4 @@
+import IpRegionSettings from "./IpRegionSettings";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   Badge,
@@ -720,6 +721,12 @@ function SettingsWindow() {
                 label="刷新间隔"
               />
             </div>
+            <IpRegionSettings
+              enabled={settings.ipRegionEnabled}
+              ipv6={settings.ipRegionIpv6}
+              onEnable={(value) => updateSetting("ipRegionEnabled", value)}
+              onIpv6Change={(value) => updateSetting("ipRegionIpv6", value)}
+            />
           </>
         );
       case "connection":

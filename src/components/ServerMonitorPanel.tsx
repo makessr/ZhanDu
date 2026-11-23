@@ -1,3 +1,5 @@
+import { createPortal } from "react-dom";
+import { WorkspaceToolSurface, type WorkspaceTool } from "./WorkspaceToolPanel";
 import {
   lazy,
   Suspense,
@@ -8,12 +10,13 @@ import {
   useState,
 } from "react";
 import { isTauri } from "@tauri-apps/api/core";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   Alert,
+  Message,
   Button,
   Descriptions,
-  Drawer,
   Empty,
   Input,
   Radio,
@@ -43,6 +46,8 @@ import type {
   NetworkConnectionsResult,
   NetworkPingResult,
   NetworkTraceResult,
+  ServerProcess,
+  ServerProcessListResult,
   PortForwardStatus,
 } from "../models";
 import {
@@ -55,6 +60,7 @@ import {
   formatUptime,
   monitorNetworkRates,
 } from "../monitor-utils";
+import { MonitorLatencyChart, NetworkTrendChart } from "./MonitorBarCharts";
 import ServerProcessDrawer from "./ServerProcessDrawer";
 import PortForwardDrawer from "./PortForwardDrawer";
 import { commandErrorMessage } from "../tauri-protocol";
@@ -67,11 +73,14 @@ const loadCharts = () => import("./ServerMonitorCharts");
 const ResourceTrendChart = lazy(() =>
   loadCharts().then(({ ResourceTrendChart }) => ({ default: ResourceTrendChart })),
 );
-const NetworkTrendChart = lazy(() =>
-  loadCharts().then(({ NetworkTrendChart }) => ({ default: NetworkTrendChart })),
-);
 
 interface ServerMonitorPanelProps {
+  tool?: WorkspaceTool;
+  toolTarget?: HTMLElement | null;
+  onSelectTool?: (tool: WorkspaceTool) => void;
+  ipRegionEnabled?: boolean;
+  ipRegionIpv6?: boolean;
+  onOpenSettings?: () => void;
   visible: boolean;
   refreshIntervalSeconds: number;
   session: TerminalSession | null;
@@ -120,6 +129,12 @@ function ServerMonitorPanel({
   onSnapshotChange,
   onPortForwardStatusChange,
   onSendToAi,
+  tool,
+  toolTarget,
+  onSelectTool,
+  ipRegionEnabled = false,
+  ipRegionIpv6 = false,
+  onOpenSettings,
 }: ServerMonitorPanelProps) {
   const appearance = useResolvedAppearance();
   const chartSecondaryTextColor =
@@ -135,6 +150,9 @@ function ServerMonitorPanel({
   const [snapshot, setSnapshot] = useState<ServerMonitorSnapshot | null>(null);
   const [history, setHistory] = useState<ServerMonitorHistoryPoint[]>([]);
   const [error, setError] = useState<string>();
+  const [processPreview, setProcessPreview] = useState<{ sessionId: string; rows: ServerProcess[] }>();
+  const [ipRegions, setIpRegions] = useState<Record<string, string>>({});
+  const [networkQuery, setNetworkQuery] = useState("");
   const [diagnosticsVisible, setDiagnosticsVisible] = useState(false);
   const [processDrawerVisible, setProcessDrawerVisible] = useState(false);
   const [portForwardDrawerVisible, setPortForwardDrawerVisible] =
@@ -183,6 +201,8 @@ function ServerMonitorPanel({
       setConnectionsLoading(false);
       setConnectionsError(undefined);
       setConnectionFilter("all");
+      setNetworkQuery("");
+      setIpRegions({});
       setTraceResult(null);
       setTraceLoading(false);
       setTraceError(undefined);
@@ -347,12 +367,72 @@ function ServerMonitorPanel({
 
   const openNetworkDiagnostics = () => {
     if (!session || !isTerminalSessionOperational(session.status)) return;
+    if (onSelectTool) {
+      onSelectTool("network");
+      return;
+    }
     setDiagnosticsVisible(true);
     if (!pingResult && !pingLoading) void runPing();
     if (!connectionsResult && !connectionsLoading) {
       void loadNetworkConnections();
     }
   };
+
+  useEffect(() => {
+    if (tool === "network" && connected) void loadNetworkConnections();
+  }, [tool, connected, session?.id]);
+
+  useEffect(() => {
+    setIpRegions({});
+    if (tool !== "network" || !connected || !ipRegionEnabled || !connectionsResult) return;
+    const addresses = [...new Set(connectionsResult.connections.map((row) => row.remoteAddress))];
+    let disposed = false;
+    let generation = 0;
+    const lookup = () => {
+      const request = ++generation;
+      void invoke<Record<string, string>>("ip_region_lookup", { addresses, includeIpv6: ipRegionIpv6 })
+        .then((regions) => {
+          if (!disposed && request === generation) setIpRegions(regions);
+        }).catch(() => {
+          if (!disposed && request === generation) setIpRegions({});
+        });
+    };
+    lookup();
+    window.addEventListener("focus", lookup);
+    return () => {
+      disposed = true;
+      window.removeEventListener("focus", lookup);
+    };
+  }, [tool, connected, connectionsResult, ipRegionEnabled, ipRegionIpv6]);
+
+  useEffect(() => {
+    if (!onSelectTool || !visible || !windowVisible || !connected || !session || tool === "processes") return;
+    let disposed = false;
+    let pending = false;
+    const collect = async () => {
+      if (pending) return;
+      pending = true;
+      try {
+        const result = await invoke<ServerProcessListResult>("ssh_processes", { sessionId: session.id });
+        if (!disposed) {
+          const rows = [...result.processes]
+            .sort((a, b) => b.residentMemoryBytes - a.residentMemoryBytes)
+            .slice(0, 5);
+          setProcessPreview({ sessionId: session.id, rows });
+        }
+      } catch {
+        if (!disposed) setProcessPreview(undefined);
+      } finally {
+        pending = false;
+      }
+    };
+    void collect();
+    const timer = window.setInterval(collect, Math.max(15, refreshIntervalSeconds) * 1000);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+    };
+  }, [connected, onSelectTool, refreshIntervalSeconds, session?.id, tool === "processes", visible, windowVisible]);
 
   const runTraceRoute = async () => {
     if (!session) return;
@@ -406,7 +486,8 @@ function ServerMonitorPanel({
   const interfaceName = selectedInterface?.name ?? "";
   const rates = monitorNetworkRates(latestHistoryPoint, interfaceName);
   const filteredConnections = useMemo(() => {
-    const connections = connectionsResult?.connections ?? [];
+    const query = networkQuery.trim().toLowerCase();
+    const connections = (connectionsResult?.connections ?? []).filter((row) => !query || [row.process, row.localAddress, row.localPort, row.remoteAddress, row.remotePort, row.protocol].some((field) => field?.toLowerCase().includes(query)));
     if (connectionFilter === "listening") {
       return connections.filter(isListeningConnection);
     }
@@ -414,7 +495,7 @@ function ServerMonitorPanel({
       return connections.filter((connection) => connection.state === "ESTAB");
     }
     return connections;
-  }, [connectionFilter, connectionsResult]);
+  }, [connectionFilter, connectionsResult, networkQuery]);
   const connectionColumns = useMemo<TableColumnProps<NetworkConnection>[]>(
     () => [
       {
@@ -454,6 +535,11 @@ function ServerMonitorPanel({
           </Typography.Text>
         ),
       },
+      ...(ipRegionEnabled ? [{
+        title: "远端 IP 归属地",
+        width: 190,
+        render: (_: unknown, row: NetworkConnection) => <Typography.Text ellipsis={{ showTooltip: true }}>{ipRegions[row.remoteAddress] || "—"}</Typography.Text>,
+      }] : []),
       {
         dataIndex: "process",
         title: "进程",
@@ -465,7 +551,7 @@ function ServerMonitorPanel({
         ),
       },
     ],
-    [],
+    [ipRegionEnabled, ipRegions],
   );
 
   const reconnecting = session?.status === "reconnecting";
@@ -500,174 +586,9 @@ function ServerMonitorPanel({
     );
   };
 
-  return (
-    <section className={`server-monitor${connected ? "" : " is-unavailable"}`}>
-      <div className="server-monitor-heading">
-        <Typography.Text bold>服务器监控</Typography.Text>
-        <Space size="mini">
-          <Tooltip content="进程管理">
-            <Button
-              aria-label="打开进程管理"
-              disabled={!connected}
-              icon={<IconNav />}
-              onClick={() => setProcessDrawerVisible(true)}
-              size="mini"
-              type="text"
-            />
-          </Tooltip>
-          <Tooltip content="网络诊断">
-            <Button
-              aria-label="打开网络诊断"
-              disabled={!connected}
-              icon={<IconCloudDownload />}
-              onClick={openNetworkDiagnostics}
-              size="mini"
-              type="text"
-            />
-          </Tooltip>
-          <Tooltip content="端口转发">
-            <Button
-              aria-label="打开端口转发"
-              disabled={!session}
-              icon={<IconReply />}
-              onClick={() => setPortForwardDrawerVisible(true)}
-              size="mini"
-              type="text"
-            />
-          </Tooltip>
-        </Space>
-      </div>
-      <dl className="monitor-system-facts">
-        <div>
-          <dt>系统</dt>
-          <dd>{monitorSnapshot?.operatingSystem || "-"}</dd>
-        </div>
-        <div>
-          <dt>主机名</dt>
-          <dd>{monitorSnapshot?.hostname || "-"}</dd>
-        </div>
-        <div>
-          <dt>内核</dt>
-          <dd>{monitorSnapshot?.kernel || "-"}</dd>
-        </div>
-        <div>
-          <dt>运行时间</dt>
-          <dd>{monitorSnapshot ? formatUptime(monitorSnapshot.uptimeSeconds) : "-"}</dd>
-        </div>
-        <div>
-          <dt>负载</dt>
-          <dd>
-            {monitorSnapshot
-              ? monitorSnapshot.loadAverage
-                  .map((value) => value.toFixed(2))
-                  .join(" / ")
-              : "-"}
-          </dd>
-        </div>
-      </dl>
-
-      <div className="monitor-chart-section">
-        <div className="monitor-chart-heading">
-          <Typography.Text bold>资源占用</Typography.Text>
-        </div>
-        <div className="monitor-resource-meters">
-          {resourceMeters.map(({ label, usage, bytes }) => {
-            const percent = typeof usage === "number" && Number.isFinite(usage)
-              ? Math.min(100, Math.max(0, usage))
-              : undefined;
-            const value = percent === undefined ? "—" : formatMonitorPercent(percent);
-            const amount = bytes?.map(formatMonitorBytes).join(" / ");
-            const text = amount ? `${value}  ${amount}` : value;
-            return (
-              <div className="monitor-resource-row" key={label}>
-                <span>{label}</span>
-                <div
-                  aria-label={label}
-                  aria-valuenow={percent}
-                  aria-valuetext={percent === undefined ? undefined : text}
-                  className="monitor-resource-track"
-                  role={percent === undefined ? undefined : "meter"}
-                  title={text}
-                >
-                  <span aria-hidden className="monitor-resource-fill" style={{ width: `${percent ?? 0}%` }} />
-                  <span className="monitor-resource-value">{text}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <Button
-          aria-expanded={chartsVisible}
-          disabled={!connected}
-          onClick={() => setChartsVisible((current) => !current)}
-          size="mini"
-          type="text"
-        >
-          {chartsVisible ? "隐藏图表" : "显示图表"}
-        </Button>
-      </div>
-
-      <div className="monitor-chart-section">
-        <div className="monitor-chart-heading">
-          <Typography.Text bold>资源趋势</Typography.Text>
-        </div>
-        {visible && windowVisible && connected && chartsVisible && (
-          <Suspense fallback={null}>
-            <ResourceTrendChart monitorHistory={monitorHistory} />
-          </Suspense>
-        )}
-      </div>
-
-      <div className="monitor-chart-section">
-        <div className="monitor-chart-heading">
-          <Typography.Text bold>网络流量</Typography.Text>
-          <Typography.Text type="secondary">
-            {monitorSnapshot
-              ? `累计 ↓ ${formatMonitorBytes(selectedInterface?.receiveBytes ?? monitorSnapshot.networkReceiveBytes)} / ↑ ${formatMonitorBytes(selectedInterface?.transmitBytes ?? monitorSnapshot.networkTransmitBytes)}`
-              : "累计 ↓ - / ↑ -"}
-          </Typography.Text>
-        </div>
-        <div className="monitor-network-summary">
-          <span className="monitor-network-upload-rate" title="上传速率" aria-label="上传速率">
-            ↑ {monitorSnapshot ? formatMonitorRate(rates.transmit) : "—"}
-          </span>
-          <span className="monitor-network-download-rate" title="下载速率" aria-label="下载速率">
-            ↓ {monitorSnapshot ? formatMonitorRate(rates.receive) : "—"}
-          </span>
-          {interfaces.length > 0 && (
-            <select aria-label="网络接口" value={interfaceName} onChange={(event) => setNetworkInterface(event.target.value)}>
-              <option value="">全部</option>
-              {interfaces.map(({ name }) => <option key={name} value={name}>{name}</option>)}
-            </select>
-          )}
-        </div>
-        {visible && windowVisible && connected && chartsVisible && (
-          <Suspense fallback={null}>
-            <NetworkTrendChart monitorHistory={monitorHistory} interfaceName={interfaceName} />
-          </Suspense>
-        )}
-      </div>
-      <div className="monitor-chart-section monitor-latency" title="从本机到服务器的 SSH 通道开启耗时，包含跳板机或代理路径">
-        <Typography.Text bold>服务器延迟</Typography.Text>
-        <span aria-label="SSH 延迟">{formatLatency(monitorSnapshot?.sshLatencyMs)}</span>
-      </div>
-      <div className="monitor-chart-section">
-        <Typography.Text bold>磁盘</Typography.Text>
-        <table className="monitor-disk-table" aria-label="磁盘挂载点">
-          <thead>
-            <tr><th scope="col">路径</th><th scope="col">可用／大小</th></tr>
-          </thead>
-          <tbody>
-            {monitorSnapshot?.diskMounts?.length ? monitorSnapshot.diskMounts.map((mount) => (
-              <tr key={mount.path}>
-                <td title={mount.path}>{mount.path}</td>
-                <td>{formatMonitorBytes(mount.availableBytes)} / {formatMonitorBytes(mount.totalBytes)}</td>
-              </tr>
-            )) : <tr><td colSpan={2} className="monitor-disk-empty">暂无挂载点数据</td></tr>}
-          </tbody>
-        </table>
-      </div>
-      <Drawer
+  const toolSurfaces = (<>
+      <WorkspaceToolSurface
+        embedded={Boolean(onSelectTool)}
         className="network-diagnostics-drawer"
         footer={null}
         onCancel={() => setDiagnosticsVisible(false)}
@@ -690,9 +611,73 @@ function ServerMonitorPanel({
             </Button>
           </div>
         }
-        visible={diagnosticsVisible}
+        visible={onSelectTool ? tool === "network" : diagnosticsVisible}
         width={720}
       >
+        <section className="network-diagnostics-section">
+          <div className="network-diagnostics-section-heading">
+            <span>
+              <Typography.Text bold>网络连接</Typography.Text>
+              {connectionsResult && (
+                <Typography.Text type="secondary">
+                  {connectionsResult.connections.length} 条
+                </Typography.Text>
+              )}
+            </span>
+            <Tooltip content="刷新网络连接">
+              <Button
+                aria-label="刷新网络连接"
+                icon={<IconRefresh />}
+                loading={connectionsLoading}
+                onClick={() => void loadNetworkConnections()}
+                size="mini"
+                type="text"
+              />
+            </Tooltip>
+          </div>
+          {onSelectTool && (
+            <div className="workspace-network-tools">
+              <Input allowClear aria-label="筛选网络连接" onChange={setNetworkQuery} placeholder="按进程、端口或 IP 筛选" size="small" value={networkQuery} />
+              <Button onClick={onOpenSettings} size="mini">IP 归属地设置</Button>
+              <Button disabled={!connectionsResult && !pingResult && !traceResult} onClick={sendNetworkToAi} size="mini">交给 AI</Button>
+            </div>
+          )}
+          <Radio.Group
+            mode="fill"
+            onChange={setConnectionFilter}
+            options={[
+              { label: "全部", value: "all" },
+              { label: "监听", value: "listening" },
+              { label: "已连接", value: "connected" },
+            ]}
+            size="small"
+            type="button"
+            value={connectionFilter}
+          />
+          {connectionsError && (
+            <Alert content={connectionsError} showIcon type="error" />
+          )}
+          {connectionsResult?.truncated && (
+            <Alert
+              content="连接数量较多，仅显示前 500 条"
+              showIcon
+              type="warning"
+            />
+          )}
+          <Table
+            border={false}
+            columns={connectionColumns}
+            data={filteredConnections}
+            loading={connectionsLoading}
+            noDataElement={<Empty description="暂无网络连接" />}
+            pagination={false}
+            rowKey="id"
+            scroll={{ y: 320 }}
+            size="small"
+          />
+        </section>
+        <details className="workspace-network-diagnostics" open={onSelectTool ? undefined : true}>
+          <summary>Ping 与路由追踪</summary>
         <section className="network-diagnostics-section">
           <Typography.Text bold>Ping</Typography.Text>
           <Input.Search
@@ -809,78 +794,216 @@ function ServerMonitorPanel({
             </>
           )}
         </section>
-        <section className="network-diagnostics-section">
-          <div className="network-diagnostics-section-heading">
-            <span>
-              <Typography.Text bold>网络连接</Typography.Text>
-              {connectionsResult && (
-                <Typography.Text type="secondary">
-                  {connectionsResult.connections.length} 条
-                </Typography.Text>
-              )}
-            </span>
-            <Tooltip content="刷新网络连接">
-              <Button
-                aria-label="刷新网络连接"
-                icon={<IconRefresh />}
-                loading={connectionsLoading}
-                onClick={() => void loadNetworkConnections()}
-                size="mini"
-                type="text"
-              />
-            </Tooltip>
-          </div>
-          <Radio.Group
-            mode="fill"
-            onChange={setConnectionFilter}
-            options={[
-              { label: "全部", value: "all" },
-              { label: "监听", value: "listening" },
-              { label: "已连接", value: "connected" },
-            ]}
-            size="small"
-            type="button"
-            value={connectionFilter}
-          />
-          {connectionsError && (
-            <Alert content={connectionsError} showIcon type="error" />
-          )}
-          {connectionsResult?.truncated && (
-            <Alert
-              content="连接数量较多，仅显示前 500 条"
-              showIcon
-              type="warning"
-            />
-          )}
-          <Table
-            border={false}
-            columns={connectionColumns}
-            data={filteredConnections}
-            loading={connectionsLoading}
-            noDataElement={<Empty description="暂无网络连接" />}
-            pagination={false}
-            rowKey="id"
-            scroll={{ y: 320 }}
-            size="small"
-          />
-        </section>
-      </Drawer>
+        </details>
+      </WorkspaceToolSurface>
       {session && (
         <>
           <ServerProcessDrawer
+            embedded={Boolean(onSelectTool)}
             onCancel={() => setProcessDrawerVisible(false)}
             onSendToAi={(request) => onSendToAi(session.id, request)}
             session={session}
-            visible={processDrawerVisible}
+            visible={onSelectTool ? tool === "processes" : processDrawerVisible}
           />
           <PortForwardDrawer
+            embedded={Boolean(onSelectTool)}
             onCancel={() => setPortForwardDrawerVisible(false)}
             onStatusChange={onPortForwardStatusChange}
             session={session}
-            visible={portForwardDrawerVisible}
+            visible={onSelectTool ? tool === "tunnels" : portForwardDrawerVisible}
           />
         </>
       )}
+  </>);
+
+  return (
+    <section className={`server-monitor${onSelectTool ? " monitor-compact" : ""}${connected ? "" : " is-unavailable"}`}>
+      <div className="server-monitor-heading">
+        <Typography.Text bold>服务器监控</Typography.Text>
+        <Space size="mini">
+          <Tooltip content="进程管理">
+            <Button
+              aria-label="打开进程管理"
+              disabled={!connected}
+              icon={<IconNav />}
+              onClick={() => onSelectTool ? onSelectTool("processes") : setProcessDrawerVisible(true)}
+              size="mini"
+              type="text"
+            />
+          </Tooltip>
+          <Tooltip content="网络诊断">
+            <Button
+              aria-label="打开网络诊断"
+              disabled={!connected}
+              icon={<IconCloudDownload />}
+              onClick={openNetworkDiagnostics}
+              size="mini"
+              type="text"
+            />
+          </Tooltip>
+          <Tooltip content="端口转发">
+            <Button
+              aria-label="打开端口转发"
+              disabled={!session}
+              icon={<IconReply />}
+              onClick={() => onSelectTool ? onSelectTool("tunnels") : setPortForwardDrawerVisible(true)}
+              size="mini"
+              type="text"
+            />
+          </Tooltip>
+        </Space>
+      </div>
+      {onSelectTool && session && (
+        <div className="monitor-address">
+          <span title={session.host.address}>IP {session.host.address}</span>
+          <Button onClick={() => void writeText(session.host.address).catch((error) => Message.error(commandErrorMessage(error)))} size="mini" type="text">复制</Button>
+        </div>
+      )}
+      <details className="monitor-system-details" open={onSelectTool ? undefined : true}>
+        <summary>系统信息</summary>
+      <dl className="monitor-system-facts">
+        <div>
+          <dt>系统</dt>
+          <dd>{monitorSnapshot?.operatingSystem || "-"}</dd>
+        </div>
+        <div>
+          <dt>主机名</dt>
+          <dd>{monitorSnapshot?.hostname || "-"}</dd>
+        </div>
+        <div>
+          <dt>内核</dt>
+          <dd>{monitorSnapshot?.kernel || "-"}</dd>
+        </div>
+      </dl>
+      </details>
+      <dl className="monitor-system-facts monitor-runtime-facts">
+        <div>
+          <dt>运行时间</dt>
+          <dd>{monitorSnapshot ? formatUptime(monitorSnapshot.uptimeSeconds) : "-"}</dd>
+        </div>
+        <div>
+          <dt>负载</dt>
+          <dd>
+            {monitorSnapshot
+              ? monitorSnapshot.loadAverage
+                  .map((value) => value.toFixed(2))
+                  .join(" / ")
+              : "-"}
+          </dd>
+        </div>
+      </dl>
+
+      <div className="monitor-chart-section">
+        <div className="monitor-chart-heading">
+          <Typography.Text bold>资源占用</Typography.Text>
+        </div>
+        <div className="monitor-resource-meters">
+          {resourceMeters.map(({ label, usage, bytes }) => {
+            const percent = typeof usage === "number" && Number.isFinite(usage)
+              ? Math.min(100, Math.max(0, usage))
+              : undefined;
+            const value = percent === undefined ? "—" : formatMonitorPercent(percent);
+            const amount = bytes?.map(formatMonitorBytes).join(" / ");
+            const text = amount ? `${value}  ${amount}` : value;
+            return (
+              <div className="monitor-resource-row" key={label}>
+                <span>{label}</span>
+                <div
+                  aria-label={label}
+                  aria-valuenow={percent}
+                  aria-valuetext={percent === undefined ? undefined : text}
+                  className="monitor-resource-track"
+                  role={percent === undefined ? undefined : "meter"}
+                  title={text}
+                >
+                  <span aria-hidden className="monitor-resource-fill" style={{ width: `${percent ?? 0}%` }} />
+                  <span className="monitor-resource-value">{text}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <Button
+          aria-expanded={chartsVisible}
+          disabled={!connected}
+          onClick={() => setChartsVisible((current) => !current)}
+          size="mini"
+          type="text"
+        >
+          {chartsVisible ? "隐藏图表" : "显示图表"}
+        </Button>
+      </div>
+
+      {onSelectTool && connected && (
+        <table className="monitor-process-preview" aria-label="内存占用最高的进程">
+          <thead><tr><th scope="col">内存</th><th scope="col">CPU</th><th scope="col">命令</th></tr></thead>
+          <tbody>{processPreview?.sessionId === session?.id && processPreview?.rows.length ? processPreview.rows.map((row) => (
+            <tr key={row.id}><td>{formatMonitorBytes(row.residentMemoryBytes)}</td><td>{formatMonitorPercent(row.cpuUsagePercent)}</td><td title={row.command}>{row.name}</td></tr>
+          )) : <tr><td colSpan={3}>暂无进程摘要</td></tr>}</tbody>
+        </table>
+      )}
+      <div className="monitor-chart-section monitor-resource-trend" hidden={!chartsVisible}>
+        <div className="monitor-chart-heading">
+          <Typography.Text bold>资源趋势</Typography.Text>
+        </div>
+        {visible && windowVisible && connected && chartsVisible && (
+          <Suspense fallback={null}>
+            <ResourceTrendChart monitorHistory={monitorHistory} />
+          </Suspense>
+        )}
+      </div>
+
+      <div className="monitor-chart-section">
+        <div className="monitor-chart-heading">
+          <Typography.Text bold>网络流量</Typography.Text>
+          <Typography.Text type="secondary">
+            {monitorSnapshot
+              ? `累计 ↓ ${formatMonitorBytes(selectedInterface?.receiveBytes ?? monitorSnapshot.networkReceiveBytes)} / ↑ ${formatMonitorBytes(selectedInterface?.transmitBytes ?? monitorSnapshot.networkTransmitBytes)}`
+              : "累计 ↓ - / ↑ -"}
+          </Typography.Text>
+        </div>
+        <div className="monitor-network-summary">
+          <span className="monitor-network-upload-rate" title="上传速率" aria-label="上传速率">
+            ↑ {monitorSnapshot ? formatMonitorRate(rates.transmit) : "—"}
+          </span>
+          <span className="monitor-network-download-rate" title="下载速率" aria-label="下载速率">
+            ↓ {monitorSnapshot ? formatMonitorRate(rates.receive) : "—"}
+          </span>
+          {interfaces.length > 0 && (
+            <select aria-label="网络接口" value={interfaceName} onChange={(event) => setNetworkInterface(event.target.value)}>
+              <option value="">全部</option>
+              {interfaces.map(({ name }) => <option key={name} value={name}>{name}</option>)}
+            </select>
+          )}
+        </div>
+        {visible && windowVisible && connected && (chartsVisible || onSelectTool) && (
+          <NetworkTrendChart monitorHistory={monitorHistory} interfaceName={interfaceName} />
+        )}
+      </div>
+      <div className="monitor-chart-section monitor-latency" title="从本机到服务器的 SSH 通道开启耗时，包含跳板机或代理路径">
+        <div className="monitor-latency-heading">
+          <span aria-label="SSH 延迟">{formatLatency(monitorSnapshot?.sshLatencyMs)}</span>
+          <Typography.Text type="secondary">服务器延迟</Typography.Text>
+        </div>
+        {onSelectTool && visible && windowVisible && connected && <MonitorLatencyChart history={monitorHistory} />}
+      </div>
+      <div className="monitor-chart-section">
+        <Typography.Text bold>磁盘</Typography.Text>
+        <table className="monitor-disk-table" aria-label="磁盘挂载点">
+          <thead>
+            <tr><th scope="col">路径</th><th scope="col">可用／大小</th></tr>
+          </thead>
+          <tbody>
+            {monitorSnapshot?.diskMounts?.length ? monitorSnapshot.diskMounts.map((mount) => (
+              <tr key={mount.path}>
+                <td title={mount.path}>{mount.path}</td>
+                <td>{formatMonitorBytes(mount.availableBytes)} / {formatMonitorBytes(mount.totalBytes)}</td>
+              </tr>
+            )) : <tr><td colSpan={2} className="monitor-disk-empty">暂无挂载点数据</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {onSelectTool ? (toolTarget && createPortal(toolSurfaces, toolTarget)) : toolSurfaces}
       {connectionUnavailable && (
         <ConnectionStatusOverlay
           description={connectionDescription}

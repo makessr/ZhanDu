@@ -53,7 +53,14 @@ fn create_auxiliary_window<R: Runtime>(
         _ => return Err(format!("不支持的辅助窗口: {label}")),
     };
     let path = PathBuf::from(format!("index.html#view={view}"));
-    WebviewWindowBuilder::new(app, label, WebviewUrl::App(path))
+    let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App(path));
+    if label == SETTINGS_WINDOW_LABEL {
+        let main = app
+            .get_webview_window(MAIN_WINDOW_LABEL)
+            .ok_or("栈渡主窗口尚未打开")?;
+        builder = builder.parent(&main).map_err(|error| error.to_string())?;
+    }
+    builder
         .title(title)
         .inner_size(width, height)
         .min_inner_size(min_width, min_height)
@@ -71,6 +78,11 @@ fn show_auxiliary_window<R: Runtime>(
 ) -> Result<(), String> {
     let window = app.get_webview_window(label);
     if let Some(window) = window {
+        if label == SETTINGS_WINDOW_LABEL {
+            if let Some(main) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+                main.unminimize().map_err(|error| error.to_string())?;
+            }
+        }
         window.show().map_err(|error| error.to_string())?;
         window.set_focus().map_err(|error| error.to_string())?;
         crate::diagnostics::record_native_info(
