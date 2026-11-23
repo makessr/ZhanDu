@@ -117,16 +117,18 @@ export function ResourceTrendChart({ monitorHistory }: { monitorHistory: ServerM
       className="monitor-chart"
       color={["#165dff", "#00b42a", "#d68025"]}
       data={[{ id: "resource-trend", values: trendData }]}
-      height={128}
+      height={104}
       legends={{
         orient: "top",
         position: "start",
+        padding: [0, 8, 3, 24],
         item: {
+          padding: 0,
           label: { style: { fill: chartTextColor, fontSize: 10 } },
         },
       }}
       line={{ style: { lineWidth: 2 } }}
-      padding={{ bottom: 6, left: 0, right: 0, top: 22 }}
+      padding={{ bottom: 6, left: 0, right: 0, top: 2 }}
       point={{ style: { size: 2 }, visible: monitorHistory.length < 2 }}
       seriesField="metric"
       stack={false}

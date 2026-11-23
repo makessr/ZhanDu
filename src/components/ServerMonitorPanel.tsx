@@ -139,7 +139,6 @@ function ServerMonitorPanel({
   const appearance = useResolvedAppearance();
   const chartSecondaryTextColor =
     appearance === "dark" ? "rgba(255, 255, 255, 0.45)" : "#86909c";
-  const [chartsVisible, setChartsVisible] = useState(false);
   const [windowVisible, setWindowVisible] = useState(
     () => !document.hidden && !isTauri(),
   );
@@ -180,6 +179,7 @@ function ServerMonitorPanel({
   const connected = Boolean(
     session && isTerminalSessionOperational(session.status),
   );
+  const showMonitorCharts = visible && windowVisible && connected;
   const monitorSnapshot = connected ? snapshot : null;
   const monitorHistory = connected ? history : [];
 
@@ -937,15 +937,6 @@ function ServerMonitorPanel({
             );
           })}
         </div>
-        <Button
-          aria-expanded={chartsVisible}
-          disabled={!connected}
-          onClick={() => setChartsVisible((current) => !current)}
-          size="mini"
-          type="text"
-        >
-          {chartsVisible ? "隐藏图表" : "显示图表"}
-        </Button>
       </div>
 
       {onSelectTool && connected && (
@@ -956,18 +947,17 @@ function ServerMonitorPanel({
           )) : <tr><td colSpan={3}>暂无进程摘要</td></tr>}</tbody>
         </table>
       )}
-      <div
-        aria-label="CPU、内存和磁盘使用率趋势"
-        className="monitor-chart-section monitor-resource-trend"
-        hidden={!chartsVisible}
-        role="group"
-      >
-        {visible && windowVisible && connected && chartsVisible && (
+      {showMonitorCharts && (
+        <div
+          aria-label="CPU、内存和磁盘使用率趋势"
+          className="monitor-chart-section monitor-resource-trend"
+          role="group"
+        >
           <Suspense fallback={null}>
             <ResourceTrendChart monitorHistory={monitorHistory} />
           </Suspense>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="monitor-chart-section">
         <Typography.Text className="monitor-network-total" type="secondary">
@@ -989,7 +979,7 @@ function ServerMonitorPanel({
             </select>
           )}
         </div>
-        {visible && windowVisible && connected && (chartsVisible || onSelectTool) && (
+        {showMonitorCharts && (
           <NetworkTrendChart monitorHistory={monitorHistory} interfaceName={interfaceName} />
         )}
       </div>
@@ -998,7 +988,7 @@ function ServerMonitorPanel({
           <span aria-label="SSH 延迟">{formatLatency(monitorSnapshot?.sshLatencyMs)}</span>
           <Typography.Text type="secondary">服务器延迟</Typography.Text>
         </div>
-        {onSelectTool && visible && windowVisible && connected && <MonitorLatencyChart history={monitorHistory} />}
+        {showMonitorCharts && <MonitorLatencyChart history={monitorHistory} />}
       </div>
       <div className="monitor-chart-section">
         <Typography.Text bold>磁盘</Typography.Text>

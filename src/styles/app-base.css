@@ -1193,6 +1193,7 @@ body[arco-theme="dark"] .monitor-resource-fill {
 .monitor-system-details[open] .monitor-system-facts { margin-top: 4px; }
 .monitor-compact .monitor-system-facts { gap: 2px; }
 .monitor-compact .monitor-chart-section { padding-top: 5px; }
+.monitor-compact .monitor-resource-trend { padding-top: 2px; }
 .monitor-compact .monitor-resource-meters { gap: 3px; }
 .monitor-compact .monitor-resource-track { height: 17px; }
 .monitor-compact .monitor-network-summary { margin-block: 2px 3px; }
@@ -1202,7 +1203,6 @@ body[arco-theme="dark"] .monitor-resource-fill {
 .monitor-compact .monitor-network-chart { height: 46px; }
 .monitor-network-bars { justify-content: flex-start; }
 .monitor-network-sample { max-width: calc((100% - 23px) / 24); }
-.monitor-resource-trend[hidden] { display: none; }
 .monitor-process-preview {
   width: 100%;
   border: 1px solid var(--workspace-border);

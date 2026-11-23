@@ -33,7 +33,7 @@ function session(status: TerminalSession["status"]): TerminalSession {
 }
 
 describe("ServerMonitorPanel", () => {
-  test("pauses hidden monitoring and loads charts only on request", async () => {
+  test("shows charts automatically and pauses hidden monitoring", async () => {
     const collect = mock(() => Promise.resolve({
       collectedAt: Date.now(),
       hostname: "test-host",
@@ -73,6 +73,7 @@ describe("ServerMonitorPanel", () => {
     const view = render(<ServerMonitorPanel {...props} visible={false} />);
     try {
       expect(collect).toHaveBeenCalledTimes(0);
+      expect(screen.queryByTestId("area-chart")).toBeNull();
       view.rerender(<ServerMonitorPanel {...props} visible />);
       expect(await screen.findByText("test-host")).not.toBeNull();
       expect(collect).toHaveBeenCalledTimes(1);
@@ -86,9 +87,10 @@ describe("ServerMonitorPanel", () => {
       expect(screen.getByText("477 MB / 486 MB")).not.toBeNull();
       fireEvent.change(screen.getByLabelText("网络接口"), { target: { value: "eth0" } });
       expect(screen.getByText("累计 ↓ 200 B / ↑ 100 B")).not.toBeNull();
-      expect(screen.queryByTestId("area-chart")).toBeNull();
-      fireEvent.click(screen.getByRole("button", { name: "显示图表" }));
+      expect(screen.queryByRole("button", { name: /显示图表|隐藏图表/ })).toBeNull();
       expect(await screen.findByTestId("area-chart")).not.toBeNull();
+      expect(screen.getByRole("img", { name: "上传和下载速率趋势" })).not.toBeNull();
+      expect(screen.getByRole("img", { name: "SSH 延迟趋势" })).not.toBeNull();
       await act(async () => {
         hidden = true;
         document.dispatchEvent(new Event("visibilitychange"));
