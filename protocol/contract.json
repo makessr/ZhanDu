@@ -1,5 +1,5 @@
 {
-  "version": 47,
+  "version": 48,
   "commands": {
     "protocol_version": true,
     "host_sync_account": true,

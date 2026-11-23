@@ -8,6 +8,7 @@ import {
   formatMonitorRate,
   formatNetworkEndpoint,
   formatUptime,
+  monitorNetworkRates,
   normalizeMonitorPercent,
 } from "./monitor-utils";
 
@@ -29,6 +30,21 @@ const snapshot: ServerMonitorSnapshot = {
 };
 
 describe("server monitor display helpers", () => {
+  test("derives individual interface rates and handles a reset counter", () => {
+    const first = appendMonitorHistory([], {
+      ...snapshot,
+      networkInterfaces: [{ name: "eth0", receiveBytes: 100, transmitBytes: 200 }],
+    }, 1000);
+    const next = appendMonitorHistory(first, {
+      ...snapshot,
+      networkInterfaces: [
+        { name: "eth0", receiveBytes: 120, transmitBytes: 10 },
+        { name: "eth1", receiveBytes: 300, transmitBytes: 400 },
+      ],
+    }, 3000);
+    expect(monitorNetworkRates(next[1], "eth0")).toEqual({ receive: 10, transmit: 0 });
+    expect(monitorNetworkRates(next[1], "eth1")).toEqual({ receive: 0, transmit: 0 });
+  });
   test("formats byte values and uptime", () => {
     expect(formatMonitorBytes(1536)).toBe("1.5 KB");
     expect(formatMonitorBytes(8 * 1024 ** 3)).toBe("8.0 GB");

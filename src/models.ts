@@ -216,6 +216,14 @@ export interface ServerMonitorSnapshot {
   loadAverage: [number, number, number];
   networkReceiveBytes: number;
   networkTransmitBytes: number;
+  networkInterfaces?: NetworkInterfaceCounters[];
+  sshLatencyMs?: number;
+}
+
+export interface NetworkInterfaceCounters {
+  name: string;
+  receiveBytes: number;
+  transmitBytes: number;
 }
 
 export interface ServerMonitorHistoryPoint {
@@ -226,6 +234,10 @@ export interface ServerMonitorHistoryPoint {
   networkTransmitBytes: number;
   networkReceiveBytesPerSecond: number;
   networkTransmitBytesPerSecond: number;
+  networkInterfaces?: (NetworkInterfaceCounters & {
+    receiveBytesPerSecond: number;
+    transmitBytesPerSecond: number;
+  })[];
 }
 
 export interface NetworkPingResult {

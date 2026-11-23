@@ -35,6 +35,7 @@ export default function TerminalCommandBar({
   const [selected, setSelected] = useState(0);
   const [notice, setNotice] = useState("");
   const [sending, setSending] = useState(false);
+  const sendingRef = useRef(false);
   const completionRequest = useRef(0);
   const remoteCommands = useRef<Promise<[string, string[]]>>();
 
@@ -126,7 +127,9 @@ export default function TerminalCommandBar({
   }
 
   async function send() {
-    if (!connected || sending || !isSingleTerminalCommand(draft)) return;
+    if (!connected || sendingRef.current || !isSingleTerminalCommand(draft)) return;
+    sendingRef.current = true;
+    inputRef.current?.focus({ preventScroll: true });
     clearChoices();
     setSending(true);
     try {
@@ -135,6 +138,7 @@ export default function TerminalCommandBar({
     } catch (error) {
       setNotice(commandErrorMessage(error));
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   }
@@ -145,7 +149,9 @@ export default function TerminalCommandBar({
       <input
         aria-label="命令输入框"
         className="terminal-command-input"
-        disabled={!connected || sending}
+        aria-busy={sending}
+        disabled={!connected}
+        readOnly={sending}
         maxLength={4096}
         placeholder="输入命令，回车发送"
         ref={inputRef}

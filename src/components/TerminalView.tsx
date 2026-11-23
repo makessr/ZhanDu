@@ -817,7 +817,7 @@ function TerminalView({
       }
       if (searchVisibleRef.current) {
         searchInputRef.current?.focus();
-      } else {
+      } else if (document.activeElement !== commandInputRef.current) {
         terminal.focus();
       }
       if (isTerminalSessionOperational(session.status)) {

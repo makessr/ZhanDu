@@ -37,7 +37,21 @@ df -Pk / 2>/dev/null | awk 'NR==2 { printf "%s,%s,%s", $2, $3, $4 }'
 printf '\nload_average='
 awk '{ printf "%s,%s,%s", $1, $2, $3 }' /proc/loadavg 2>/dev/null || printf '0,0,0'
 printf '\nnetwork_bytes='
-awk -F '[: ]+' 'NR > 2 { interface=$2; if (interface != "lo") { received += $3; transmitted += $11 } } END { printf "%.0f,%.0f", received, transmitted }' /proc/net/dev 2>/dev/null || printf '0,0'
+awk -F ':' '
+NR > 2 {
+    interface = $1
+    gsub(/^[[:space:]]+|[[:space:]]+$/, "", interface)
+    if (interface == "" || interface == "lo") next
+    counters = $2
+    sub(/^[[:space:]]+/, "", counters)
+    if (split(counters, fields, /[[:space:]]+/) < 9) next
+    received += fields[1]
+    transmitted += fields[9]
+    if (count++ < 64)
+        interfaces = interfaces sprintf("\nnetwork_interface=%s,%.0f,%.0f", interface, fields[1], fields[9])
+}
+END { printf "%.0f,%.0f%s", received, transmitted, interfaces }
+' /proc/net/dev 2>/dev/null || printf '0,0'
 printf '\n'
 "#;
 
@@ -165,6 +179,18 @@ pub(crate) struct ServerMonitorSnapshot {
     load_average: [f64; 3],
     network_receive_bytes: u64,
     network_transmit_bytes: u64,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    network_interfaces: Vec<NetworkInterfaceCounters>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) ssh_latency_ms: Option<f64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NetworkInterfaceCounters {
+    name: String,
+    receive_bytes: u64,
+    transmit_bytes: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -600,6 +626,24 @@ pub(crate) fn parse_monitor_output(output: &str) -> Result<ServerMonitorSnapshot
     let (disk_total_kib, disk_used_kib) = parse_pair(values.get("disk_kib").copied(), "disk_kib")?;
     let (network_receive_bytes, network_transmit_bytes) =
         parse_pair(values.get("network_bytes").copied(), "network_bytes")?;
+    let network_interfaces = output
+        .lines()
+        .filter_map(|line| line.strip_prefix("network_interface="))
+        .take(64)
+        .filter_map(|line| {
+            let (name, counters) = line.split_once(',')?;
+            if name.is_empty() || name.len() > 64 || name.chars().any(char::is_control) {
+                return None;
+            }
+            let (receive_bytes, transmit_bytes) =
+                parse_pair(Some(counters), "network_interface").ok()?;
+            Some(NetworkInterfaceCounters {
+                name: name.to_owned(),
+                receive_bytes,
+                transmit_bytes,
+            })
+        })
+        .collect();
     let memory_total_bytes = memory_total_kib.saturating_mul(1024);
     let memory_used_bytes = memory_total_kib
         .saturating_sub(memory_available_kib)
@@ -635,6 +679,8 @@ pub(crate) fn parse_monitor_output(output: &str) -> Result<ServerMonitorSnapshot
         load_average: parse_load_average(values.get("load_average").copied())?,
         network_receive_bytes,
         network_transmit_bytes,
+        network_interfaces,
+        ssh_latency_ms: None,
     })
 }
 
@@ -830,8 +876,9 @@ mod tests {
         parse_monitor_output, parse_network_connections, parse_ping_output, parse_process_list,
         parse_service_inspection, parse_trace_output, process_list_error, process_signal_command,
         validate_ping_target, validate_service_name, NetworkConnection, NetworkConnectionsResult,
-        NetworkPingResult, NetworkRouteHop, NetworkTraceResult, ServerMonitorSnapshot,
-        ServerProcess, ServerProcessListResult, ServiceInspectionResult, SwapUsage,
+        NetworkInterfaceCounters, NetworkPingResult, NetworkRouteHop, NetworkTraceResult,
+        ServerMonitorSnapshot, ServerProcess, ServerProcessListResult, ServiceInspectionResult,
+        SwapUsage,
     };
 
     #[test]
@@ -846,6 +893,9 @@ swap_kib=2048,1024
 disk_kib=104857600,52428800,52428800
 load_average=0.42,0.35,0.30
 network_bytes=15728640,6291456
+network_interface=eth0,10485760,4194304
+network_interface=eth1,5242880,2097152
+network_interface=invalid,nan,100
 "#;
 
         assert_eq!(
@@ -870,6 +920,19 @@ network_bytes=15728640,6291456
                 load_average: [0.42, 0.35, 0.30],
                 network_receive_bytes: 15_728_640,
                 network_transmit_bytes: 6_291_456,
+                network_interfaces: vec![
+                    NetworkInterfaceCounters {
+                        name: "eth0".to_string(),
+                        receive_bytes: 10_485_760,
+                        transmit_bytes: 4_194_304
+                    },
+                    NetworkInterfaceCounters {
+                        name: "eth1".to_string(),
+                        receive_bytes: 5_242_880,
+                        transmit_bytes: 2_097_152
+                    },
+                ],
+                ssh_latency_ms: None,
             }
         );
     }

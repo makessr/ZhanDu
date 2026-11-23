@@ -53,6 +53,7 @@ import {
   formatMonitorRate,
   formatNetworkEndpoint,
   formatUptime,
+  monitorNetworkRates,
 } from "../monitor-utils";
 import ServerProcessDrawer from "./ServerProcessDrawer";
 import PortForwardDrawer from "./PortForwardDrawer";
@@ -140,6 +141,7 @@ function ServerMonitorPanel({
     useState(false);
   const [pingTarget, setPingTarget] = useState("1.1.1.1");
   const [pingResult, setPingResult] = useState<NetworkPingResult | null>(null);
+  const [networkInterface, setNetworkInterface] = useState("");
   const [pingLoading, setPingLoading] = useState(false);
   const [pingError, setPingError] = useState<string>();
   const [connectionsResult, setConnectionsResult] =
@@ -172,6 +174,7 @@ function ServerMonitorPanel({
       setSnapshot(null);
       onSnapshotChange(sessionId, null);
       setHistory([]);
+      setNetworkInterface("");
       setError(undefined);
       setPingResult(null);
       setPingLoading(false);
@@ -398,6 +401,10 @@ function ServerMonitorPanel({
     },
   ];
   const latestHistoryPoint = monitorHistory[monitorHistory.length - 1];
+  const interfaces = monitorSnapshot?.networkInterfaces ?? [];
+  const selectedInterface = interfaces.find(({ name }) => name === networkInterface);
+  const interfaceName = selectedInterface?.name ?? "";
+  const rates = monitorNetworkRates(latestHistoryPoint, interfaceName);
   const filteredConnections = useMemo(() => {
     const connections = connectionsResult?.connections ?? [];
     if (connectionFilter === "listening") {
@@ -621,37 +628,33 @@ function ServerMonitorPanel({
           <Typography.Text bold>网络流量</Typography.Text>
           <Typography.Text type="secondary">
             {monitorSnapshot
-              ? `累计 ↓ ${formatMonitorBytes(monitorSnapshot.networkReceiveBytes)} / ↑ ${formatMonitorBytes(monitorSnapshot.networkTransmitBytes)}`
+              ? `累计 ↓ ${formatMonitorBytes(selectedInterface?.receiveBytes ?? monitorSnapshot.networkReceiveBytes)} / ↑ ${formatMonitorBytes(selectedInterface?.transmitBytes ?? monitorSnapshot.networkTransmitBytes)}`
               : "累计 ↓ - / ↑ -"}
           </Typography.Text>
         </div>
-        <div className="monitor-current-values monitor-network-values">
-          <span>
-            <span>下载</span>
-            <strong>
-              {monitorSnapshot
-                ? formatMonitorRate(
-                    latestHistoryPoint?.networkReceiveBytesPerSecond ?? 0,
-                  )
-                : "-"}
-            </strong>
+        <div className="monitor-network-summary">
+          <span className="monitor-network-upload-rate" title="上传速率" aria-label="上传速率">
+            ↑ {monitorSnapshot ? formatMonitorRate(rates.transmit) : "—"}
           </span>
-          <span>
-            <span>上传</span>
-            <strong>
-              {monitorSnapshot
-                ? formatMonitorRate(
-                    latestHistoryPoint?.networkTransmitBytesPerSecond ?? 0,
-                  )
-                : "-"}
-            </strong>
+          <span className="monitor-network-download-rate" title="下载速率" aria-label="下载速率">
+            ↓ {monitorSnapshot ? formatMonitorRate(rates.receive) : "—"}
           </span>
+          {interfaces.length > 0 && (
+            <select aria-label="网络接口" value={interfaceName} onChange={(event) => setNetworkInterface(event.target.value)}>
+              <option value="">全部</option>
+              {interfaces.map(({ name }) => <option key={name} value={name}>{name}</option>)}
+            </select>
+          )}
         </div>
         {visible && windowVisible && connected && chartsVisible && (
           <Suspense fallback={null}>
-            <NetworkTrendChart monitorHistory={monitorHistory} />
+            <NetworkTrendChart monitorHistory={monitorHistory} interfaceName={interfaceName} />
           </Suspense>
         )}
+      </div>
+      <div className="monitor-chart-section monitor-latency" title="从本机到服务器的 SSH 通道开启耗时，包含跳板机或代理路径">
+        <Typography.Text bold>服务器延迟</Typography.Text>
+        <span aria-label="SSH 延迟">{formatLatency(monitorSnapshot?.sshLatencyMs)}</span>
       </div>
       <Drawer
         className="network-diagnostics-drawer"
