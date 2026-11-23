@@ -47,6 +47,10 @@ describe("ServerMonitorPanel", () => {
       networkReceiveBytes: 800,
       networkTransmitBytes: 400,
       networkInterfaces: [{ name: "eth0", receiveBytes: 200, transmitBytes: 100 }],
+      diskMounts: [
+        { path: "/", availableBytes: 20 * 1024 ** 3, totalBytes: 40 * 1024 ** 3 },
+        { path: "/boot/efi", availableBytes: 477 * 1024 ** 2, totalBytes: 486 * 1024 ** 2 },
+      ],
     }));
     mockIPC((command) => {
       if (command === "ssh_monitor_snapshot") return collect();
@@ -75,6 +79,8 @@ describe("ServerMonitorPanel", () => {
       expect(screen.getByRole("meter", { name: "内存" }).getAttribute("aria-valuetext")).toContain("1.0 GB / 2.0 GB");
       expect(screen.getByRole("meter", { name: "交换" }).getAttribute("aria-valuenow")).toBe("0");
       expect(screen.getByLabelText("SSH 延迟").textContent).toBe("16.7 ms");
+      expect(screen.getByText("/boot/efi")).not.toBeNull();
+      expect(screen.getByText("477 MB / 486 MB")).not.toBeNull();
       fireEvent.change(screen.getByLabelText("网络接口"), { target: { value: "eth0" } });
       expect(screen.getByText("累计 ↓ 200 B / ↑ 100 B")).not.toBeNull();
       expect(screen.queryByTestId("area-chart")).toBeNull();

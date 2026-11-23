@@ -213,6 +213,7 @@ export interface ServerMonitorSnapshot {
   diskTotalBytes: number;
   diskUsedBytes: number;
   diskUsagePercent: number;
+  diskMounts?: { path: string; availableBytes: number; totalBytes: number }[];
   loadAverage: [number, number, number];
   networkReceiveBytes: number;
   networkTransmitBytes: number;

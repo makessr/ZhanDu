@@ -610,11 +610,6 @@ function ServerMonitorPanel({
       <div className="monitor-chart-section">
         <div className="monitor-chart-heading">
           <Typography.Text bold>资源趋势</Typography.Text>
-          <Typography.Text type="secondary">
-            {monitorSnapshot
-              ? `磁盘 ${formatMonitorBytes(monitorSnapshot.diskUsedBytes)} / ${formatMonitorBytes(monitorSnapshot.diskTotalBytes)}`
-              : "磁盘 - / -"}
-          </Typography.Text>
         </div>
         {visible && windowVisible && connected && chartsVisible && (
           <Suspense fallback={null}>
@@ -655,6 +650,22 @@ function ServerMonitorPanel({
       <div className="monitor-chart-section monitor-latency" title="从本机到服务器的 SSH 通道开启耗时，包含跳板机或代理路径">
         <Typography.Text bold>服务器延迟</Typography.Text>
         <span aria-label="SSH 延迟">{formatLatency(monitorSnapshot?.sshLatencyMs)}</span>
+      </div>
+      <div className="monitor-chart-section">
+        <Typography.Text bold>磁盘</Typography.Text>
+        <table className="monitor-disk-table" aria-label="磁盘挂载点">
+          <thead>
+            <tr><th scope="col">路径</th><th scope="col">可用／大小</th></tr>
+          </thead>
+          <tbody>
+            {monitorSnapshot?.diskMounts?.length ? monitorSnapshot.diskMounts.map((mount) => (
+              <tr key={mount.path}>
+                <td title={mount.path}>{mount.path}</td>
+                <td>{formatMonitorBytes(mount.availableBytes)} / {formatMonitorBytes(mount.totalBytes)}</td>
+              </tr>
+            )) : <tr><td colSpan={2} className="monitor-disk-empty">暂无挂载点数据</td></tr>}
+          </tbody>
+        </table>
       </div>
       <Drawer
         className="network-diagnostics-drawer"

@@ -33,7 +33,20 @@ fi
 printf '\nmemory_kib='
 awk '/^MemTotal:/ { total=$2 } /^MemAvailable:/ { available=$2 } /^SwapTotal:/ { swap_total=$2; has_swap=1 } /^SwapFree:/ { swap_free=$2 } END { printf "%.0f,%.0f", total, available; if (has_swap) printf "\nswap_kib=%.0f,%.0f", swap_total, swap_free }' /proc/meminfo 2>/dev/null || printf '0,0'
 printf '\ndisk_kib='
-df -Pk / 2>/dev/null | awk 'NR==2 { printf "%s,%s,%s", $2, $3, $4 }'
+(LC_ALL=C df -Pk -l -x tmpfs -x devtmpfs -x squashfs 2>/dev/null || LC_ALL=C df -Pk / 2>/dev/null) | awk '
+NR > 1 && match($0, /[[:blank:]]+[0-9]+[[:blank:]]+[0-9]+[[:blank:]]+-?[0-9]+[[:blank:]]+[0-9]+%[[:blank:]]+/) {
+    path = substr($0, RSTART + RLENGTH)
+    if (substr(path, 1, 1) != "/") next
+    raw = substr($0, RSTART, RLENGTH)
+    sub(/^[[:blank:]]+/, "", raw)
+    split(raw, sizes, /[[:blank:]]+/)
+    available = sizes[3] < 0 ? "0" : sizes[3]
+    if (path == "/") root = sizes[1] "," sizes[2] "," available
+    if (count++ < 64)
+        mounts = mounts sprintf("\ndisk_mount=%s,%s,%s", available, sizes[1], path)
+}
+END { printf "%s%s", root == "" ? "0,0,0" : root, mounts }
+'
 printf '\nload_average='
 awk '{ printf "%s,%s,%s", $1, $2, $3 }' /proc/loadavg 2>/dev/null || printf '0,0,0'
 printf '\nnetwork_bytes='
@@ -176,6 +189,8 @@ pub(crate) struct ServerMonitorSnapshot {
     disk_total_bytes: u64,
     disk_used_bytes: u64,
     disk_usage_percent: f64,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    disk_mounts: Vec<DiskMountUsage>,
     load_average: [f64; 3],
     network_receive_bytes: u64,
     network_transmit_bytes: u64,
@@ -191,6 +206,14 @@ struct NetworkInterfaceCounters {
     name: String,
     receive_bytes: u64,
     transmit_bytes: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DiskMountUsage {
+    path: String,
+    available_bytes: u64,
+    total_bytes: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -650,6 +673,39 @@ pub(crate) fn parse_monitor_output(output: &str) -> Result<ServerMonitorSnapshot
         .saturating_mul(1024);
     let disk_total_bytes = disk_total_kib.saturating_mul(1024);
     let disk_used_bytes = disk_used_kib.saturating_mul(1024);
+    let mut disk_mounts: Vec<_> = output
+        .lines()
+        .filter_map(|line| line.strip_prefix("disk_mount="))
+        .take(64)
+        .filter_map(|line| {
+            let mut fields = line.splitn(3, ',');
+            let available_kib: u64 = fields.next()?.parse().ok()?;
+            let total_kib: u64 = fields.next()?.parse().ok()?;
+            let path = fields.next()?;
+            if !path.starts_with('/') || path.len() > 4096 || path.chars().any(char::is_control) {
+                return None;
+            }
+            Some(DiskMountUsage {
+                path: path.to_owned(),
+                available_bytes: available_kib.saturating_mul(1024),
+                total_bytes: total_kib.saturating_mul(1024),
+            })
+        })
+        .collect();
+    if disk_mounts.is_empty() && disk_total_kib > 0 {
+        let available = values
+            .get("disk_kib")
+            .and_then(|line| line.split(',').nth(2))
+            .and_then(|value| value.parse::<u64>().ok())
+            .unwrap_or_else(|| disk_total_kib.saturating_sub(disk_used_kib));
+        disk_mounts.push(DiskMountUsage {
+            path: "/".to_owned(),
+            available_bytes: available.saturating_mul(1024),
+            total_bytes: disk_total_bytes,
+        });
+    }
+    disk_mounts.sort_by(|left, right| left.path.cmp(&right.path));
+    disk_mounts.dedup_by(|left, right| left.path == right.path);
     let swap = values
         .get("swap_kib")
         .and_then(|value| parse_pair(Some(value), "swap_kib").ok())
@@ -676,6 +732,7 @@ pub(crate) fn parse_monitor_output(output: &str) -> Result<ServerMonitorSnapshot
         disk_total_bytes,
         disk_used_bytes,
         disk_usage_percent: percent(disk_used_bytes, disk_total_bytes),
+        disk_mounts,
         load_average: parse_load_average(values.get("load_average").copied())?,
         network_receive_bytes,
         network_transmit_bytes,
@@ -875,10 +932,10 @@ mod tests {
     use super::{
         parse_monitor_output, parse_network_connections, parse_ping_output, parse_process_list,
         parse_service_inspection, parse_trace_output, process_list_error, process_signal_command,
-        validate_ping_target, validate_service_name, NetworkConnection, NetworkConnectionsResult,
-        NetworkInterfaceCounters, NetworkPingResult, NetworkRouteHop, NetworkTraceResult,
-        ServerMonitorSnapshot, ServerProcess, ServerProcessListResult, ServiceInspectionResult,
-        SwapUsage,
+        validate_ping_target, validate_service_name, DiskMountUsage, NetworkConnection,
+        NetworkConnectionsResult, NetworkInterfaceCounters, NetworkPingResult, NetworkRouteHop,
+        NetworkTraceResult, ServerMonitorSnapshot, ServerProcess, ServerProcessListResult,
+        ServiceInspectionResult, SwapUsage,
     };
 
     #[test]
@@ -891,6 +948,9 @@ cpu_percent=37.50
 memory_kib=8192000,3072000
 swap_kib=2048,1024
 disk_kib=104857600,52428800,52428800
+disk_mount=52428800,104857600,/
+disk_mount=488448,497664,/boot/efi
+disk_mount=1024,2048,/srv/my files,2026
 load_average=0.42,0.35,0.30
 network_bytes=15728640,6291456
 network_interface=eth0,10485760,4194304
@@ -917,6 +977,23 @@ network_interface=invalid,nan,100
                 disk_total_bytes: 107_374_182_400,
                 disk_used_bytes: 53_687_091_200,
                 disk_usage_percent: 50.0,
+                disk_mounts: vec![
+                    DiskMountUsage {
+                        path: "/".into(),
+                        available_bytes: 53_687_091_200,
+                        total_bytes: 107_374_182_400
+                    },
+                    DiskMountUsage {
+                        path: "/boot/efi".into(),
+                        available_bytes: 500_170_752,
+                        total_bytes: 509_607_936
+                    },
+                    DiskMountUsage {
+                        path: "/srv/my files,2026".into(),
+                        available_bytes: 1_048_576,
+                        total_bytes: 2_097_152
+                    },
+                ],
                 load_average: [0.42, 0.35, 0.30],
                 network_receive_bytes: 15_728_640,
                 network_transmit_bytes: 6_291_456,

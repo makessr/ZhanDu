@@ -740,6 +740,39 @@ body[arco-theme="dark"] .monitor-network-download-rate { color: #6bdbb2; }
   font-variant-numeric: tabular-nums;
 }
 
+.monitor-disk-table {
+  width: 100%;
+  margin-top: 5px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  color: var(--workspace-ink);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.monitor-disk-table :is(th, td) {
+  overflow: hidden;
+  padding: 3px 4px;
+  border-bottom: 1px solid var(--workspace-border);
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monitor-disk-table th {
+  color: var(--workspace-muted);
+  font-weight: 500;
+}
+
+.monitor-disk-table :is(th, td):nth-child(2) {
+  width: 58%;
+  text-align: end;
+}
+
+.monitor-disk-empty {
+  color: var(--workspace-muted);
+}
+
 .monitor-current-values {
   margin-top: 8px;
   display: grid;
