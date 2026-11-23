@@ -418,7 +418,7 @@
   padding: calc(8px + var(--terminal-grid-extra-top, 0px)) 0 4px 8px;
 }
 
-.terminal-view .xterm-viewport {
+.terminal-view .xterm .xterm-viewport {
   /* The fallback viewport extends beyond the rendered rows. */
   background-color: transparent;
   overflow: hidden;
