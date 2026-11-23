@@ -1,3 +1,4 @@
+import { WorkspaceToolPanel, type WorkspaceTool } from "./components/WorkspaceToolPanel";
 import {
   lazy,
   Suspense,
@@ -7,17 +8,17 @@ import {
   useRef,
   useState,
 } from "react";
-import { Message, Typography } from "@arco-design/web-react";
+import { Button, Message, Typography } from "@arco-design/web-react";
 import { isTauri } from "@tauri-apps/api/core";
 import {
   IconClose,
   IconCloseCircle,
+  IconLeft,
   IconPlus,
   IconPoweroff,
   IconRefresh,
 } from "@arco-design/web-react/icon";
 import type {
-  QuickCommandRecord,
   ServerMonitorSnapshot,
   TerminalSession,
 } from "./models";
@@ -30,13 +31,13 @@ import { resolveWorkspaceConnection } from "./terminal-workspaces";
 import AppWorkspaceLayout from "./components/AppWorkspaceLayout";
 import ApplicationTitleBar from "./components/ApplicationTitleBar";
 export { default as CollapsibleSplitTrigger } from "./components/CollapsibleSplitTrigger";
-import { loadConfiguration } from "./config-database";
+import { loadConfiguration, type FineShellConfiguration } from "./config-database";
 import {
   DEFAULT_APP_SETTINGS,
   sanitizeAppSettings,
   type AppSettings,
 } from "./app-settings";
-import { setAppearanceMode } from "./appearance";
+import { readAppearanceModeHint, setAppearanceMode } from "./appearance";
 import {
   type AiContextSource,
   type AiContextSourceId,
@@ -78,6 +79,7 @@ import {
   promptStartupApplicationUpdate,
 } from "./app-window-actions";
 import { useTerminalSessions } from "./hooks/useTerminalSessions";
+const QuickCommandSettings = lazy(() => import("./components/QuickCommandSettings"));
 const ServerMonitorPanel = lazy(
   () => import("./components/ServerMonitorPanel"),
 );
@@ -88,9 +90,17 @@ const SERVER_MONITOR_COLLAPSED_KEY = "fineshell:server-monitor-collapsed";
 
 function App() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
-  const [quickCommands, setQuickCommands] = useState<QuickCommandRecord[]>([]);
-  const [quickCommandDrawerVisible, setQuickCommandDrawerVisible] =
-    useState(false);
+  const savedAppearanceRef = useRef<AppSettings["appearanceMode"]>();
+  const [commandLibrary, setCommandLibrary] = useState<Pick<FineShellConfiguration, "quickCommands" | "quickCommandGroups">>({
+    quickCommands: [],
+    quickCommandGroups: [],
+  });
+  const applyCommandLibrary = useCallback(({ quickCommands, quickCommandGroups }: FineShellConfiguration) => {
+    setCommandLibrary({ quickCommands, quickCommandGroups });
+  }, []);
+  const [workspaceTool, setWorkspaceTool] = useState<WorkspaceTool>("files");
+  const [workspaceToolTarget, setWorkspaceToolTarget] = useState<HTMLDivElement | null>(null);
+  const [editingQuickCommands, setEditingQuickCommands] = useState(false);
   const [serverMonitorCollapsed, setServerMonitorCollapsed] = useState(
     () => localStorage.getItem(SERVER_MONITOR_COLLAPSED_KEY) === "true",
   );
@@ -334,10 +344,11 @@ function App() {
       .then((configuration) => {
         if (disposed) return;
         setSettings(configuration.settings);
+        savedAppearanceRef.current = configuration.settings.appearanceMode;
         setAppearanceMode(configuration.settings.appearanceMode, {
           persist: true,
         });
-        setQuickCommands(configuration.quickCommands);
+        applyCommandLibrary(configuration);
       })
       .catch((error) => {
         if (!disposed) {
@@ -424,7 +435,7 @@ function App() {
       void loadConfiguration()
         .then((configuration) => {
           if (disposed) return;
-          setQuickCommands(configuration.quickCommands);
+          applyCommandLibrary(configuration);
           syncKnownHostFingerprints(configuration.knownHosts);
         })
         .catch((error) => {
@@ -443,26 +454,28 @@ function App() {
       disposed = true;
       unlisten?.();
     };
-  }, [syncKnownHostFingerprints]);
+  }, [applyCommandLibrary, syncKnownHostFingerprints]);
 
   useEffect(() => {
     if (!isTauri()) return;
     let disposed = false;
-    let unlisten: (() => void) | undefined;
+    const listeners: Array<() => void> = [];
+    const keepListener = (stop: () => void) => {
+      if (disposed) stop();
+      else listeners.push(stop);
+    };
+    void listenProtocolEvent("appearance:preview", ({ payload }) => {
+      setAppearanceMode(payload ?? savedAppearanceRef.current ?? readAppearanceModeHint());
+    }).then(keepListener);
     void listenProtocolEvent("settings:changed", ({ payload }) => {
       const nextSettings = sanitizeAppSettings(payload);
       setSettings(nextSettings);
+      savedAppearanceRef.current = nextSettings.appearanceMode;
       setAppearanceMode(nextSettings.appearanceMode, { persist: true });
-    }).then((stopListening) => {
-      if (disposed) {
-        stopListening();
-      } else {
-        unlisten = stopListening;
-      }
-    });
+    }).then(keepListener);
     return () => {
       disposed = true;
-      unlisten?.();
+      listeners.forEach((stop) => stop());
     };
   }, []);
 
@@ -505,9 +518,14 @@ function App() {
     terminalSelections,
   ]);
 
+  const openWorkspaceTool = useCallback((tool: WorkspaceTool) => {
+    setWorkspaceTool(tool);
+    setSftpCollapsed(false);
+  }, []);
+
   useEffect(() => {
     if (!activeSessionId) {
-      setQuickCommandDrawerVisible(false);
+      setWorkspaceTool("files");
       closeAiSidebar();
       return;
     }
@@ -520,25 +538,26 @@ function App() {
       ) {
         event.preventDefault();
         event.stopPropagation();
-        setQuickCommandDrawerVisible(true);
+        openWorkspaceTool("commands");
       }
     };
     window.addEventListener("keydown", handleQuickCommandShortcut, true);
     return () =>
       window.removeEventListener("keydown", handleQuickCommandShortcut, true);
-  }, [activeSessionId, closeAiSidebar]);
+  }, [activeSessionId, closeAiSidebar, openWorkspaceTool]);
 
-  async function sendQuickCommand(command: string, execute: boolean) {
-    if (!activeSession || !isTerminalSessionOperational(activeSession.status)) {
-      throw new Error("当前终端未连接");
+  async function sendQuickCommand(command: string, execute: boolean, sessionId?: string) {
+    const target = sessionId ? sessions.find((session) => session.id === sessionId) : activeSession;
+    if (!target || !isTerminalSessionOperational(target.status)) {
+      throw new Error("目标会话未连接");
     }
     const input = execute ? `${command}\r` : command;
     await invoke("ssh_write", {
-      sessionId: activeSession.id,
+      sessionId: target.id,
       data: Array.from(new TextEncoder().encode(input)),
     });
-    setQuickCommandDrawerVisible(false);
-    Message.success(execute ? "命令已发送" : "命令已填入终端");
+    if (target.id === activeSessionId) setTerminalFocusRequest((current) => current + 1);
+    Message.success(execute ? `命令已发送到 ${target.host.name}` : `命令已填入 ${target.host.name} 的终端`);
   }
 
   function handleAiAgentActionExecuted(
@@ -665,6 +684,12 @@ function App() {
             }
           >
             <ServerMonitorPanel
+              tool={sftpCollapsed ? undefined : workspaceTool}
+              toolTarget={workspaceToolTarget}
+              ipRegionEnabled={settings.ipRegionEnabled}
+              ipRegionIpv6={settings.ipRegionIpv6}
+              onOpenSettings={() => openAuxiliaryWindow("settings")}
+              onSelectTool={openWorkspaceTool}
               onReconnect={() => reconnectSession(activeSession)}
               onSendToAi={(sessionId, request) =>
                 void handoffContext(sessionId, request)
@@ -680,9 +705,6 @@ function App() {
           </Suspense>
         ) : (
           <section className="server-monitor is-unavailable">
-            <div className="server-monitor-heading">
-              <Typography.Text bold>服务器监控</Typography.Text>
-            </div>
             <Typography.Text type="secondary">打开主机会话后查看监控。</Typography.Text>
           </section>
         )}
@@ -758,49 +780,82 @@ function App() {
         sessionContextMenuItems={sessionContextMenuItems}
         sessions={sessions}
       />
-      <QuickCommandDrawer
-        canSend={Boolean(
-          activeSession && isTerminalSessionOperational(activeSession.status),
-        )}
-        commands={quickCommands}
-        onAfterClose={() => setTerminalFocusRequest((current) => current + 1)}
-        onCancel={() => setQuickCommandDrawerVisible(false)}
-        onSend={sendQuickCommand}
-        visible={quickCommandDrawerVisible}
-      />
     </section>
   );
 
   const sftpPanel = (
-    <SftpPanel
-      confirmFileDelete={settings.confirmFileDelete}
-      externalEditorName={settings.externalEditorName}
-      externalEditorPath={settings.externalEditorPath}
-      sftpUploadRetryAttempts={settings.sftpUploadRetryAttempts}
-      onCurrentPathChange={updateSftpCurrentPath}
-      onReconnect={() => {
-        if (activeSession) reconnectSession(activeSession);
-      }}
-      onSendFilesToAi={async (sessionId, files) => {
-        await handoffRemoteFiles(sessionId, files);
-      }}
-      onSendSelectionToAi={async (sessionId, currentDirectory, entries) => {
-        await handoffContext(
-          sessionId,
-          createSftpSelectionAiHandoff(currentDirectory, entries),
-        );
-      }}
-      refreshRequest={
-        activeSessionId ? (sftpRefreshRequests[activeSessionId] ?? 0) : 0
-      }
-      session={activeSession}
-      showHiddenFiles={settings.showHiddenFiles}
-      terminalDirectory={
-        activeSessionId
-          ? terminalCurrentDirectories[activeSessionId]
-          : undefined
-      }
-    />
+    <WorkspaceToolPanel activeTool={workspaceTool} onSelect={openWorkspaceTool}>
+      <SftpPanel
+        filesVisible={workspaceTool === "files" && !sftpCollapsed}
+        transfersVisible={workspaceTool === "transfers" && !sftpCollapsed}
+        onShowFiles={() => openWorkspaceTool("files")}
+        onShowTransfers={() => openWorkspaceTool("transfers")}
+        confirmFileDelete={settings.confirmFileDelete}
+        externalEditorName={settings.externalEditorName}
+        externalEditorPath={settings.externalEditorPath}
+        sftpUploadRetryAttempts={settings.sftpUploadRetryAttempts}
+        onCurrentPathChange={updateSftpCurrentPath}
+        onReconnect={() => {
+          if (activeSession) reconnectSession(activeSession);
+        }}
+        onSendFilesToAi={async (sessionId, files) => {
+          await handoffRemoteFiles(sessionId, files);
+        }}
+        onSendSelectionToAi={async (sessionId, currentDirectory, entries) => {
+          await handoffContext(
+            sessionId,
+            createSftpSelectionAiHandoff(currentDirectory, entries),
+          );
+        }}
+        refreshRequest={
+          activeSessionId ? (sftpRefreshRequests[activeSessionId] ?? 0) : 0
+        }
+        session={activeSession}
+        showHiddenFiles={settings.showHiddenFiles}
+        terminalDirectory={
+          activeSessionId
+            ? terminalCurrentDirectories[activeSessionId]
+            : undefined
+        }
+      />
+      <div className="workspace-tool-slot" hidden={!["tunnels", "processes", "network"].includes(workspaceTool)} ref={setWorkspaceToolTarget} />
+      {workspaceTool === "commands" && !sftpCollapsed && (
+        <>
+          {editingQuickCommands && (
+            <div className="workspace-tool-surface">
+              <Button
+                className="workspace-tool-back"
+                icon={<IconLeft />}
+                onClick={() => setEditingQuickCommands(false)}
+                size="small"
+              >
+                返回快捷命令
+              </Button>
+              <Suspense fallback={null}>
+                <QuickCommandSettings />
+              </Suspense>
+            </div>
+          )}
+          <QuickCommandDrawer
+            canSend={Boolean(activeSession && isTerminalSessionOperational(activeSession.status))}
+            commands={commandLibrary.quickCommands}
+            savedGroups={commandLibrary.quickCommandGroups}
+            embedded
+            key={activeSessionId}
+            onLibraryChange={applyCommandLibrary}
+            onEdit={() => setEditingQuickCommands(true)}
+            onSend={sendQuickCommand}
+            targets={sessions
+              .filter((session) => session.id !== activeSessionId && isTerminalSessionOperational(session.status))
+              .map((session) => ({
+                label: `${session.host.name} (${session.host.address})`,
+                value: session.id,
+              }))}
+            visible={!editingQuickCommands}
+          />
+        </>
+      )}
+    </WorkspaceToolPanel>
   );
 
   const aiAssistantPanel = aiAssistantMounted ? (
@@ -844,7 +899,7 @@ function App() {
       applicationTitleBar={
         <ApplicationTitleBar
           hasActiveSession={Boolean(activeSession)}
-          onOpenQuickCommands={() => setQuickCommandDrawerVisible(true)}
+          onOpenQuickCommands={() => openWorkspaceTool("commands")}
           onOpenSettings={() => openAuxiliaryWindow("settings")}
           onOpenShortcutGuide={() => openAuxiliaryWindow("shortcuts")}
           onToggleServerMonitor={() => {

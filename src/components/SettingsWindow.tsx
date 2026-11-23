@@ -1,3 +1,4 @@
+import IpRegionSettings from "./IpRegionSettings";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   Badge,
@@ -45,8 +46,9 @@ import {
   readApplicationUpdateNotice,
   type ApplicationUpdateNotice,
 } from "../app-updater";
-import { emitProtocolEventTo } from "../tauri-protocol";
+import { emitProtocolEventTo, listenProtocolEvent } from "../tauri-protocol";
 import TerminalThemeLibrary from "./TerminalThemeLibrary";
+import TerminalBackgroundSettings from "./TerminalBackgroundSettings";
 import { resolveDefaultTerminalLogDirectory } from "../terminal-logging";
 import { isApplePlatform } from "../platform-utils";
 import AdvancedSettings from "./AdvancedSettings";
@@ -225,8 +227,35 @@ function SettingsWindow() {
   }, [savedSettings.diagnosticLogLevel]);
 
   useEffect(() => {
-    if (!loading) setAppearanceMode(settings.appearanceMode);
-  }, [loading, settings.appearanceMode]);
+    if (loading) return;
+    setAppearanceMode(settings.appearanceMode);
+    if (isTauri()) {
+      const preview = settings.appearanceMode === savedSettings.appearanceMode
+        ? null
+        : settings.appearanceMode;
+      void emitProtocolEventTo("main", "appearance:preview", preview).catch(() => undefined);
+    }
+  }, [loading, savedSettings.appearanceMode, settings.appearanceMode]);
+
+  useEffect(() => {
+    if (!isTauri()) return;
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void listenProtocolEvent("appearance:preview", ({ payload }) => {
+      if (payload === null) {
+        setSettings((current) => current.appearanceMode === savedSettings.appearanceMode
+          ? current
+          : { ...current, appearanceMode: savedSettings.appearanceMode });
+      }
+    }).then((stop) => {
+      if (disposed) stop();
+      else unlisten = stop;
+    });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [savedSettings.appearanceMode]);
 
   const updateSetting = <Key extends keyof AppSettings>(
     key: Key,
@@ -375,6 +404,35 @@ function SettingsWindow() {
               />
               <SettingRow
                 control={
+                  <Input
+                    aria-label="自定义终端字体"
+                    allowClear
+                    maxLength={180}
+                    placeholder="例如 Cascadia Mono, JetBrains Mono"
+                    value={settings.terminalCustomFontNames}
+                    onChange={(value) => updateSetting("terminalCustomFontNames", value)}
+                  />
+                }
+                label="自定义字体"
+              />
+              <SettingRow
+                control={
+                  <Select
+                    aria-label="终端字体粗细"
+                    options={[
+                      { label: "标准", value: "normal" },
+                      { label: "中等", value: "500" },
+                      { label: "半粗", value: "600" },
+                      { label: "粗体", value: "700" },
+                    ]}
+                    value={settings.terminalFontWeight}
+                    onChange={(value) => updateSetting("terminalFontWeight", value as AppSettings["terminalFontWeight"])}
+                  />
+                }
+                label="字体粗细"
+              />
+              <SettingRow
+                control={
                   <InputNumber
                     aria-label="终端字号"
                     max={24}
@@ -406,6 +464,23 @@ function SettingsWindow() {
                 }
                 label="行高"
               />
+            </div>
+            <TerminalBackgroundSettings settings={settings} setSettings={setSettings} />
+            <div className="settings-group">
+              {([
+                ["terminalCommandBarVisible", "显示命令输入框"],
+                ["terminalCommandBarHistory", "命令框历史"],
+                ["terminalCommandBarPaths", "命令框路径补全"],
+                ["terminalCommandBarNames", "命令框远程命令补全"],
+              ] as const).map(([key, label]) => (
+                <SettingRow
+                  control={<Switch aria-label={label} checked={settings[key]} onChange={(value) => updateSetting(key, value)} />}
+                  key={key}
+                  label={label}
+                />
+              ))}
+            </div>
+            <div className="settings-group">
               <SettingRow
                 control={
                   <Radio.Group
@@ -673,6 +748,12 @@ function SettingsWindow() {
                 label="刷新间隔"
               />
             </div>
+            <IpRegionSettings
+              enabled={settings.ipRegionEnabled}
+              ipv6={settings.ipRegionIpv6}
+              onEnable={(value) => updateSetting("ipRegionEnabled", value)}
+              onIpv6Change={(value) => updateSetting("ipRegionIpv6", value)}
+            />
           </>
         );
       case "connection":

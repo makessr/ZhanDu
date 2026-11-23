@@ -31,13 +31,44 @@ else
   printf '0'
 fi
 printf '\nmemory_kib='
-awk '/^MemTotal:/ { total=$2 } /^MemAvailable:/ { available=$2 } END { printf "%.0f,%.0f", total, available }' /proc/meminfo 2>/dev/null || printf '0,0'
+awk '/^MemTotal:/ { total=$2 } /^MemAvailable:/ { available=$2 } /^SwapTotal:/ { swap_total=$2; has_swap=1 } /^SwapFree:/ { swap_free=$2 } END { printf "%.0f,%.0f", total, available; if (has_swap) printf "\nswap_kib=%.0f,%.0f", swap_total, swap_free }' /proc/meminfo 2>/dev/null || printf '0,0'
 printf '\ndisk_kib='
-df -Pk / 2>/dev/null | awk 'NR==2 { printf "%s,%s,%s", $2, $3, $4 }'
+(LC_ALL=C df -Pk -l -x tmpfs -x devtmpfs -x squashfs 2>/dev/null || LC_ALL=C df -Pk / 2>/dev/null) | awk '
+NR > 1 && match($0, /[[:blank:]]+[0-9]+[[:blank:]]+[0-9]+[[:blank:]]+-?[0-9]+[[:blank:]]+[0-9]+%[[:blank:]]+/) {
+    path = substr($0, RSTART + RLENGTH)
+    if (substr(path, 1, 1) != "/") next
+    if (path ~ /^\/(var\/lib\/docker|run\/docker|var\/run\/docker)\// ||
+        path ~ /\/overlay2\/[^/]+\/merged$/ ||
+        path ~ /\/docker\/(overlay2|overlayfs|containers|buildkit|volumes|containerd|plugins)\// ||
+        path ~ /\/io\.containerd\.runtime\.v2\.task\/moby\//) next
+    raw = substr($0, RSTART, RLENGTH)
+    sub(/^[[:blank:]]+/, "", raw)
+    split(raw, sizes, /[[:blank:]]+/)
+    available = sizes[3] < 0 ? "0" : sizes[3]
+    if (path == "/") root = sizes[1] "," sizes[2] "," available
+    if (count++ < 64)
+        mounts = mounts sprintf("\ndisk_mount=%s,%s,%s", available, sizes[1], path)
+}
+END { printf "%s%s", root == "" ? "0,0,0" : root, mounts }
+'
 printf '\nload_average='
 awk '{ printf "%s,%s,%s", $1, $2, $3 }' /proc/loadavg 2>/dev/null || printf '0,0,0'
 printf '\nnetwork_bytes='
-awk -F '[: ]+' 'NR > 2 { interface=$2; if (interface != "lo") { received += $3; transmitted += $11 } } END { printf "%.0f,%.0f", received, transmitted }' /proc/net/dev 2>/dev/null || printf '0,0'
+awk -F ':' '
+NR > 2 {
+    interface = $1
+    gsub(/^[[:space:]]+|[[:space:]]+$/, "", interface)
+    if (interface == "" || interface == "lo") next
+    counters = $2
+    sub(/^[[:space:]]+/, "", counters)
+    if (split(counters, fields, /[[:space:]]+/) < 9) next
+    received += fields[1]
+    transmitted += fields[9]
+    if (count++ < 64)
+        interfaces = interfaces sprintf("\nnetwork_interface=%s,%.0f,%.0f", interface, fields[1], fields[9])
+}
+END { printf "%.0f,%.0f%s", received, transmitted, interfaces }
+' /proc/net/dev 2>/dev/null || printf '0,0'
 printf '\n'
 "#;
 
@@ -49,6 +80,51 @@ if ! command -v ss >/dev/null 2>&1; then
 fi
 ss -H -tunap 2>/dev/null | awk 'BEGIN { OFS="\t" } NR <= 500 { process=""; for (i=7; i<=NF; i++) process=process (i == 7 ? "" : " ") $i; print $1, $2, $5, $6, process } END { if (NR > 500) print "__FINESHELL_TRUNCATED__" }'
 "#;
+
+const COMMAND_NAMES_SCRIPT: &str = r#"
+printf '%s\n' "$HOME"
+old_ifs=$IFS
+IFS=:
+set -f
+set -- $PATH
+set +f
+IFS=$old_ifs
+count=0
+for dir do
+  case "$dir" in /*) ;; *) continue ;; esac
+  for file in "$dir"/*; do
+    [ -f "$file" ] && [ -x "$file" ] || continue
+    printf '%s\n' "${file##*/}"
+    count=$((count + 1))
+    [ "$count" -lt 4096 ] || exit 0
+  done
+done
+"#;
+
+pub(crate) fn collect_command_names(session: &Session) -> Result<(String, Vec<String>), String> {
+    let (output, exit) = execute_remote_command(session, COMMAND_NAMES_SCRIPT, "读取远程命令列表")?;
+    if exit != 0 {
+        return Err("远程命令列表读取失败".to_string());
+    }
+    let mut lines = output.lines();
+    let home = lines
+        .next()
+        .filter(|line| line.starts_with('/') && !line.chars().any(char::is_control))
+        .unwrap_or_default();
+    let names = lines
+        .filter(|line| {
+            !line.is_empty()
+                && line.len() <= 128
+                && line
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"._+-".contains(&b))
+        })
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .map(str::to_owned)
+        .collect();
+    Ok((home.to_owned(), names))
+}
 
 const PROCESS_LIST_COMMAND: &str = r#"
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
@@ -95,6 +171,14 @@ fi
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct SwapUsage {
+    total_bytes: u64,
+    used_bytes: u64,
+    usage_percent: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct ServerMonitorSnapshot {
     hostname: String,
     operating_system: String,
@@ -104,12 +188,36 @@ pub(crate) struct ServerMonitorSnapshot {
     memory_total_bytes: u64,
     memory_used_bytes: u64,
     memory_usage_percent: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    swap: Option<SwapUsage>,
     disk_total_bytes: u64,
     disk_used_bytes: u64,
     disk_usage_percent: f64,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    disk_mounts: Vec<DiskMountUsage>,
     load_average: [f64; 3],
     network_receive_bytes: u64,
     network_transmit_bytes: u64,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    network_interfaces: Vec<NetworkInterfaceCounters>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) ssh_latency_ms: Option<f64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NetworkInterfaceCounters {
+    name: String,
+    receive_bytes: u64,
+    transmit_bytes: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DiskMountUsage {
+    path: String,
+    available_bytes: u64,
+    total_bytes: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -517,6 +625,39 @@ pub(crate) fn parse_process_list(output: &str) -> ServerProcessListResult {
     }
 }
 
+fn is_docker_mount(path: &str) -> bool {
+    if ["/var/lib/docker/", "/run/docker/", "/var/run/docker/"]
+        .iter()
+        .any(|prefix| path.starts_with(prefix))
+    {
+        return true;
+    }
+    if path.contains("/io.containerd.runtime.v2.task/moby/") {
+        return true;
+    }
+    if let Some((_, parent)) = path.rsplit_once("/overlay2/") {
+        if let Some((layer, "merged")) = parent.split_once('/') {
+            if !layer.is_empty() {
+                return true;
+            }
+        }
+    }
+    path.split_once("/docker/").is_some_and(|(_, relative)| {
+        relative.split_once('/').is_some_and(|(directory, _)| {
+            matches!(
+                directory,
+                "overlay2"
+                    | "overlayfs"
+                    | "containers"
+                    | "buildkit"
+                    | "volumes"
+                    | "containerd"
+                    | "plugins"
+            )
+        })
+    })
+}
+
 pub(crate) fn parse_monitor_output(output: &str) -> Result<ServerMonitorSnapshot, String> {
     let values = output
         .lines()
@@ -545,12 +686,79 @@ pub(crate) fn parse_monitor_output(output: &str) -> Result<ServerMonitorSnapshot
     let (disk_total_kib, disk_used_kib) = parse_pair(values.get("disk_kib").copied(), "disk_kib")?;
     let (network_receive_bytes, network_transmit_bytes) =
         parse_pair(values.get("network_bytes").copied(), "network_bytes")?;
+    let network_interfaces = output
+        .lines()
+        .filter_map(|line| line.strip_prefix("network_interface="))
+        .take(64)
+        .filter_map(|line| {
+            let (name, counters) = line.split_once(',')?;
+            if name.is_empty() || name.len() > 64 || name.chars().any(char::is_control) {
+                return None;
+            }
+            let (receive_bytes, transmit_bytes) =
+                parse_pair(Some(counters), "network_interface").ok()?;
+            Some(NetworkInterfaceCounters {
+                name: name.to_owned(),
+                receive_bytes,
+                transmit_bytes,
+            })
+        })
+        .collect();
     let memory_total_bytes = memory_total_kib.saturating_mul(1024);
     let memory_used_bytes = memory_total_kib
         .saturating_sub(memory_available_kib)
         .saturating_mul(1024);
     let disk_total_bytes = disk_total_kib.saturating_mul(1024);
     let disk_used_bytes = disk_used_kib.saturating_mul(1024);
+    let mut disk_mounts: Vec<_> = output
+        .lines()
+        .filter_map(|line| line.strip_prefix("disk_mount="))
+        .filter_map(|line| {
+            let mut fields = line.splitn(3, ',');
+            let available_kib: u64 = fields.next()?.parse().ok()?;
+            let total_kib: u64 = fields.next()?.parse().ok()?;
+            let path = fields.next()?;
+            if !path.starts_with('/')
+                || path.len() > 4096
+                || path.chars().any(char::is_control)
+                || is_docker_mount(path)
+            {
+                return None;
+            }
+            Some(DiskMountUsage {
+                path: path.to_owned(),
+                available_bytes: available_kib.saturating_mul(1024),
+                total_bytes: total_kib.saturating_mul(1024),
+            })
+        })
+        .take(64)
+        .collect();
+    if disk_mounts.is_empty() && disk_total_kib > 0 {
+        let available = values
+            .get("disk_kib")
+            .and_then(|line| line.split(',').nth(2))
+            .and_then(|value| value.parse::<u64>().ok())
+            .unwrap_or_else(|| disk_total_kib.saturating_sub(disk_used_kib));
+        disk_mounts.push(DiskMountUsage {
+            path: "/".to_owned(),
+            available_bytes: available.saturating_mul(1024),
+            total_bytes: disk_total_bytes,
+        });
+    }
+    disk_mounts.sort_by(|left, right| left.path.cmp(&right.path));
+    disk_mounts.dedup_by(|left, right| left.path == right.path);
+    let swap = values
+        .get("swap_kib")
+        .and_then(|value| parse_pair(Some(value), "swap_kib").ok())
+        .map(|(total, free)| {
+            let total_bytes = total.saturating_mul(1024);
+            let used_bytes = total.saturating_sub(free).saturating_mul(1024);
+            SwapUsage {
+                total_bytes,
+                used_bytes,
+                usage_percent: percent(used_bytes, total_bytes),
+            }
+        });
 
     Ok(ServerMonitorSnapshot {
         hostname,
@@ -561,12 +769,16 @@ pub(crate) fn parse_monitor_output(output: &str) -> Result<ServerMonitorSnapshot
         memory_total_bytes,
         memory_used_bytes,
         memory_usage_percent: percent(memory_used_bytes, memory_total_bytes),
+        swap,
         disk_total_bytes,
         disk_used_bytes,
         disk_usage_percent: percent(disk_used_bytes, disk_total_bytes),
+        disk_mounts,
         load_average: parse_load_average(values.get("load_average").copied())?,
         network_receive_bytes,
         network_transmit_bytes,
+        network_interfaces,
+        ssh_latency_ms: None,
     })
 }
 
@@ -761,9 +973,10 @@ mod tests {
     use super::{
         parse_monitor_output, parse_network_connections, parse_ping_output, parse_process_list,
         parse_service_inspection, parse_trace_output, process_list_error, process_signal_command,
-        validate_ping_target, validate_service_name, NetworkConnection, NetworkConnectionsResult,
-        NetworkPingResult, NetworkRouteHop, NetworkTraceResult, ServerMonitorSnapshot,
-        ServerProcess, ServerProcessListResult, ServiceInspectionResult,
+        validate_ping_target, validate_service_name, DiskMountUsage, NetworkConnection,
+        NetworkConnectionsResult, NetworkInterfaceCounters, NetworkPingResult, NetworkRouteHop,
+        NetworkTraceResult, ServerMonitorSnapshot, ServerProcess, ServerProcessListResult,
+        ServiceInspectionResult, SwapUsage,
     };
 
     #[test]
@@ -774,9 +987,21 @@ kernel=6.8.0-60-generic
 uptime_seconds=86461
 cpu_percent=37.50
 memory_kib=8192000,3072000
+swap_kib=2048,1024
 disk_kib=104857600,52428800,52428800
+disk_mount=52428800,104857600,/
+disk_mount=488448,497664,/boot/efi
+disk_mount=1024,2048,/srv/my files,2026
+disk_mount=1024,2048,/var/lib/docker/overlay2/container-layer/merged
+disk_mount=1024,2048,/srv/custom/overlay2/other-layer/merged
+disk_mount=1024,2048,/run/docker/netns/test
+disk_mount=1024,2048,/mnt/docker/volumes/test/_data
+disk_mount=1024,2048,/var/lib/docker
 load_average=0.42,0.35,0.30
 network_bytes=15728640,6291456
+network_interface=eth0,10485760,4194304
+network_interface=eth1,5242880,2097152
+network_interface=invalid,nan,100
 "#;
 
         assert_eq!(
@@ -790,12 +1015,52 @@ network_bytes=15728640,6291456
                 memory_total_bytes: 8_388_608_000,
                 memory_used_bytes: 5_242_880_000,
                 memory_usage_percent: 62.5,
+                swap: Some(SwapUsage {
+                    total_bytes: 2_097_152,
+                    used_bytes: 1_048_576,
+                    usage_percent: 50.0,
+                }),
                 disk_total_bytes: 107_374_182_400,
                 disk_used_bytes: 53_687_091_200,
                 disk_usage_percent: 50.0,
+                disk_mounts: vec![
+                    DiskMountUsage {
+                        path: "/".into(),
+                        available_bytes: 53_687_091_200,
+                        total_bytes: 107_374_182_400
+                    },
+                    DiskMountUsage {
+                        path: "/boot/efi".into(),
+                        available_bytes: 500_170_752,
+                        total_bytes: 509_607_936
+                    },
+                    DiskMountUsage {
+                        path: "/srv/my files,2026".into(),
+                        available_bytes: 1_048_576,
+                        total_bytes: 2_097_152
+                    },
+                    DiskMountUsage {
+                        path: "/var/lib/docker".into(),
+                        available_bytes: 1_048_576,
+                        total_bytes: 2_097_152
+                    },
+                ],
                 load_average: [0.42, 0.35, 0.30],
                 network_receive_bytes: 15_728_640,
                 network_transmit_bytes: 6_291_456,
+                network_interfaces: vec![
+                    NetworkInterfaceCounters {
+                        name: "eth0".to_string(),
+                        receive_bytes: 10_485_760,
+                        transmit_bytes: 4_194_304
+                    },
+                    NetworkInterfaceCounters {
+                        name: "eth1".to_string(),
+                        receive_bytes: 5_242_880,
+                        transmit_bytes: 2_097_152
+                    },
+                ],
+                ssh_latency_ms: None,
             }
         );
     }

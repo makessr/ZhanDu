@@ -35,7 +35,7 @@ export function readAppearanceModeHint(): AppearanceMode {
   }
 }
 
-function applyResolvedAppearance(resolved: ResolvedAppearance) {
+function applyResolvedAppearance(resolved: ResolvedAppearance, mode: AppearanceMode) {
   document.body.dataset.appearance = resolved;
   document.documentElement.dataset.appearance = resolved;
   document.documentElement.style.colorScheme = resolved;
@@ -45,7 +45,7 @@ function applyResolvedAppearance(resolved: ResolvedAppearance) {
     document.body.removeAttribute("arco-theme");
   }
   if (isTauri()) {
-    void setNativeTheme(resolved).catch(() => {
+    void setNativeTheme(mode === "system" ? null : resolved).catch(() => {
       // The web theme remains usable if the native window rejects a theme update.
     });
   }
@@ -59,7 +59,7 @@ function applyResolvedAppearance(resolved: ResolvedAppearance) {
 export function applyAppearanceMode(mode: AppearanceMode) {
   currentMode = mode;
   const resolved = resolveAppearance(mode);
-  applyResolvedAppearance(resolved);
+  applyResolvedAppearance(resolved, mode);
   return resolved;
 }
 

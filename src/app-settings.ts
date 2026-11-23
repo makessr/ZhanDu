@@ -1,5 +1,11 @@
 import { inferAiProvider, type AiProvider } from "./ai-providers";
 import {
+  sanitizeTerminalBackgroundImage,
+  sanitizeTerminalFontNames,
+  type TerminalBackgroundMode,
+  type TerminalFontWeight,
+} from "./terminal-appearance";
+import {
   isTerminalColorScheme,
   sanitizeCustomTerminalThemes,
   type StoredTerminalTheme,
@@ -30,6 +36,15 @@ export interface AppSettings {
   terminalColorScheme: TerminalColorScheme;
   terminalCustomThemes: StoredTerminalTheme[];
   terminalFontFamily: TerminalFontFamily;
+  terminalCustomFontNames: string;
+  terminalFontWeight: TerminalFontWeight;
+  terminalBackgroundImage: string;
+  terminalBackgroundMode: TerminalBackgroundMode;
+  terminalBackgroundOpacity: number;
+  terminalCommandBarVisible: boolean;
+  terminalCommandBarHistory: boolean;
+  terminalCommandBarPaths: boolean;
+  terminalCommandBarNames: boolean;
   terminalFontSize: number;
   terminalLineHeight: number;
   terminalCursorStyle: TerminalCursorStyle;
@@ -46,6 +61,8 @@ export interface AppSettings {
   externalEditorPath: string;
   externalEditorName: string;
   monitorRefreshIntervalSeconds: number;
+  ipRegionEnabled: boolean;
+  ipRegionIpv6: boolean;
   defaultConnectTimeoutSeconds: number;
   defaultKeepAliveIntervalSeconds: number;
   defaultAutoReconnect: boolean;
@@ -71,6 +88,15 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   terminalColorScheme: "appearance",
   terminalCustomThemes: [],
   terminalFontFamily: "system",
+  terminalCustomFontNames: "",
+  terminalFontWeight: "normal",
+  terminalBackgroundImage: "",
+  terminalBackgroundMode: "cover",
+  terminalBackgroundOpacity: 30,
+  terminalCommandBarVisible: true,
+  terminalCommandBarHistory: true,
+  terminalCommandBarPaths: true,
+  terminalCommandBarNames: true,
   terminalFontSize: 13,
   terminalLineHeight: 1.2,
   terminalCursorStyle: "block",
@@ -87,6 +113,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   externalEditorPath: "",
   externalEditorName: "",
   monitorRefreshIntervalSeconds: 15,
+  ipRegionEnabled: false,
+  ipRegionIpv6: false,
   defaultConnectTimeoutSeconds: 10,
   defaultKeepAliveIntervalSeconds: 15,
   defaultAutoReconnect: true,
@@ -112,6 +140,14 @@ export const TERMINAL_FONT_FAMILIES: Record<TerminalFontFamily, string> = {
   menlo: 'Menlo, Monaco, "Liberation Mono", monospace',
   consolas: 'Consolas, "Liberation Mono", monospace',
 };
+
+export function terminalFontCss(
+  settings: Pick<AppSettings, "terminalFontFamily" | "terminalCustomFontNames">,
+): string {
+  const preset = TERMINAL_FONT_FAMILIES[settings.terminalFontFamily];
+  const names = sanitizeTerminalFontNames(settings.terminalCustomFontNames);
+  return names ? names.split(", ").map((name) => `"${name}"`).concat(preset).join(", ") : preset;
+}
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -196,6 +232,28 @@ export function sanitizeAppSettings(value: unknown): AppSettings {
       settings.terminalFontFamily === "consolas"
         ? settings.terminalFontFamily
         : DEFAULT_APP_SETTINGS.terminalFontFamily,
+    terminalCustomFontNames: sanitizeTerminalFontNames(settings.terminalCustomFontNames),
+    terminalFontWeight:
+      settings.terminalFontWeight === "500" ||
+      settings.terminalFontWeight === "600" ||
+      settings.terminalFontWeight === "700"
+        ? settings.terminalFontWeight
+        : DEFAULT_APP_SETTINGS.terminalFontWeight,
+    terminalBackgroundImage: sanitizeTerminalBackgroundImage(settings.terminalBackgroundImage),
+    terminalBackgroundMode:
+      settings.terminalBackgroundMode === "contain" || settings.terminalBackgroundMode === "tile"
+        ? settings.terminalBackgroundMode
+        : DEFAULT_APP_SETTINGS.terminalBackgroundMode,
+    terminalBackgroundOpacity: numberValue(
+      settings.terminalBackgroundOpacity,
+      DEFAULT_APP_SETTINGS.terminalBackgroundOpacity,
+      0,
+      100,
+    ),
+    terminalCommandBarVisible: booleanValue(settings.terminalCommandBarVisible, true),
+    terminalCommandBarHistory: booleanValue(settings.terminalCommandBarHistory, true),
+    terminalCommandBarPaths: booleanValue(settings.terminalCommandBarPaths, true),
+    terminalCommandBarNames: booleanValue(settings.terminalCommandBarNames, true),
     terminalFontSize: numberValue(
       settings.terminalFontSize,
       DEFAULT_APP_SETTINGS.terminalFontSize,
@@ -256,6 +314,8 @@ export function sanitizeAppSettings(value: unknown): AppSettings {
     ),
     externalEditorPath: stringValue(settings.externalEditorPath),
     externalEditorName: stringValue(settings.externalEditorName),
+    ipRegionEnabled: settings.ipRegionEnabled === true,
+    ipRegionIpv6: settings.ipRegionIpv6 === true,
     monitorRefreshIntervalSeconds: numberValue(
       settings.monitorRefreshIntervalSeconds,
       DEFAULT_APP_SETTINGS.monitorRefreshIntervalSeconds,

@@ -7,12 +7,13 @@ export function appendMonitorHistory(
   history: ServerMonitorHistoryPoint[],
   snapshot: ServerMonitorSnapshot,
   collectedAt = Date.now(),
-  limit = 24,
+  limit = 48,
 ) {
   const previous = history[history.length - 1];
   const elapsedSeconds = previous
     ? (collectedAt - previous.collectedAt) / 1_000
     : 0;
+  const interfaceCounters = new Map(previous?.networkInterfaces?.map((item) => [item.name, item]));
   const receiveBytesPerSecond =
     previous && elapsedSeconds > 0
       ? Math.max(
@@ -34,14 +35,36 @@ export function appendMonitorHistory(
     ...history,
     {
       collectedAt,
+      ...(snapshot.sshLatencyMs !== undefined && { sshLatencyMs: snapshot.sshLatencyMs }),
       cpuUsagePercent: snapshot.cpuUsagePercent,
       memoryUsagePercent: snapshot.memoryUsagePercent,
+      diskUsagePercent: snapshot.diskUsagePercent,
       networkReceiveBytes: snapshot.networkReceiveBytes,
       networkTransmitBytes: snapshot.networkTransmitBytes,
       networkReceiveBytesPerSecond: receiveBytesPerSecond,
       networkTransmitBytesPerSecond: transmitBytesPerSecond,
+      ...(snapshot.networkInterfaces && {
+        networkInterfaces: snapshot.networkInterfaces.map((item) => {
+          const prior = interfaceCounters.get(item.name);
+          return {
+            ...item,
+            receiveBytesPerSecond: prior && elapsedSeconds > 0
+              ? Math.max(0, (item.receiveBytes - prior.receiveBytes) / elapsedSeconds)
+              : 0,
+            transmitBytesPerSecond: prior && elapsedSeconds > 0
+              ? Math.max(0, (item.transmitBytes - prior.transmitBytes) / elapsedSeconds)
+              : 0,
+          };
+        }),
+      }),
     },
   ].slice(-Math.max(1, limit));
+}
+
+export function monitorNetworkRates(point: ServerMonitorHistoryPoint | undefined, interfaceName: string) {
+  const selected = point?.networkInterfaces?.find((item) => item.name === interfaceName);
+  if (interfaceName) return { receive: selected?.receiveBytesPerSecond ?? 0, transmit: selected?.transmitBytesPerSecond ?? 0 };
+  return { receive: point?.networkReceiveBytesPerSecond ?? 0, transmit: point?.networkTransmitBytesPerSecond ?? 0 };
 }
 
 export function formatMonitorBytes(bytes: number) {

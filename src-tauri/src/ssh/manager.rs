@@ -273,6 +273,21 @@ impl SshSessionManager {
         .map_err(|error| format!("服务器监控任务异常结束：{error}"))?
     }
 
+    pub(crate) async fn command_names(
+        &self,
+        session_id: &str,
+    ) -> Result<(String, Vec<String>), String> {
+        let (send, receive) = mpsc::sync_channel(1);
+        self.send(session_id, SessionCommand::CommandNames(send))?;
+        tauri::async_runtime::spawn_blocking(move || {
+            receive
+                .recv_timeout(Duration::from_secs(10))
+                .map_err(|error| format!("等待远程命令列表失败：{error}"))?
+        })
+        .await
+        .map_err(|error| format!("读取远程命令列表失败：{error}"))?
+    }
+
     pub(crate) async fn ping(
         &self,
         session_id: &str,

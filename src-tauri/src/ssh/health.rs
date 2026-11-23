@@ -59,6 +59,7 @@ pub(super) struct RemoteCommandOutput {
     pub(super) stdout: String,
     pub(super) stderr: String,
     pub(super) exit_status: i32,
+    pub(super) channel_open_elapsed: Duration,
 }
 
 pub(super) enum RemoteCommandPoll {
@@ -72,6 +73,8 @@ pub(super) struct PendingRemoteCommand {
     command: String,
     operation: &'static str,
     channel: Option<Channel>,
+    opening_at: Option<Instant>,
+    channel_open_elapsed: Duration,
     exec_started: bool,
     output: Vec<u8>,
     error_output: Vec<u8>,
@@ -90,6 +93,8 @@ impl PendingRemoteCommand {
             command: remote_shell::posix_script(script),
             operation,
             channel: None,
+            opening_at: None,
+            channel_open_elapsed: Duration::ZERO,
             exec_started: false,
             output: Vec::new(),
             error_output: Vec::new(),
@@ -107,8 +112,10 @@ impl PendingRemoteCommand {
 
         let mut active = false;
         if self.channel.is_none() {
+            let opening_at = *self.opening_at.get_or_insert_with(Instant::now);
             match session.channel_session() {
                 Ok(channel) => {
+                    self.channel_open_elapsed = opening_at.elapsed();
                     self.channel = Some(channel);
                     active = true;
                 }
@@ -208,6 +215,7 @@ impl PendingRemoteCommand {
                     stdout: String::from_utf8_lossy(&self.output).into_owned(),
                     stderr: String::from_utf8_lossy(&self.error_output).into_owned(),
                     exit_status,
+                    channel_open_elapsed: self.channel_open_elapsed,
                 }),
             },
             Err(error) => {

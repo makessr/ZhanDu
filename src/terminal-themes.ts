@@ -11,12 +11,12 @@ export interface TerminalThemeDefinition {
 export const TERMINAL_THEMES = {
   fineshellDark: {
     label: "栈渡深色",
-    swatch: "#191b20",
+    swatch: "#18181b",
     theme: {
-      background: "#191b20",
+      background: "#18181b",
       foreground: "#d7dae0",
       cursor: "#23c343",
-      cursorAccent: "#191b20",
+      cursorAccent: "#18181b",
       selectionBackground: "#3b4354",
       black: "#1d2129",
       red: "#f53f3f",

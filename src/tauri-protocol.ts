@@ -405,6 +405,7 @@ interface EventPayloadMap {
   "configuration:changed": undefined;
   "host-sync:request": { resolution?: { snapshot: string; choices: Record<string, boolean> }; recover?: boolean; manual?: boolean };
   "settings:changed": AppSettings;
+  "appearance:preview": AppSettings["appearanceMode"] | null;
   "menu-select-all": MenuSelectAllPayload;
 }
 

@@ -14,6 +14,8 @@
       },
       {
         "label": "settings",
+        "parent": "main",
+        "skipTaskbar": true,
         "title": "设置",
         "url": "index.html#view=settings",
         "width": 860,

@@ -249,6 +249,7 @@ enum SessionCommand {
         rows: u32,
     },
     Monitor(SyncSender<Result<ServerMonitorSnapshot, String>>),
+    CommandNames(SyncSender<Result<(String, Vec<String>), String>>),
     Ping {
         target: String,
         response: SyncSender<Result<NetworkPingResult, String>>,

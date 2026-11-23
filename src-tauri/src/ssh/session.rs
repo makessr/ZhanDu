@@ -38,7 +38,9 @@ impl PendingMonitorCommand {
                     format!("服务器监控命令异常退出：{}（{detail}）", output.exit_status)
                 });
             }
-            monitor::parse_server_snapshot_command(&output.stdout, output.exit_status)
+            let mut snapshot = monitor::parse_server_snapshot_command(&output.stdout, output.exit_status)?;
+            snapshot.ssh_latency_ms = Some(output.channel_open_elapsed.as_secs_f64() * 1_000.0);
+            Ok(snapshot)
         });
         if let Some(response) = self.response.take() {
             let _ = response.send(result);
@@ -129,6 +131,10 @@ pub(super) fn run_session(
                 }
                 Ok(SessionCommand::Processes(response)) => {
                     let _ = response.send(monitor::collect_processes(&session));
+                    active = true;
+                }
+                Ok(SessionCommand::CommandNames(response)) => {
+                    let _ = response.send(monitor::collect_command_names(&session));
                     active = true;
                 }
                 Ok(SessionCommand::InspectService { service, response }) => {

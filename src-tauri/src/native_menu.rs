@@ -8,9 +8,9 @@ use tauri::{
         AboutMetadata, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu, HELP_SUBMENU_ID,
         WINDOW_SUBMENU_ID,
     },
-    Emitter, RunEvent,
+    RunEvent,
 };
-use tauri::{AppHandle, Manager, Runtime, Window, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, Runtime, Window, WindowEvent};
 #[cfg(not(target_os = "windows"))]
 use tauri::{WebviewUrl, WebviewWindowBuilder};
 
@@ -53,7 +53,14 @@ fn create_auxiliary_window<R: Runtime>(
         _ => return Err(format!("不支持的辅助窗口: {label}")),
     };
     let path = PathBuf::from(format!("index.html#view={view}"));
-    WebviewWindowBuilder::new(app, label, WebviewUrl::App(path))
+    let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App(path));
+    if label == SETTINGS_WINDOW_LABEL {
+        let main = app
+            .get_webview_window(MAIN_WINDOW_LABEL)
+            .ok_or("栈渡主窗口尚未打开")?;
+        builder = builder.parent(&main).map_err(|error| error.to_string())?;
+    }
+    builder
         .title(title)
         .inner_size(width, height)
         .min_inner_size(min_width, min_height)
@@ -71,6 +78,11 @@ fn show_auxiliary_window<R: Runtime>(
 ) -> Result<(), String> {
     let window = app.get_webview_window(label);
     if let Some(window) = window {
+        if label == SETTINGS_WINDOW_LABEL {
+            if let Some(main) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+                main.unminimize().map_err(|error| error.to_string())?;
+            }
+        }
         window.show().map_err(|error| error.to_string())?;
         window.set_focus().map_err(|error| error.to_string())?;
         crate::diagnostics::record_native_info(
@@ -242,6 +254,19 @@ pub fn handle_window_event<R: Runtime>(window: &Window<R>, event: &WindowEvent) 
                         "error": error.to_string(),
                         "label": window.label(),
                     })),
+                );
+            }
+            if window.label() == SETTINGS_WINDOW_LABEL {
+                let app = window.app_handle();
+                let _ = app.emit_to(
+                    MAIN_WINDOW_LABEL,
+                    "appearance:preview",
+                    serde_json::Value::Null,
+                );
+                let _ = app.emit_to(
+                    SETTINGS_WINDOW_LABEL,
+                    "appearance:preview",
+                    serde_json::Value::Null,
                 );
             }
             if let Some(main_window) = window.app_handle().get_webview_window(MAIN_WINDOW_LABEL) {

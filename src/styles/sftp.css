@@ -38,7 +38,7 @@
 }
 
 .sftp-panel {
-  background: var(--workspace-surface);
+  background: var(--workspace-page);
 }
 
 .sftp-path-controls {
@@ -207,7 +207,7 @@
 }
 
 .sftp-table :where(.arco-table-tr) > .arco-table-td {
-  background-color: var(--workspace-surface);
+  background-color: var(--workspace-page);
 }
 
 .sftp-table :where(.arco-table-tr:hover) > .arco-table-td {

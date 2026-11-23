@@ -5,7 +5,6 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { HostRecord, TerminalSession } from "../models";
 
 mock.module("./ServerMonitorCharts", () => ({
-  UtilizationChart: () => <div data-testid="bar-chart" />,
   ResourceTrendChart: () => <div data-testid="area-chart" />,
   NetworkTrendChart: () => <div data-testid="network-chart" />,
 }));
@@ -34,12 +33,25 @@ function session(status: TerminalSession["status"]): TerminalSession {
 }
 
 describe("ServerMonitorPanel", () => {
-  test("pauses hidden monitoring and loads charts only on request", async () => {
+  test("shows charts automatically and pauses hidden monitoring", async () => {
     const collect = mock(() => Promise.resolve({
       collectedAt: Date.now(),
       hostname: "test-host",
       loadAverage: [0, 0, 0],
       cpuUsagePercent: 5,
+      memoryUsagePercent: 60,
+      diskUsagePercent: 32,
+      memoryUsedBytes: 2 ** 30,
+      memoryTotalBytes: 2 ** 31,
+      swap: { usagePercent: 80, usedBytes: 1_048_576, totalBytes: 2 ** 32 },
+      sshLatencyMs: 16.72,
+      networkReceiveBytes: 800,
+      networkTransmitBytes: 400,
+      networkInterfaces: [{ name: "eth0", receiveBytes: 200, transmitBytes: 100 }],
+      diskMounts: [
+        { path: "/", availableBytes: 20 * 1024 ** 3, totalBytes: 40 * 1024 ** 3 },
+        { path: "/boot/efi", availableBytes: 477 * 1024 ** 2, totalBytes: 486 * 1024 ** 2 },
+      ],
     }));
     mockIPC((command) => {
       if (command === "ssh_monitor_snapshot") return collect();
@@ -61,24 +73,36 @@ describe("ServerMonitorPanel", () => {
     const view = render(<ServerMonitorPanel {...props} visible={false} />);
     try {
       expect(collect).toHaveBeenCalledTimes(0);
+      expect(screen.queryByTestId("area-chart")).toBeNull();
       view.rerender(<ServerMonitorPanel {...props} visible />);
       expect(await screen.findByText("test-host")).not.toBeNull();
       expect(collect).toHaveBeenCalledTimes(1);
-      expect(screen.queryByTestId("bar-chart")).toBeNull();
-      fireEvent.click(screen.getByRole("button", { name: "显示图表" }));
-      expect(await screen.findByTestId("bar-chart")).not.toBeNull();
+      expect(screen.getByRole("meter", { name: "CPU" }).getAttribute("aria-valuenow")).toBe("5");
+      expect(screen.getByRole("meter", { name: "内存" }).getAttribute("aria-valuetext")).toContain("1.0 GB / 2.0 GB");
+      expect(screen.getByRole("meter", { name: "CPU" }).getAttribute("data-usage-level")).toBe("low");
+      expect(screen.getByRole("meter", { name: "内存" }).getAttribute("data-usage-level")).toBe("medium");
+      expect(screen.getByRole("meter", { name: "交换" }).getAttribute("data-usage-level")).toBe("high");
+      expect(screen.getByLabelText("SSH 延迟").textContent).toBe("16.7 ms");
+      expect(screen.getByText("/boot/efi")).not.toBeNull();
+      expect(screen.getByText("477 MB / 486 MB")).not.toBeNull();
+      fireEvent.change(screen.getByLabelText("网络接口"), { target: { value: "eth0" } });
+      expect(screen.getByText("累计 ↓ 200 B / ↑ 100 B")).not.toBeNull();
+      expect(screen.queryByRole("button", { name: /显示图表|隐藏图表/ })).toBeNull();
+      expect(await screen.findByTestId("area-chart")).not.toBeNull();
+      expect(screen.getByRole("img", { name: "上传和下载速率趋势" })).not.toBeNull();
+      expect(screen.getByRole("img", { name: "SSH 延迟趋势" })).not.toBeNull();
       await act(async () => {
         hidden = true;
         document.dispatchEvent(new Event("visibilitychange"));
       });
-      expect(screen.queryByTestId("bar-chart")).toBeNull();
+      expect(screen.queryByTestId("area-chart")).toBeNull();
       expect(collect).toHaveBeenCalledTimes(1);
       await act(async () => {
         hidden = false;
         document.dispatchEvent(new Event("visibilitychange"));
       });
       expect(collect).toHaveBeenCalledTimes(2);
-      expect(await screen.findByTestId("bar-chart")).not.toBeNull();
+      expect(await screen.findByTestId("area-chart")).not.toBeNull();
     } finally {
       view.unmount();
       if (originalHidden) Object.defineProperty(document, "hidden", originalHidden);
@@ -144,7 +168,7 @@ describe("ServerMonitorPanel", () => {
     const monitor = container.querySelector(".server-monitor");
     expect(monitor?.classList.contains("is-unavailable")).toBe(true);
     expect(container.querySelector(".monitor-system-facts")?.textContent).toBe(
-      "系统-主机名-内核-运行时间-负载-",
+      "系统-主机名-内核-",
     );
     expect(onSnapshotChange).toHaveBeenCalledWith("session-1", null);
   });

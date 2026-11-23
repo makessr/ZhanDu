@@ -101,13 +101,26 @@ struct Records {
     hosts: BTreeMap<String, Record>,
     keys: BTreeMap<String, Record>,
     proxies: BTreeMap<String, Record>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    command_library: Option<CommandLibrary>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize, Default, PartialEq, Eq)]
+struct CommandLibrary {
+    commands: BTreeMap<String, Record>,
+    groups: BTreeMap<String, Record>,
+}
+
+#[derive(Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct Configuration {
     hosts: Vec<Value>,
     keys: Vec<Value>,
     proxies: Vec<Value>,
+    #[serde(default)]
+    quick_commands: Vec<Value>,
+    #[serde(default)]
+    quick_command_groups: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -278,7 +291,13 @@ async fn request<T: DeserializeOwned>(
 
 fn seal(device: &Device, revision: u64, records: &Records) -> Result<Vault, String> {
     // Bind the encrypted content to this protocol and account.
-    let bytes = serde_json::to_vec(&("fineshell-host-sync-v1", &device.account_id, revision, records))
+    // Older clients reject the new encrypted format instead of overwriting its command library.
+    let format = if records.command_library.is_some() {
+        "fineshell-host-sync-v2"
+    } else {
+        "fineshell-host-sync-v1"
+    };
+    let bytes = serde_json::to_vec(&(format, &device.account_id, revision, records))
         .map_err(|_| "无法编码主机数据")?;
     let (nonce, ciphertext) = encrypt_payload(&device.key, &bytes)?;
     Ok(Vault {
@@ -308,10 +327,13 @@ fn open_with_key(device: &Device, key: &[u8; 32], vault: &Vault) -> Result<(u64,
         .map_err(|_| "无法解密同步数据，请重新登录并检查恢复密钥")?;
     let (format, account, revision, records): (String, String, u64, Records) =
         serde_json::from_slice(&bytes).map_err(|_| "主机同步数据无效")?;
-    if format != "fineshell-host-sync-v1" || account != device.account_id {
+    if account != device.account_id {
         return Err("同步数据账号不匹配".into());
     }
-    Ok((revision, records))
+    match (format.as_str(), records.command_library.is_some()) {
+        ("fineshell-host-sync-v1", false) | ("fineshell-host-sync-v2", true) => Ok((revision, records)),
+        _ => Err("同步数据格式不受支持，请更新栈渡客户端".into()),
+    }
 }
 
 fn conflict_snapshot_data(
@@ -418,7 +440,19 @@ fn capture(configuration: Configuration, blocked: &mut Vec<BlockedRecord>) -> Re
             private_key: None,
         })
     })?;
-    Ok(Records { hosts, keys, proxies })
+    let commands = insert_records(configuration.quick_commands, |metadata, _| {
+        Ok(Record { metadata, secret: None, private_key: None })
+    })?;
+    let groups = configuration.quick_command_groups.into_iter()
+        .filter(|name| !name.is_empty())
+        .map(|name| {
+            let metadata = json!({ "id": name, "name": name });
+            (name, Record { metadata, secret: None, private_key: None })
+        })
+        .collect::<BTreeMap<_, _>>();
+    let command_library = (!commands.is_empty() || !groups.is_empty())
+        .then_some(CommandLibrary { commands, groups });
+    Ok(Records { hosts, keys, proxies, command_library })
 }
 
 fn prepare_capture(
@@ -536,6 +570,26 @@ fn merge_map(
     merged
 }
 
+fn merge_command_library(
+    previous: Option<&CommandLibrary>,
+    local: Option<CommandLibrary>,
+    cloud: Option<&CommandLibrary>,
+    choices: Option<&BTreeMap<String, bool>>,
+    conflicts: &mut Vec<Conflict>,
+) -> Option<CommandLibrary> {
+    if previous.is_none() && local.is_none() && cloud.is_none() {
+        return None;
+    }
+    let empty = CommandLibrary::default();
+    let previous = previous.unwrap_or(&empty);
+    let cloud = cloud.unwrap_or(&empty);
+    let local = local.unwrap_or_default();
+    Some(CommandLibrary {
+        commands: merge_map(&previous.commands, local.commands, &cloud.commands, "quickCommands", choices, conflicts),
+        groups: merge_map(&previous.groups, local.groups, &cloud.groups, "quickCommandGroups", choices, conflicts),
+    })
+}
+
 fn put_secret(kind: &str, id: &str, secret: Option<&str>) -> Result<(), String> {
     if read_backup_credential(kind, id)?.as_deref() == secret {
         return Ok(());
@@ -569,7 +623,11 @@ fn apply_records(
     records.keys.retain(|id, _| !preserve_keys.contains(id));
     let old_hosts = current.hosts.iter().filter_map(|host| Some((host["id"].as_str()?, host))).collect::<BTreeMap<_, _>>();
     let old_keys = current.keys.iter().filter_map(|key| Some((key["id"].as_str()?, key))).collect::<BTreeMap<_, _>>();
-    let mut result = Configuration { hosts: Vec::new(), keys: Vec::new(), proxies: Vec::new() };
+    let mut result = Configuration::default();
+    if let Some(library) = records.command_library {
+        result.quick_commands = library.commands.into_values().map(|record| record.metadata).collect();
+        result.quick_command_groups = library.groups.into_keys().collect();
+    }
 
     // Install key files before changing any keyring entries.
     let mut pending_secrets = Vec::new();
@@ -1055,12 +1113,13 @@ pub(crate) async fn host_sync_exchange(
                 });
             }
         }
-        let Records { hosts, keys, proxies } = local;
+        let Records { hosts, keys, proxies, command_library } = local;
         let mut conflicts = Vec::new();
         let combined = Records {
             hosts: merge_map(&previous.hosts, hosts, &cloud.hosts, "hosts", choices, &mut conflicts),
             keys: merge_map(&previous.keys, keys, &cloud.keys, "keys", choices, &mut conflicts),
             proxies: merge_map(&previous.proxies, proxies, &cloud.proxies, "proxies", choices, &mut conflicts),
+            command_library: merge_command_library(previous.command_library.as_ref(), command_library, cloud.command_library.as_ref(), choices, &mut conflicts),
         };
         if !conflicts.is_empty() {
             return Ok(SyncResult {
@@ -1097,11 +1156,7 @@ pub(crate) fn host_sync_apply(
     (|| {
         let device = require_device(&account_id)?;
         let (_, records) = open(&device, &vault)?;
-        if open(&device, &expected_local)?.1 != capture(Configuration {
-            hosts: configuration.hosts.clone(),
-            keys: configuration.keys.clone(),
-            proxies: configuration.proxies.clone(),
-        }, &mut Vec::new())? {
+        if open(&device, &expected_local)?.1 != capture(configuration.clone(), &mut Vec::new())? {
             return Err("本机 SSH 凭据刚发生变化，将在下一次同步时重试".into());
         }
         apply_records(records, configuration, &preserve_hosts, &preserve_keys)
@@ -1186,6 +1241,42 @@ mod tests {
     }
 
     #[test]
+    fn merges_command_library_edits_and_keeps_empty_library_versioned() {
+        let command = |name: &str| Record {
+            metadata: json!({"id": "cmd", "name": name, "command": "printf test"}),
+            secret: None,
+            private_key: None,
+        };
+        let group = Record {
+            metadata: json!({"id": "Empty", "name": "Empty"}),
+            secret: None,
+            private_key: None,
+        };
+        let previous = CommandLibrary {
+            commands: BTreeMap::from([("cmd".into(), command("original"))]),
+            groups: BTreeMap::from([("Empty".into(), group.clone())]),
+        };
+        let cloud = CommandLibrary {
+            commands: BTreeMap::from([("cmd".into(), command("cloud edit"))]),
+            ..previous.clone()
+        };
+        let local = CommandLibrary {
+            commands: BTreeMap::from([("cmd".into(), command("local edit"))]),
+            ..previous.clone()
+        };
+        let mut conflicts = Vec::new();
+        merge_command_library(Some(&previous), Some(local.clone()), Some(&cloud), None, &mut conflicts);
+        assert_eq!(conflicts[0].id, "quickCommands/cmd");
+        let choices = BTreeMap::from([("quickCommands/cmd".into(), false)]);
+        let combined = merge_command_library(Some(&previous), Some(local), Some(&cloud), Some(&choices), &mut Vec::new()).unwrap();
+        assert!(combined == cloud);
+        let deleted = merge_command_library(Some(&combined), None, Some(&combined), None, &mut Vec::new()).unwrap();
+        assert!(deleted.commands.is_empty());
+        assert!(deleted.groups.is_empty());
+        assert!(merge_command_library(None, None, None, None, &mut Vec::new()).is_none());
+    }
+
+    #[test]
     fn vault_binds_revision_and_account() {
         let recovery = generate_recovery_key();
         let key = random_master_key();
@@ -1206,6 +1297,13 @@ mod tests {
         let advanced = seal(&device, 18, &empty).unwrap();
         assert!(!verifies_conflict(&device, &advanced, &empty, &empty, &snapshot).unwrap());
         assert_eq!(open(&device, &vault).unwrap().0, 17);
+        let library = Records { command_library: Some(CommandLibrary::default()), ..Records::default() };
+        let library_vault = seal(&device, 18, &library).unwrap();
+        assert_eq!(library_vault.version, 1);
+        let bytes = decrypt_payload(&device.key, &library_vault.nonce, &library_vault.ciphertext).unwrap();
+        let (format, _, _, _): (String, String, u64, Value) = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(format, "fineshell-host-sync-v2");
+        assert!(open(&device, &library_vault).unwrap().1 == library);
         device.previous_key = Some(device.key);
         device.key = random_master_key();
         assert!(open(&device, &vault).is_err());

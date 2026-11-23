@@ -1,4 +1,5 @@
-import { Button, Drawer, Tooltip } from "@arco-design/web-react";
+import { WorkspaceToolSurface } from "../WorkspaceToolPanel";
+import { Button, Tooltip } from "@arco-design/web-react";
 import { IconDelete } from "@arco-design/web-react/icon";
 import type { ExternalEditPayload } from "../../tauri-protocol";
 import { isActiveSftpTransfer } from "../../sftp-utils";
@@ -21,6 +22,7 @@ interface SftpTransferDrawerProps {
   onRetryTransfer: (transfer: TransferActivityRecord) => void;
   transfers: TransferActivityRecord[];
   visible: boolean;
+  embedded?: boolean;
 }
 
 export default function SftpTransferDrawer({
@@ -37,12 +39,14 @@ export default function SftpTransferDrawer({
   onRetryTransfer,
   transfers,
   visible,
+  embedded,
 }: SftpTransferDrawerProps) {
   const { copyPath, homeDirectory, missingTransferIds, openLocal, revealLocal } =
     useTransferRecordActions();
 
   return (
-    <Drawer
+    <WorkspaceToolSurface
+      embedded={embedded}
       bodyStyle={{ padding: 0 }}
       className="sftp-transfer-drawer"
       footer={null}
@@ -67,6 +71,11 @@ export default function SftpTransferDrawer({
       visible={visible}
       width={440}
     >
+      {embedded && (
+        <div className="workspace-tool-actions">
+          <Button disabled={!transfers.some((item) => !isActiveSftpTransfer(item.status))} onClick={onClearFinished} size="mini">清除已完成</Button>
+        </div>
+      )}
       <TransferActivityList
         externalEdits={externalEdits}
         homeDirectory={homeDirectory}
@@ -84,6 +93,6 @@ export default function SftpTransferDrawer({
         onRetry={onRetryTransfer}
         transfers={transfers}
       />
-    </Drawer>
+    </WorkspaceToolSurface>
   );
 }

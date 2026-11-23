@@ -14,6 +14,7 @@ mod diagnostics;
 mod dynamic_forward;
 mod external_edit;
 mod host_sync;
+mod ip_region;
 mod local_files;
 mod managed_keys;
 mod monitor;
@@ -97,6 +98,9 @@ pub fn run() {
             host_sync::host_sync_probe,
             host_sync::host_sync_apply,
             protocol::protocol_version,
+            ip_region::ip_region_status,
+            ip_region::ip_region_update,
+            ip_region::ip_region_lookup,
             #[cfg(desktop)]
             native_menu::open_settings_window,
             #[cfg(desktop)]
@@ -173,6 +177,7 @@ pub fn run() {
             ssh::ssh_write,
             ssh::ssh_resize,
             ssh::ssh_monitor_snapshot,
+            ssh::ssh_command_names,
             ssh::ssh_ping,
             ssh::ssh_network_connections,
             ssh::ssh_trace_route,

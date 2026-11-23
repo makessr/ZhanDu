@@ -62,7 +62,7 @@ export default function AppWorkspaceLayout({
           trigger: (prevNode, _resizeNode, nextNode) => (
             <CollapsibleSplitTrigger
               direction="vertical"
-              label="文件管理栏"
+              label="会话工具栏"
               nextNode={nextNode}
               prevNode={prevNode}
             />

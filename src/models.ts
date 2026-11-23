@@ -209,22 +209,38 @@ export interface ServerMonitorSnapshot {
   memoryTotalBytes: number;
   memoryUsedBytes: number;
   memoryUsagePercent: number;
+  swap?: { totalBytes: number; usedBytes: number; usagePercent: number };
   diskTotalBytes: number;
   diskUsedBytes: number;
   diskUsagePercent: number;
+  diskMounts?: { path: string; availableBytes: number; totalBytes: number }[];
   loadAverage: [number, number, number];
   networkReceiveBytes: number;
   networkTransmitBytes: number;
+  networkInterfaces?: NetworkInterfaceCounters[];
+  sshLatencyMs?: number;
+}
+
+export interface NetworkInterfaceCounters {
+  name: string;
+  receiveBytes: number;
+  transmitBytes: number;
 }
 
 export interface ServerMonitorHistoryPoint {
   collectedAt: number;
+  sshLatencyMs?: number;
   cpuUsagePercent: number;
   memoryUsagePercent: number;
+  diskUsagePercent: number;
   networkReceiveBytes: number;
   networkTransmitBytes: number;
   networkReceiveBytesPerSecond: number;
   networkTransmitBytesPerSecond: number;
+  networkInterfaces?: (NetworkInterfaceCounters & {
+    receiveBytesPerSecond: number;
+    transmitBytesPerSecond: number;
+  })[];
 }
 
 export interface NetworkPingResult {

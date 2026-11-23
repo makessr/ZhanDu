@@ -36,7 +36,9 @@ import type {
   TerminalCommandHistoryRecord,
   TerminalSession,
 } from "../models";
-import { TERMINAL_FONT_FAMILIES, type AppSettings } from "../app-settings";
+import { terminalFontCss, type AppSettings } from "../app-settings";
+import { terminalWallpaperStyle } from "../terminal-appearance";
+import { isSingleTerminalCommand } from "../terminal-command-bar";
 import {
   appendInjectedTerminalInput,
   decodeSshOutput,
@@ -75,6 +77,7 @@ import { diagnosticInvoke as invoke } from "../diagnostics";
 import { listenProtocolEvent } from "../tauri-protocol";
 import ConnectionStatusOverlay from "./ConnectionStatusOverlay";
 import ContextMenu, { type ContextMenuItem } from "./ContextMenu";
+import TerminalCommandBar from "./TerminalCommandBar";
 
 interface TerminalViewProps {
   collectRecentOutput: boolean;
@@ -185,6 +188,7 @@ function TerminalView({
     appearance,
     settings.terminalCustomThemes,
   );
+  const fontFamily = terminalFontCss(settings);
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -193,6 +197,7 @@ function TerminalView({
     null,
   );
   const searchInputRef = useRef<RefInputType>(null);
+  const commandInputRef = useRef<HTMLInputElement>(null);
   const connectedRef = useRef(isTerminalSessionOperational(session.status));
   const shellIntegrationInstalledRef = useRef(false);
   const shellIntegrationNonceRef = useRef(createShellIntegrationNonce());
@@ -452,8 +457,10 @@ function TerminalView({
       cursorBlink: settings.terminalCursorBlink,
       cursorStyle: settings.terminalCursorStyle,
       cursorWidth: 1,
-      fontFamily: TERMINAL_FONT_FAMILIES[settings.terminalFontFamily],
+      fontFamily,
       fontSize: terminalFontSize,
+      fontWeight: settings.terminalFontWeight,
+      fontWeightBold: settings.terminalFontWeight === "700" ? "900" : "bold",
       lineHeight: settings.terminalLineHeight,
       minimumContrastRatio: 4.5,
       overviewRuler: {
@@ -764,9 +771,10 @@ function TerminalView({
     terminal.options.cursorBlink = settings.terminalCursorBlink;
     terminal.options.cursorStyle = settings.terminalCursorStyle;
     terminal.options.cursorWidth = 1;
-    terminal.options.fontFamily =
-      TERMINAL_FONT_FAMILIES[settings.terminalFontFamily];
+    terminal.options.fontFamily = fontFamily;
     terminal.options.fontSize = terminalFontSize;
+    terminal.options.fontWeight = settings.terminalFontWeight;
+    terminal.options.fontWeightBold = settings.terminalFontWeight === "700" ? "900" : "bold";
     terminal.options.lineHeight = settings.terminalLineHeight;
     terminal.options.scrollback = settings.terminalScrollback;
     terminal.options.theme = terminalTheme;
@@ -785,7 +793,8 @@ function TerminalView({
     settings.terminalCursorBlink,
     settings.terminalCursorStyle,
     terminalTheme,
-    settings.terminalFontFamily,
+    fontFamily,
+    settings.terminalFontWeight,
     terminalFontSize,
     settings.terminalLineHeight,
     settings.terminalScrollback,
@@ -808,7 +817,7 @@ function TerminalView({
       }
       if (searchVisibleRef.current) {
         searchInputRef.current?.focus();
-      } else {
+      } else if (document.activeElement !== commandInputRef.current) {
         terminal.focus();
       }
       if (isTerminalSessionOperational(session.status)) {
@@ -901,6 +910,15 @@ function TerminalView({
   }
 
   function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (settings.terminalCommandBarVisible && event.shiftKey &&
+      (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "l" &&
+      !commandInputRef.current?.disabled) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.target === commandInputRef.current) terminalRef.current?.focus();
+      else commandInputRef.current?.focus();
+      return;
+    }
     if (!searchVisible) return;
     const target = event.target;
     if (
@@ -911,6 +929,30 @@ function TerminalView({
       event.preventDefault();
       event.stopPropagation();
       findSearchMatch(event.shiftKey ? "previous" : "next");
+    }
+  }
+
+  async function submitCommandBar(command: string) {
+    const terminal = terminalRef.current;
+    if (!terminal || !connectedRef.current || !isSingleTerminalCommand(command)) {
+      throw new Error("当前会话无法发送这条命令");
+    }
+    const history = historyCompletionRef.current;
+    if (terminal.buffer.active.type === "alternate" ||
+      shellIntegrationMutationRef.current ||
+      (shellIntegrationStateRef.current === "ready" && !history?.isPromptReady)) {
+      throw new Error("请等待终端回到 Shell 提示符再发送");
+    }
+    if (!inputStateRef.current.reliable || inputStateRef.current.value) {
+      throw new Error("请先完成或取消终端里正在编辑的命令");
+    }
+    history?.setPromptReady(false);
+    try {
+      await invoke("ssh_write", { sessionId: session.id, data: Array.from(new TextEncoder().encode(command + "\r")) });
+      recordTerminalHistoryRef.current(command);
+    } catch (error) {
+      history?.setPromptReady(true);
+      throw error;
     }
   }
 
@@ -995,10 +1037,17 @@ function TerminalView({
 
   return (
     <div
-      className="terminal-view"
+      className={`terminal-view${settings.terminalBackgroundImage ? " terminal-wallpaper" : ""}`}
       onKeyDownCapture={handleKeyDown}
       style={
-        { "--terminal-background": terminalTheme.background } as CSSProperties
+        {
+          "--terminal-background": terminalTheme.background,
+          ...terminalWallpaperStyle(
+            settings.terminalBackgroundImage,
+            settings.terminalBackgroundMode,
+            settings.terminalBackgroundOpacity,
+          ),
+        } as CSSProperties
       }
     >
       <ContextMenu
@@ -1012,6 +1061,19 @@ function TerminalView({
           ref={containerRef}
         />
       </ContextMenu>
+      {settings.terminalCommandBarVisible && active && (
+        <TerminalCommandBar
+          connected={terminalReady && isTerminalSessionOperational(session.status)}
+          getDirectory={() => currentDirectoryRef.current}
+          getHistory={() => terminalCommandHistoryRef.current}
+          hostId={session.host.id}
+          inputRef={commandInputRef}
+          onFocusTerminal={() => terminalRef.current?.focus()}
+          onSubmit={submitCommandBar}
+          sessionId={session.id}
+          settings={settings}
+        />
+      )}
       {searchVisible && (
         <div className="terminal-search-bar" role="search">
           <Input

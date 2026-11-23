@@ -4,6 +4,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { AppSettings } from "../app-settings";
 import { useResolvedAppearance } from "../hooks/useResolvedAppearance";
+import TerminalAppearancePreview from "./TerminalAppearancePreview";
 import { commandErrorMessage, invokeProtocolCommand as invoke } from "../tauri-protocol";
 import {
   ANSI_COLOR_KEYS,
@@ -178,11 +179,7 @@ export default function TerminalThemeLibrary({
               </Button>
             )}
           </div>
-          <div className="terminal-theme-preview" style={{ backgroundColor: theme.background, color: theme.foreground }}>
-            <div><span style={{ color: theme.green }}>admin@server</span>:<span style={{ color: theme.blue }}>~/logs</span>$ ls</div>
-            <div><span style={{ color: theme.blue }}>archive/</span>  app.log  <span style={{ color: theme.green }}>rotate.sh</span></div>
-            <div>$ <span className="terminal-theme-cursor" style={{ backgroundColor: theme.cursor }} /></div>
-          </div>
+          <TerminalAppearancePreview settings={settings} theme={theme} />
           <div className="terminal-theme-ansi" aria-label="16 色 ANSI 色板">
             {ANSI_COLOR_KEYS.map((key, index) => (
               <span key={key} title={`ANSI ${index} · ${theme[key]}`} style={{ backgroundColor: theme[key] }} />

@@ -27,7 +27,7 @@ describe("migrateLegacyConfiguration", () => {
       "2026-07-22T00:00:00.000Z",
     );
 
-    expect(configuration.schemaVersion).toBe(18);
+    expect(configuration.schemaVersion).toBe(19);
     expect(configuration.proxies).toEqual([]);
     expect(configuration.sshKeys).toEqual([]);
     expect(configuration.quickCommands).toEqual([]);
