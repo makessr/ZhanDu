@@ -46,7 +46,7 @@ import {
   type ApplicationUpdateNotice,
 } from "../app-updater";
 import { emitProtocolEventTo } from "../tauri-protocol";
-import { TERMINAL_THEMES } from "../terminal-themes";
+import TerminalThemeLibrary from "./TerminalThemeLibrary";
 import { resolveDefaultTerminalLogDirectory } from "../terminal-logging";
 import { isApplePlatform } from "../platform-utils";
 import AdvancedSettings from "./AdvancedSettings";
@@ -351,43 +351,8 @@ function SettingsWindow() {
       case "terminal":
         return (
           <>
+            <TerminalThemeLibrary settings={settings} setSettings={setSettings} />
             <div className="settings-group">
-              <SettingRow
-                control={
-                  <Select
-                    aria-label="终端配色方案"
-                    onChange={(value) =>
-                      updateSetting(
-                        "terminalColorScheme",
-                        value as AppSettings["terminalColorScheme"],
-                      )
-                    }
-                    options={[
-                      { label: "跟随界面外观", value: "appearance" },
-                      ...Object.entries(TERMINAL_THEMES).map(([value, definition]) => ({
-                        label: (
-                          <span className="terminal-theme-option">
-                            <span
-                              className="terminal-theme-swatch"
-                              aria-hidden="true"
-                              style={{
-                                background: definition.swatch,
-                                color: definition.theme.foreground,
-                              }}
-                            >
-                              Aa
-                            </span>
-                            {definition.label}
-                          </span>
-                        ),
-                        value,
-                      })),
-                    ]}
-                    value={settings.terminalColorScheme}
-                  />
-                }
-                label="配色方案"
-              />
               <SettingRow
                 control={
                   <Select
