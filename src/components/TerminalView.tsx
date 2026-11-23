@@ -59,7 +59,8 @@ import {
   parseShellIntegrationMessage,
   type ShellIntegrationEchoFilter,
 } from "../shell-integration";
-import { TERMINAL_THEMES } from "../terminal-themes";
+import { resolveTerminalTheme } from "../terminal-themes";
+import { useResolvedAppearance } from "../hooks/useResolvedAppearance";
 import { balancedTerminalGridTopInset } from "../terminal-layout";
 import {
   terminalFontZoomKeyboardAction,
@@ -178,6 +179,11 @@ function TerminalView({
   onRecentOutputChange,
   onSelectionChange,
 }: TerminalViewProps) {
+  const appearance = useResolvedAppearance();
+  const { theme: terminalTheme } = resolveTerminalTheme(
+    settings.terminalColorScheme,
+    appearance,
+  );
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -448,11 +454,12 @@ function TerminalView({
       fontFamily: TERMINAL_FONT_FAMILIES[settings.terminalFontFamily],
       fontSize: terminalFontSize,
       lineHeight: settings.terminalLineHeight,
+      minimumContrastRatio: 4.5,
       overviewRuler: {
         width: 6,
       },
       scrollback: settings.terminalScrollback,
-      theme: TERMINAL_THEMES[settings.terminalColorScheme].theme,
+      theme: terminalTheme,
     });
     const fitAddon = new FitAddon();
     const searchAddon = new SearchAddon({ highlightLimit: 1000 });
@@ -761,8 +768,7 @@ function TerminalView({
     terminal.options.fontSize = terminalFontSize;
     terminal.options.lineHeight = settings.terminalLineHeight;
     terminal.options.scrollback = settings.terminalScrollback;
-    terminal.options.theme =
-      TERMINAL_THEMES[settings.terminalColorScheme].theme;
+    terminal.options.theme = terminalTheme;
     requestAnimationFrame(() => {
       try {
         const container = containerRef.current;
@@ -777,7 +783,7 @@ function TerminalView({
   }, [
     settings.terminalCursorBlink,
     settings.terminalCursorStyle,
-    settings.terminalColorScheme,
+    terminalTheme,
     settings.terminalFontFamily,
     terminalFontSize,
     settings.terminalLineHeight,
@@ -977,7 +983,6 @@ function TerminalView({
 
   const currentSearchResult =
     searchResult.resultIndex >= 0 ? searchResult.resultIndex + 1 : 0;
-  const terminalTheme = TERMINAL_THEMES[settings.terminalColorScheme].theme;
   const reconnecting = session.status === "reconnecting";
   const connectionUnavailable =
     session.status === "failed" ||

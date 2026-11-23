@@ -362,20 +362,27 @@ function SettingsWindow() {
                         value as AppSettings["terminalColorScheme"],
                       )
                     }
-                    options={Object.entries(TERMINAL_THEMES).map(
-                      ([value, definition]) => ({
+                    options={[
+                      { label: "跟随界面外观", value: "appearance" },
+                      ...Object.entries(TERMINAL_THEMES).map(([value, definition]) => ({
                         label: (
                           <span className="terminal-theme-option">
                             <span
                               className="terminal-theme-swatch"
-                              style={{ background: definition.swatch }}
-                            />
+                              aria-hidden="true"
+                              style={{
+                                background: definition.swatch,
+                                color: definition.theme.foreground,
+                              }}
+                            >
+                              Aa
+                            </span>
                             {definition.label}
                           </span>
                         ),
                         value,
-                      }),
-                    )}
+                      })),
+                    ]}
                     value={settings.terminalColorScheme}
                   />
                 }

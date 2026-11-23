@@ -16,6 +16,12 @@
   padding: 4px 8px;
 }
 
+.sftp-follow-status {
+  display: grid;
+  gap: 2px;
+  overflow-wrap: anywhere;
+}
+
 .sftp-name-filter .arco-input-wrapper {
   max-width: 360px;
 }

@@ -103,7 +103,10 @@ interface BrowserState {
   entries: SftpEntry[];
   previewEntries?: SftpEntry[];
   error?: string;
+  followError?: { path: string; message: string };
 }
+
+type DirectoryLoadReason = "manual" | "initial" | "terminal";
 
 interface SftpPanelProps {
   confirmFileDelete: boolean;
@@ -210,7 +213,10 @@ function SftpPanel({
     (sessionId: string, values: Partial<BrowserState>) => {
       if (values.status === "idle" || values.status === "failed") {
         directoryRequestsRef.current.delete(sessionId);
-        values = { ...values, previewEntries: undefined };
+        values = { ...values, previewEntries: undefined, followError: undefined };
+      }
+      if (values.status === "idle") {
+        handledTerminalDirectoryRevisionsRef.current.delete(sessionId);
       }
       setBrowsers((current) => ({
         ...current,
@@ -224,7 +230,12 @@ function SftpPanel({
   );
 
   const loadDirectory = useCallback(
-    async (sessionId: string, path: string, initial = false) => {
+    async (
+      sessionId: string,
+      path: string,
+      reason: DirectoryLoadReason = "manual",
+    ) => {
+      const initial = reason === "initial";
       const requests = directoryRequestsRef.current;
       const request = Symbol();
       requests.set(sessionId, request);
@@ -232,6 +243,7 @@ function SftpPanel({
         status: initial ? "connecting" : "loading",
         inputPath: path,
         error: undefined,
+        followError: undefined,
         previewEntries: undefined,
       });
       const onBatch = new Channel<SftpEntry[]>((batch) => {
@@ -268,7 +280,7 @@ function SftpPanel({
       } catch (error) {
         if (requests.get(sessionId) !== request) return;
         const message = commandErrorMessage(error);
-        if (initial) {
+        if (initial || isSftpSessionFailure(message)) {
           updateBrowser(sessionId, { status: "failed", error: message });
         } else {
           setBrowsers((current) => {
@@ -280,11 +292,11 @@ function SftpPanel({
                 status: "ready",
                 inputPath: previous.path,
                 previewEntries: undefined,
-                error: message,
+                followError: reason === "terminal" ? { path, message } : undefined,
               },
             };
           });
-          Message.error(message);
+          if (reason === "manual") Message.error(message);
         }
       } finally {
         if (requests.get(sessionId) === request) requests.delete(sessionId);
@@ -331,7 +343,7 @@ function SftpPanel({
           homeDir = result.homeDir;
           connectedHomesRef.current.set(currentSession.id, homeDir);
         }
-        await loadDirectory(currentSession.id, homeDir, true);
+        await loadDirectory(currentSession.id, homeDir, "initial");
       } catch (error) {
         updateBrowser(currentSession.id, {
           status: "failed",
@@ -592,7 +604,7 @@ function SftpPanel({
   }, [virtualized]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!session || !connected) return;
     if (!terminalDirectory) {
       handledTerminalDirectoryRevisionsRef.current.delete(session.id);
       return;
@@ -609,14 +621,19 @@ function SftpPanel({
       terminalDirectory.revision,
     );
     if (browser.path !== terminalDirectory.path) {
-      void loadDirectory(session.id, terminalDirectory.path);
+      void loadDirectory(session.id, terminalDirectory.path, "terminal");
+    } else if (browser.followError) {
+      updateBrowser(session.id, { followError: undefined });
     }
   }, [
+    browser?.followError,
     browser?.path,
     browser?.status,
+    connected,
     loadDirectory,
     session,
     terminalDirectory,
+    updateBrowser,
   ]);
 
   useEffect(() => {
@@ -1169,6 +1186,14 @@ function SftpPanel({
       {showingPreview && (
         <div className="sftp-directory-preview-status" role="status">
           正在读取目录，完成后即可操作文件
+        </div>
+      )}
+      {ready && browser?.followError && (
+        <div className="sftp-directory-preview-status sftp-follow-status" role="status">
+          <span>
+            无法跟随到 <bdi>{browser.followError.path}</bdi>，已保留当前目录。
+          </span>
+          <span>{browser.followError.message}</span>
         </div>
       )}
 

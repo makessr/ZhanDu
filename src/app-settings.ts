@@ -1,4 +1,5 @@
 import { inferAiProvider, type AiProvider } from "./ai-providers";
+import { isTerminalColorScheme, type TerminalColorScheme } from "./terminal-themes";
 import {
   ALL_AI_READ_ONLY_TOOLS,
   sanitizeAiReadOnlyTools,
@@ -10,8 +11,7 @@ export type { AiProvider } from "./ai-providers";
 export type TerminalFontFamily = "system" | "menlo" | "consolas";
 export type AppearanceMode = "light" | "dark" | "system";
 export type TerminalCursorStyle = "block" | "underline" | "bar";
-export type TerminalColorScheme =
-  "fineshellDark" | "graphiteLight" | "solarizedDark" | "dracula";
+export type { TerminalColorScheme } from "./terminal-themes";
 export type TerminalRightClickAction = "menu" | "paste";
 export type TerminalLogFormat = "plain" | "raw";
 export type ConnectionHistoryLimit = 0 | 20 | 50 | 100;
@@ -62,7 +62,7 @@ export interface AppSettings {
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   appearanceMode: "light",
-  terminalColorScheme: "fineshellDark",
+  terminalColorScheme: "appearance",
   terminalFontFamily: "system",
   terminalFontSize: 13,
   terminalLineHeight: 1.2,
@@ -179,9 +179,7 @@ export function sanitizeAppSettings(value: unknown): AppSettings {
         ? settings.appearanceMode
         : DEFAULT_APP_SETTINGS.appearanceMode,
     terminalColorScheme:
-      settings.terminalColorScheme === "graphiteLight" ||
-      settings.terminalColorScheme === "solarizedDark" ||
-      settings.terminalColorScheme === "dracula"
+      isTerminalColorScheme(settings.terminalColorScheme)
         ? settings.terminalColorScheme
         : DEFAULT_APP_SETTINGS.terminalColorScheme,
     terminalFontFamily:
