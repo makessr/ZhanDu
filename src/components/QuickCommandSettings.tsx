@@ -1,15 +1,13 @@
+import QuickCommandEditorModal from "./QuickCommandEditorModal";
+import { quickCommandFromForm } from "../quick-command-utils";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Button,
   Empty,
-  Form,
-  Input,
   Message,
-  Modal,
   Popconfirm,
   Space,
   Table,
-  Tooltip,
   Typography,
 } from "@arco-design/web-react";
 import type { TableColumnProps } from "@arco-design/web-react";
@@ -17,12 +15,9 @@ import {
   IconDelete,
   IconEdit,
   IconPlus,
-  IconQuestionCircle,
 } from "@arco-design/web-react/icon";
 import { isTauri } from "@tauri-apps/api/core";
-import {
-  loadConfiguration,
-} from "../config-database";
+import { loadConfiguration } from "../config-database";
 import {
   deleteQuickCommand,
   upsertQuickCommand,
@@ -35,93 +30,6 @@ import {
   emitProtocolEventTo,
   listenProtocolEvent,
 } from "../tauri-protocol";
-
-function createQuickCommandId() {
-  return `command-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-interface QuickCommandEditorModalProps {
-  command: QuickCommandRecord | null;
-  submitting: boolean;
-  visible: boolean;
-  onCancel: () => void;
-  onSubmit: (values: QuickCommandFormValues) => void;
-}
-
-function QuickCommandEditorModal({
-  command,
-  submitting,
-  visible,
-  onCancel,
-  onSubmit,
-}: QuickCommandEditorModalProps) {
-  return (
-    <Modal
-      className="quick-command-editor-modal"
-      footer={null}
-      maskClosable={false}
-      onCancel={onCancel}
-      style={{ width: 680 }}
-      title={command ? "编辑快捷命令" : "新增快捷命令"}
-      visible={visible}
-    >
-      <Form<QuickCommandFormValues>
-        initialValues={{
-          name: command?.name ?? "",
-          group: command?.group ?? "",
-          command: command?.command ?? "",
-          description: command?.description ?? "",
-        }}
-        layout="vertical"
-        onSubmit={onSubmit}
-      >
-        <div className="quick-command-form-row">
-          <Form.Item
-            field="name"
-            label="名称"
-            rules={[{ required: true, message: "请输入快捷命令名称" }]}
-          >
-            <Input autoFocus maxLength={80} placeholder="例如：查看服务日志" />
-          </Form.Item>
-          <Form.Item field="group" label="分组">
-            <Input maxLength={60} placeholder="可选" />
-          </Form.Item>
-        </div>
-        <Form.Item
-          field="command"
-          label={
-            <span className="quick-command-template-label">
-              命令模板
-              <Tooltip content="使用 {{参数}} 或 {{参数:默认值}} 插入动态参数">
-                <IconQuestionCircle />
-              </Tooltip>
-            </span>
-          }
-          rules={[{ required: true, message: "请输入命令模板" }]}
-        >
-          <Input.TextArea
-            autoSize={{ minRows: 5, maxRows: 10 }}
-            maxLength={4000}
-            placeholder="tail -n {{行数:100}} {{文件路径}}"
-          />
-        </Form.Item>
-        <Form.Item field="description" label="备注">
-          <Input maxLength={160} placeholder="可选" />
-        </Form.Item>
-        <div className="modal-actions">
-          <Space>
-            <Button disabled={submitting} onClick={onCancel}>
-              取消
-            </Button>
-            <Button htmlType="submit" loading={submitting} type="primary">
-              保存
-            </Button>
-          </Space>
-        </div>
-      </Form>
-    </Modal>
-  );
-}
 
 function QuickCommandSettings() {
   const [commands, setCommands] = useState<QuickCommandRecord[]>([]);
@@ -174,13 +82,7 @@ function QuickCommandSettings() {
   };
 
   const saveCommand = async (values: QuickCommandFormValues) => {
-    const command: QuickCommandRecord = {
-      id: editingCommand?.id ?? createQuickCommandId(),
-      name: values.name.trim(),
-      command: values.command.trim(),
-      group: values.group?.trim() || undefined,
-      description: values.description?.trim() || undefined,
-    };
+    const command = quickCommandFromForm(values, editingCommand?.id);
     setActing(true);
     try {
       const configuration = await upsertQuickCommand(command);

@@ -10,7 +10,6 @@ import {
   Space,
   Switch,
   Table,
-  Tag,
   Tooltip,
   Typography,
 } from "@arco-design/web-react";
@@ -45,7 +44,7 @@ interface ServerProcessDrawerProps {
   embedded?: boolean;
 }
 
-const PROCESS_TABLE_WIDTH = 1024;
+const PROCESS_TABLE_WIDTH = 830;
 
 const PROCESS_REFRESH_INTERVAL_MS = 5_000;
 
@@ -60,14 +59,6 @@ const PROCESS_STATE_LABELS: Record<string, string> = {
 
 function processStateLabel(state: string) {
   return PROCESS_STATE_LABELS[state.charAt(0)] ?? state;
-}
-
-function processStateColor(state: string) {
-  const primaryState = state.charAt(0);
-  if (primaryState === "R") return "green";
-  if (primaryState === "D" || primaryState === "Z") return "red";
-  if (primaryState === "T") return "orange";
-  return "gray";
 }
 
 function ServerProcessDrawer({
@@ -201,74 +192,71 @@ function ServerProcessDrawer({
   const columns = useMemo<TableColumnProps<ServerProcess>[]>(
     () => [
       {
-        dataIndex: "name",
-        title: "进程",
-        width: 250,
-        render: (_, process) => (
-          <div className="server-process-name">
-            <Typography.Text bold ellipsis={{ showTooltip: true }}>
-              {process.name}
-            </Typography.Text>
-            <Typography.Text ellipsis={{ showTooltip: true }} type="secondary">
-              {process.command}
-            </Typography.Text>
-          </div>
-        ),
-      },
-      {
+        align: "right",
         dataIndex: "pid",
         sorter: (left, right) => left.pid - right.pid,
         title: "PID",
-        width: 82,
+        width: 74,
       },
       {
         dataIndex: "user",
         sorter: (left, right) => left.user.localeCompare(right.user),
         title: "用户",
-        width: 110,
+        width: 100,
+        render: (user: string) => <span className="server-process-cell" title={user}>{user}</span>,
       },
       {
-        dataIndex: "state",
-        title: "状态",
-        width: 96,
-        render: (state: string) => (
-          <Tag color={processStateColor(state)}>{processStateLabel(state)}</Tag>
+        align: "right",
+        dataIndex: "residentMemoryBytes",
+        sorter: (left, right) => left.residentMemoryBytes - right.residentMemoryBytes,
+        title: "内存",
+        width: 94,
+        render: (bytes: number, process) => (
+          <span title={`占用 ${formatProcessPercent(process.memoryUsagePercent)}`}>
+            {formatMonitorBytes(bytes)}
+          </span>
         ),
       },
       {
+        align: "right",
         dataIndex: "cpuUsagePercent",
         defaultSortOrder: "descend",
         sorter: (left, right) => left.cpuUsagePercent - right.cpuUsagePercent,
-        title: "CPU",
-        width: 88,
+        title: "CPU %",
+        width: 86,
         render: (value: number) => formatProcessPercent(value),
       },
       {
-        dataIndex: "memoryUsagePercent",
-        sorter: (left, right) =>
-          left.memoryUsagePercent - right.memoryUsagePercent,
-        title: "内存",
-        width: 88,
-        render: (value: number) => formatProcessPercent(value),
+        dataIndex: "name",
+        title: "名称",
+        width: 126,
+        render: (name: string, process) => (
+          <span
+            className="server-process-cell"
+            title={`${name} · ${processStateLabel(process.state)} · 已运行 ${formatProcessElapsed(process.elapsedSeconds)}`}
+          >
+            {name}
+          </span>
+        ),
       },
       {
-        dataIndex: "residentMemoryBytes",
-        sorter: (left, right) =>
-          left.residentMemoryBytes - right.residentMemoryBytes,
-        title: "RSS",
-        width: 94,
-        render: (value: number) => formatMonitorBytes(value),
+        dataIndex: "command",
+        title: "命令行",
+        width: "24%",
+        render: (command: string) => (
+          <span className="server-process-cell" title={command}>{command || "—"}</span>
+        ),
       },
       {
-        dataIndex: "elapsedSeconds",
-        sorter: (left, right) => left.elapsedSeconds - right.elapsedSeconds,
-        title: "运行时间",
-        width: 120,
-        render: (value: number) => formatProcessElapsed(value),
+        title: "路径",
+        render: (_, process) => {
+          const path = process.command?.trimStart().match(/^\/\S+/)?.[0];
+          return <span className="server-process-cell" title={path}>{path ?? "—"}</span>;
+        },
       },
       {
         title: "操作",
-        width: 96,
+        width: 76,
         render: (_, process) => (
           <Space size="mini">
             <Tooltip content="结束进程（TERM）">
@@ -319,16 +307,20 @@ function ServerProcessDrawer({
       <div className="server-process-toolbar">
         <Input.Search
           allowClear
+          aria-label="筛选进程"
+          className="server-process-query"
           onChange={setQuery}
           placeholder="搜索名称、PID、用户或命令"
+          size="small"
           value={query}
         />
-        <Space size="medium">
+        <Space className="server-process-toolbar-actions" size="small">
           <Typography.Text type="secondary">
             {filteredProcesses.length} / {result?.processes.length ?? 0}
           </Typography.Text>
           <span className="server-process-auto-refresh">
             <Switch
+              aria-label="自动刷新进程"
               checked={autoRefresh}
               onChange={setAutoRefresh}
               size="small"
@@ -344,6 +336,7 @@ function ServerProcessDrawer({
               icon={<IconRefresh />}
               loading={loading}
               onClick={() => void loadProcesses()}
+              size="small"
             />
           </Tooltip>
           <Button
@@ -352,6 +345,7 @@ function ServerProcessDrawer({
             onClick={() =>
               onSendToAi(createProcessesAiHandoff(selectedProcesses))
             }
+            size="small"
           >
             交给 AI
           </Button>
@@ -381,14 +375,14 @@ function ServerProcessDrawer({
         rowKey="id"
         rowSelection={{
           checkAll: true,
-          columnWidth: 42,
+          columnWidth: 36,
           onChange: (keys) =>
             setSelectedProcessIds(keys.map((key) => String(key))),
           selectedRowKeys: selectedProcessIds,
           type: "checkbox",
         }}
         scroll={{ x: PROCESS_TABLE_WIDTH, y: "calc(100vh - 180px)" }}
-        size="small"
+        size="mini"
         tableLayoutFixed
       />
     </WorkspaceToolSurface>

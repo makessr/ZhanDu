@@ -1,4 +1,4 @@
-import type { QuickCommandRecord } from "./models";
+import type { QuickCommandFormValues, QuickCommandRecord } from "./models";
 
 export interface QuickCommandParameter {
   name: string;
@@ -49,4 +49,17 @@ export function filterQuickCommands(
       (value) => value?.toLocaleLowerCase().includes(normalizedQuery),
     ),
   );
+}
+
+export function quickCommandFromForm(
+  values: QuickCommandFormValues,
+  id = `command-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+): QuickCommandRecord {
+  return {
+    id,
+    name: values.name.trim(),
+    command: values.command.trim(),
+    group: values.group?.trim() || undefined,
+    description: values.description?.trim() || undefined,
+  };
 }

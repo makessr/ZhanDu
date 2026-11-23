@@ -367,10 +367,6 @@ function ServerMonitorPanel({
 
   const openNetworkDiagnostics = () => {
     if (!session || !isTerminalSessionOperational(session.status)) return;
-    if (onSelectTool) {
-      onSelectTool("network");
-      return;
-    }
     setDiagnosticsVisible(true);
     if (!pingResult && !pingLoading) void runPing();
     if (!connectionsResult && !connectionsLoading) {
@@ -615,45 +611,62 @@ function ServerMonitorPanel({
         width={720}
       >
         <section className="network-diagnostics-section">
-          <div className="network-diagnostics-section-heading">
-            <span>
-              <Typography.Text bold>网络连接</Typography.Text>
-              {connectionsResult && (
-                <Typography.Text type="secondary">
-                  {connectionsResult.connections.length} 条
-                </Typography.Text>
-              )}
-            </span>
-            <Tooltip content="刷新网络连接">
-              <Button
-                aria-label="刷新网络连接"
-                icon={<IconRefresh />}
-                loading={connectionsLoading}
-                onClick={() => void loadNetworkConnections()}
-                size="mini"
-                type="text"
+          <div className="workspace-network-tools">
+            <div className="workspace-network-search">
+              <Input
+                allowClear
+                aria-label="筛选网络连接"
+                className="workspace-network-query"
+                onChange={setNetworkQuery}
+                placeholder="按进程、端口或 IP 筛选"
+                size="small"
+                value={networkQuery}
               />
-            </Tooltip>
-          </div>
-          {onSelectTool && (
-            <div className="workspace-network-tools">
-              <Input allowClear aria-label="筛选网络连接" onChange={setNetworkQuery} placeholder="按进程、端口或 IP 筛选" size="small" value={networkQuery} />
-              <Button onClick={onOpenSettings} size="mini">IP 归属地设置</Button>
-              <Button disabled={!connectionsResult && !pingResult && !traceResult} onClick={sendNetworkToAi} size="mini">交给 AI</Button>
+              {connectionsResult && (
+                <span aria-live="polite" className="workspace-network-count">
+                  {filteredConnections.length === connectionsResult.connections.length
+                    ? filteredConnections.length
+                    : `${filteredConnections.length} / ${connectionsResult.connections.length}`} 条
+                </span>
+              )}
             </div>
-          )}
-          <Radio.Group
-            mode="fill"
-            onChange={setConnectionFilter}
-            options={[
-              { label: "全部", value: "all" },
-              { label: "监听", value: "listening" },
-              { label: "已连接", value: "connected" },
-            ]}
-            size="small"
-            type="button"
-            value={connectionFilter}
-          />
+            <div className="workspace-network-actions">
+              <Radio.Group
+                mode="fill"
+                onChange={setConnectionFilter}
+                options={[
+                  { label: "全部", value: "all" },
+                  { label: "监听", value: "listening" },
+                  { label: "已连接", value: "connected" },
+                ]}
+                size="small"
+                type="button"
+                value={connectionFilter}
+              />
+              {onSelectTool && (
+                <>
+                  <Button onClick={onOpenSettings} size="mini">IP 归属地设置</Button>
+                  <Button
+                    disabled={pingLoading || traceLoading || connectionsLoading || (!connectionsResult && !pingResult && !traceResult)}
+                    onClick={sendNetworkToAi}
+                    size="mini"
+                  >
+                    交给 AI
+                  </Button>
+                </>
+              )}
+              <Tooltip content="刷新网络连接">
+                <Button
+                  aria-label="刷新网络连接"
+                  icon={<IconRefresh />}
+                  loading={connectionsLoading}
+                  onClick={() => void loadNetworkConnections()}
+                  size="mini"
+                  type="text"
+                />
+              </Tooltip>
+            </div>
+          </div>
           {connectionsError && (
             <Alert content={connectionsError} showIcon type="error" />
           )}
@@ -818,41 +831,43 @@ function ServerMonitorPanel({
 
   return (
     <section className={`server-monitor${onSelectTool ? " monitor-compact" : ""}${connected ? "" : " is-unavailable"}`}>
-      <div className="server-monitor-heading">
-        <Typography.Text bold>服务器监控</Typography.Text>
-        <Space size="mini">
-          <Tooltip content="进程管理">
-            <Button
-              aria-label="打开进程管理"
-              disabled={!connected}
-              icon={<IconNav />}
-              onClick={() => onSelectTool ? onSelectTool("processes") : setProcessDrawerVisible(true)}
-              size="mini"
-              type="text"
-            />
-          </Tooltip>
-          <Tooltip content="网络诊断">
-            <Button
-              aria-label="打开网络诊断"
-              disabled={!connected}
-              icon={<IconCloudDownload />}
-              onClick={openNetworkDiagnostics}
-              size="mini"
-              type="text"
-            />
-          </Tooltip>
-          <Tooltip content="端口转发">
-            <Button
-              aria-label="打开端口转发"
-              disabled={!session}
-              icon={<IconReply />}
-              onClick={() => onSelectTool ? onSelectTool("tunnels") : setPortForwardDrawerVisible(true)}
-              size="mini"
-              type="text"
-            />
-          </Tooltip>
-        </Space>
-      </div>
+      {!onSelectTool && (
+        <div className="server-monitor-heading">
+          <Typography.Text bold>服务器监控</Typography.Text>
+          <Space size="mini">
+            <Tooltip content="进程管理">
+              <Button
+                aria-label="打开进程管理"
+                disabled={!connected}
+                icon={<IconNav />}
+                onClick={() => setProcessDrawerVisible(true)}
+                size="mini"
+                type="text"
+              />
+            </Tooltip>
+            <Tooltip content="网络诊断">
+              <Button
+                aria-label="打开网络诊断"
+                disabled={!connected}
+                icon={<IconCloudDownload />}
+                onClick={openNetworkDiagnostics}
+                size="mini"
+                type="text"
+              />
+            </Tooltip>
+            <Tooltip content="端口转发">
+              <Button
+                aria-label="打开端口转发"
+                disabled={!session}
+                icon={<IconReply />}
+                onClick={() => setPortForwardDrawerVisible(true)}
+                size="mini"
+                type="text"
+              />
+            </Tooltip>
+          </Space>
+        </div>
+      )}
       {onSelectTool && session && (
         <div className="monitor-address">
           <span title={session.host.address}>IP {session.host.address}</span>

@@ -8,11 +8,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { Message, Typography } from "@arco-design/web-react";
+import { Button, Message, Typography } from "@arco-design/web-react";
 import { isTauri } from "@tauri-apps/api/core";
 import {
   IconClose,
   IconCloseCircle,
+  IconLeft,
   IconPlus,
   IconPoweroff,
   IconRefresh,
@@ -536,17 +537,18 @@ function App() {
       window.removeEventListener("keydown", handleQuickCommandShortcut, true);
   }, [activeSessionId, closeAiSidebar, openWorkspaceTool]);
 
-  async function sendQuickCommand(command: string, execute: boolean) {
-    if (!activeSession || !isTerminalSessionOperational(activeSession.status)) {
-      throw new Error("当前终端未连接");
+  async function sendQuickCommand(command: string, execute: boolean, sessionId?: string) {
+    const target = sessionId ? sessions.find((session) => session.id === sessionId) : activeSession;
+    if (!target || !isTerminalSessionOperational(target.status)) {
+      throw new Error("目标会话未连接");
     }
     const input = execute ? `${command}\r` : command;
     await invoke("ssh_write", {
-      sessionId: activeSession.id,
+      sessionId: target.id,
       data: Array.from(new TextEncoder().encode(input)),
     });
-    setTerminalFocusRequest((current) => current + 1);
-    Message.success(execute ? "命令已发送" : "命令已填入终端");
+    if (target.id === activeSessionId) setTerminalFocusRequest((current) => current + 1);
+    Message.success(execute ? `命令已发送到 ${target.host.name}` : `命令已填入 ${target.host.name} 的终端`);
   }
 
   function handleAiAgentActionExecuted(
@@ -694,9 +696,6 @@ function App() {
           </Suspense>
         ) : (
           <section className="server-monitor is-unavailable">
-            <div className="server-monitor-heading">
-              <Typography.Text bold>服务器监控</Typography.Text>
-            </div>
             <Typography.Text type="secondary">打开主机会话后查看监控。</Typography.Text>
           </section>
         )}
@@ -812,22 +811,39 @@ function App() {
       />
       <div className="workspace-tool-slot" hidden={!["tunnels", "processes", "network"].includes(workspaceTool)} ref={setWorkspaceToolTarget} />
       {workspaceTool === "commands" && !sftpCollapsed && (
-        editingQuickCommands ? (
-          <div className="workspace-tool-surface">
-            <button className="workspace-tool-back" onClick={() => setEditingQuickCommands(false)} type="button">返回快捷命令</button>
-            <Suspense fallback={null}><QuickCommandSettings /></Suspense>
-          </div>
-        ) : (
+        <>
+          {editingQuickCommands && (
+            <div className="workspace-tool-surface">
+              <Button
+                className="workspace-tool-back"
+                icon={<IconLeft />}
+                onClick={() => setEditingQuickCommands(false)}
+                size="small"
+              >
+                返回快捷命令
+              </Button>
+              <Suspense fallback={null}>
+                <QuickCommandSettings />
+              </Suspense>
+            </div>
+          )}
           <QuickCommandDrawer
             canSend={Boolean(activeSession && isTerminalSessionOperational(activeSession.status))}
             commands={quickCommands}
             embedded
             key={activeSessionId}
+            onCommandsChange={setQuickCommands}
             onEdit={() => setEditingQuickCommands(true)}
             onSend={sendQuickCommand}
-            visible
+            targets={sessions
+              .filter((session) => session.id !== activeSessionId && isTerminalSessionOperational(session.status))
+              .map((session) => ({
+                label: `${session.host.name} (${session.host.address})`,
+                value: session.id,
+              }))}
+            visible={!editingQuickCommands}
           />
-        )
+        </>
       )}
     </WorkspaceToolPanel>
   );
