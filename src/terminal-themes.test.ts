@@ -1,6 +1,13 @@
 import { expect, test } from "bun:test";
 import { sanitizeAppSettings } from "./app-settings";
-import { resolveTerminalTheme, TERMINAL_THEMES } from "./terminal-themes";
+import {
+  ANSI_COLOR_KEYS,
+  BASE24_TERMINAL_THEMES,
+  customTerminalThemeId,
+  parseGhosttyTheme,
+  resolveTerminalTheme,
+  TERMINAL_THEMES,
+} from "./terminal-themes";
 
 test("follows appearance by default and preserves an explicit palette", () => {
   const defaults = sanitizeAppSettings({});
@@ -31,4 +38,43 @@ test("light theme keeps bright ANSI foregrounds readable on its background", () 
         .toBeGreaterThanOrEqual(4.5);
     }
   }
+});
+
+test("imports Ghostty colors without applying unrelated directives", () => {
+  const imported = parseGhosttyTheme("星夜.conf", [
+    "# sample theme",
+    "background = #102030",
+    "foreground = EEEEEE",
+    "palette = 4 = #2299FF",
+    "palette = 15=#FFFFFF",
+    "selection-foreground = #000000",
+    "config-file = /other/config",
+    "cursor-color = url(evil)",
+  ].join("\r\n"));
+  expect(imported.name).toBe("星夜");
+  expect(imported.theme).toMatchObject({
+    background: "#102030", foreground: "#eeeeee", blue: "#2299ff",
+    brightWhite: "#ffffff", cursor: "#eeeeee", selectionForeground: "#000000",
+  });
+  expect(imported.theme).not.toHaveProperty("config-file");
+  expect(() => parseGhosttyTheme("bad", "command = x\nbackground = url(x)")).toThrow();
+
+  const id = customTerminalThemeId(imported.name);
+  const stored = sanitizeAppSettings(JSON.parse(JSON.stringify({
+    terminalColorScheme: id, terminalCustomThemes: [imported],
+  })));
+  expect(resolveTerminalTheme(stored.terminalColorScheme, "light", stored.terminalCustomThemes).theme)
+    .toEqual(imported.theme);
+  expect(sanitizeAppSettings({ terminalColorScheme: id }).terminalColorScheme).toBe("appearance");
+});
+
+test("bundled palettes contain all sixteen ANSI colors", () => {
+  expect(BASE24_TERMINAL_THEMES.size).toBe(253);
+  for (const { theme } of BASE24_TERMINAL_THEMES.values()) {
+    for (const key of ANSI_COLOR_KEYS) {
+      expect(theme[key]).toMatch(/^#[\da-f]{6}$/i);
+    }
+  }
+  expect(sanitizeAppSettings({ terminalColorScheme: "base24:3024-day" }).terminalColorScheme)
+    .toBe("base24:3024-day");
 });

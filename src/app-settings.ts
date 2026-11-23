@@ -1,5 +1,10 @@
 import { inferAiProvider, type AiProvider } from "./ai-providers";
-import { isTerminalColorScheme, type TerminalColorScheme } from "./terminal-themes";
+import {
+  isTerminalColorScheme,
+  sanitizeCustomTerminalThemes,
+  type StoredTerminalTheme,
+  type TerminalColorScheme,
+} from "./terminal-themes";
 import {
   ALL_AI_READ_ONLY_TOOLS,
   sanitizeAiReadOnlyTools,
@@ -23,6 +28,7 @@ export type GithubMirrorRoute =
 export interface AppSettings {
   appearanceMode: AppearanceMode;
   terminalColorScheme: TerminalColorScheme;
+  terminalCustomThemes: StoredTerminalTheme[];
   terminalFontFamily: TerminalFontFamily;
   terminalFontSize: number;
   terminalLineHeight: number;
@@ -63,6 +69,7 @@ export interface AppSettings {
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   appearanceMode: "light",
   terminalColorScheme: "appearance",
+  terminalCustomThemes: [],
   terminalFontFamily: "system",
   terminalFontSize: 13,
   terminalLineHeight: 1.2,
@@ -171,6 +178,7 @@ function githubMirrorRouteValue(value: unknown): GithubMirrorRoute {
 
 export function sanitizeAppSettings(value: unknown): AppSettings {
   const settings = isRecord(value) ? value : {};
+  const terminalCustomThemes = sanitizeCustomTerminalThemes(settings.terminalCustomThemes);
   const aiBaseUrl =
     stringValue(settings.aiBaseUrl) || DEFAULT_APP_SETTINGS.aiBaseUrl;
   return {
@@ -179,9 +187,10 @@ export function sanitizeAppSettings(value: unknown): AppSettings {
         ? settings.appearanceMode
         : DEFAULT_APP_SETTINGS.appearanceMode,
     terminalColorScheme:
-      isTerminalColorScheme(settings.terminalColorScheme)
+      isTerminalColorScheme(settings.terminalColorScheme, terminalCustomThemes)
         ? settings.terminalColorScheme
         : DEFAULT_APP_SETTINGS.terminalColorScheme,
+    terminalCustomThemes,
     terminalFontFamily:
       settings.terminalFontFamily === "menlo" ||
       settings.terminalFontFamily === "consolas"

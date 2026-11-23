@@ -183,6 +183,7 @@ function TerminalView({
   const { theme: terminalTheme } = resolveTerminalTheme(
     settings.terminalColorScheme,
     appearance,
+    settings.terminalCustomThemes,
   );
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);

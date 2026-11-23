@@ -1,5 +1,5 @@
 {
-  "version": 45,
+  "version": 46,
   "commands": {
     "protocol_version": true,
     "host_sync_account": true,
@@ -22,6 +22,7 @@
     "application_update_close": true,
     "application_update_test_route": true,
     "read_config_file": true,
+    "read_ghostty_themes": true,
     "ssh_config_include_files": true,
     "write_config_file": true,
     "cloud_backup_store_s3_credentials": true,

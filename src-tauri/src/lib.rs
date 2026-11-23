@@ -110,6 +110,7 @@ pub fn run() {
             #[cfg(desktop)]
             updater::application_update_test_route,
             config_files::read_config_file,
+            config_files::read_ghostty_themes,
             config_files::ssh_config_include_files,
             config_files::write_config_file,
             cloud_backup::cloud_backup_store_s3_credentials,

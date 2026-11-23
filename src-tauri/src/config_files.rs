@@ -1,11 +1,107 @@
 use std::{
     fs,
+    io::Read,
     path::{Path, PathBuf},
 };
 
 use crate::protocol::{CommandError, CommandResult};
 
 const MAX_CONFIG_FILE_BYTES: u64 = 5 * 1024 * 1024;
+const MAX_THEME_FILE_BYTES: u64 = 64 * 1024;
+
+#[derive(serde::Serialize)]
+pub(crate) struct GhosttyThemeFile {
+    name: String,
+    contents: String,
+}
+
+#[tauri::command]
+pub(crate) async fn read_ghostty_themes(
+    window: tauri::WebviewWindow,
+) -> CommandResult<Vec<GhosttyThemeFile>> {
+    if window.label() != "settings" {
+        return Err(CommandError::from_message(
+            "read_ghostty_themes",
+            "仅设置窗口可读取终端主题",
+        ));
+    }
+    tauri::async_runtime::spawn_blocking(|| collect_ghostty_themes(ghostty_theme_directories()))
+        .await
+        .map_err(|error| CommandError::from_message("read_ghostty_themes", error.to_string()))
+}
+
+fn ghostty_theme_directories() -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    for variable in [
+        "XDG_CONFIG_HOME",
+        if cfg!(windows) {
+            "LOCALAPPDATA"
+        } else {
+            "HOME"
+        },
+    ] {
+        if let Some(root) = std::env::var_os(variable).filter(|root| !root.is_empty()) {
+            let root = PathBuf::from(root);
+            if root.is_absolute() {
+                roots.push(if variable == "HOME" {
+                    root.join(".config")
+                } else {
+                    root
+                });
+            }
+        }
+    }
+    if cfg!(windows) {
+        if let Some(home) = std::env::var_os("USERPROFILE")
+            .map(PathBuf::from)
+            .filter(|path| path.is_absolute())
+        {
+            roots.push(home.join(".config"));
+        }
+    }
+    roots
+        .into_iter()
+        .map(|root| root.join("ghostty").join("themes"))
+        .collect()
+}
+
+fn collect_ghostty_themes(roots: Vec<PathBuf>) -> Vec<GhosttyThemeFile> {
+    let mut files = std::collections::BTreeMap::new();
+    for root in roots {
+        let Ok(entries) = fs::read_dir(root) else {
+            continue;
+        };
+        for entry in entries.take(512).flatten() {
+            if !entry.file_type().is_ok_and(|kind| kind.is_file()) {
+                continue;
+            }
+            let Ok(name) = entry.file_name().into_string() else {
+                continue;
+            };
+            if name.starts_with('.') || files.contains_key(&name) {
+                continue;
+            }
+            let Ok(file) = fs::File::open(entry.path()) else {
+                continue;
+            };
+            if file
+                .metadata()
+                .is_ok_and(|metadata| metadata.is_file() && metadata.len() <= MAX_THEME_FILE_BYTES)
+            {
+                let mut contents = String::new();
+                if file
+                    .take(MAX_THEME_FILE_BYTES + 1)
+                    .read_to_string(&mut contents)
+                    .is_ok()
+                    && contents.len() as u64 <= MAX_THEME_FILE_BYTES
+                {
+                    files.insert(name.clone(), GhosttyThemeFile { name, contents });
+                }
+            }
+        }
+    }
+    files.into_values().collect()
+}
 
 #[tauri::command]
 pub fn read_config_file(path: String) -> CommandResult<String> {
@@ -98,7 +194,8 @@ mod tests {
     use std::{fs, time::SystemTime};
 
     use super::{
-        read_config_file, resolve_ssh_config_include, write_config_file, MAX_CONFIG_FILE_BYTES,
+        collect_ghostty_themes, read_config_file, resolve_ssh_config_include, write_config_file,
+        MAX_CONFIG_FILE_BYTES, MAX_THEME_FILE_BYTES,
     };
 
     fn temporary_directory(name: &str) -> std::path::PathBuf {
@@ -134,6 +231,39 @@ mod tests {
             })
             .collect();
         assert_eq!(names, ["10.conf", "20.conf"]);
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn ghostty_theme_scan_uses_directory_precedence_and_skips_non_theme_candidates() {
+        let directory = temporary_directory("ghostty-themes");
+        let primary = directory.join("primary");
+        let secondary = directory.join("secondary");
+        fs::create_dir_all(primary.join("nested")).unwrap();
+        fs::create_dir_all(&secondary).unwrap();
+        fs::write(primary.join("Custom"), "background = #101010").unwrap();
+        fs::write(secondary.join("Custom"), "background = #202020").unwrap();
+        fs::write(secondary.join("Another"), "palette = 2=#40ff40").unwrap();
+        fs::write(primary.join(".hidden"), "background = #ffffff").unwrap();
+        fs::write(primary.join("binary"), [0xff]).unwrap();
+        fs::write(
+            primary.join("large"),
+            vec![b'a'; MAX_THEME_FILE_BYTES as usize + 1],
+        )
+        .unwrap();
+
+        let files = collect_ghostty_themes(vec![primary, secondary]);
+        let entries: Vec<_> = files
+            .iter()
+            .map(|file| (file.name.as_str(), file.contents.as_str()))
+            .collect();
+        assert_eq!(
+            entries,
+            [
+                ("Another", "palette = 2=#40ff40"),
+                ("Custom", "background = #101010")
+            ]
+        );
         fs::remove_dir_all(directory).unwrap();
     }
 

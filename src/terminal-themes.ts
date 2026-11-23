@@ -1,5 +1,6 @@
 import type { ITheme } from "@xterm/xterm";
 import type { ResolvedAppearance } from "./appearance";
+import base24 from "./terminal-base24.json";
 
 export interface TerminalThemeDefinition {
   label: string;
@@ -145,20 +146,139 @@ export const TERMINAL_THEMES = {
   },
 } satisfies Record<string, TerminalThemeDefinition>;
 
-export type TerminalColorScheme = "appearance" | keyof typeof TERMINAL_THEMES;
+export const ANSI_COLOR_KEYS = [
+  "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
+  "brightBlack", "brightRed", "brightGreen", "brightYellow", "brightBlue",
+  "brightMagenta", "brightCyan", "brightWhite",
+] as const;
 
-export function isTerminalColorScheme(value: unknown): value is TerminalColorScheme {
+export type TerminalColorScheme =
+  | "appearance" | keyof typeof TERMINAL_THEMES | `base24:${string}` | `ghostty:${string}`;
+
+export interface StoredTerminalTheme {
+  name: string;
+  theme: TerminalThemeDefinition["theme"];
+}
+
+export const MAX_CUSTOM_TERMINAL_THEMES = 256;
+const HEX_COLOR = /^#?[0-9a-f]{6}$/i;
+const GHOSTTY_COLOR_KEYS = {
+  background: "background",
+  foreground: "foreground",
+  "cursor-color": "cursor",
+  "cursor-text": "cursorAccent",
+  "selection-background": "selectionBackground",
+  "selection-foreground": "selectionForeground",
+} as const;
+
+export function customTerminalThemeId(name: string): `ghostty:${string}` {
+  return `ghostty:${name}`;
+}
+
+function terminalColors(
+  background: string,
+  foreground: string,
+  palette: readonly string[],
+): TerminalThemeDefinition["theme"] {
+  return {
+    background,
+    foreground,
+    cursor: foreground,
+    cursorAccent: background,
+    ...Object.fromEntries(ANSI_COLOR_KEYS.map((key, index) => [key, palette[index]])),
+  };
+}
+
+export const BASE24_TERMINAL_THEMES = new Map(
+  Object.entries(base24).map(([slug, [label, author, background, foreground, selectionBackground, ...palette]]) => [
+    `base24:${slug}`,
+    {
+      label,
+      author,
+      swatch: background,
+      theme: { ...terminalColors(background, foreground, palette), selectionBackground },
+    },
+  ]),
+);
+
+export function parseGhosttyTheme(fileName: string, contents: string): StoredTerminalTheme {
+  if (contents.length > 64 * 1024) throw new Error("主题文件超过 64 KB");
+  const name = fileName.replace(/\.(?:ghostty|conf|txt)$/i, "").trim();
+  if (!name || name.length > 255 || /[\x00-\x1f\x7f]/.test(name)) {
+    throw new Error("主题文件名无效");
+  }
+  const colors: Partial<ITheme> = {};
+  for (const line of contents.split(/\r?\n/)) {
+    const equals = line.indexOf("=");
+    if (equals < 0) continue;
+    const key = line.slice(0, equals).trim();
+    const value = line.slice(equals + 1).trim();
+    if (key === "palette") {
+      const entry = /^(0|[1-9]\d*)\s*=\s*(#?[0-9a-f]{6})$/i.exec(value);
+      const ansiKey = entry && ANSI_COLOR_KEYS[Number(entry[1])];
+      if (ansiKey && entry) colors[ansiKey] = `#${entry[2].replace(/^#/, "")}`.toLowerCase();
+    } else if (Object.prototype.hasOwnProperty.call(GHOSTTY_COLOR_KEYS, key) && HEX_COLOR.test(value)) {
+      colors[GHOSTTY_COLOR_KEYS[key as keyof typeof GHOSTTY_COLOR_KEYS]] =
+        `#${value.replace(/^#/, "")}`.toLowerCase();
+    }
+  }
+  if (!Object.keys(colors).length) throw new Error("文件中没有可用的 Ghostty 十六进制颜色");
+  const fallback = TERMINAL_THEMES.fineshellDark.theme;
+  const background = colors.background ?? fallback.background;
+  const foreground = colors.foreground ?? fallback.foreground;
+  return {
+    name,
+    theme: {
+      ...fallback, ...colors, background, foreground,
+      cursor: colors.cursor ?? foreground,
+      cursorAccent: colors.cursorAccent ?? background,
+    },
+  };
+}
+
+export function sanitizeCustomTerminalThemes(input: unknown): StoredTerminalTheme[] {
+  if (!Array.isArray(input)) return [];
+  const result = new Map<string, StoredTerminalTheme>();
+  for (const item of input.slice(0, MAX_CUSTOM_TERMINAL_THEMES)) {
+    if (!item || typeof item.name !== "string" || !item.name.trim() ||
+        item.name.length > 255 || /[\x00-\x1f\x7f]/.test(item.name) ||
+        !item.theme || typeof item.theme !== "object") continue;
+    const theme = { ...TERMINAL_THEMES.fineshellDark.theme } as StoredTerminalTheme["theme"];
+    for (const key of [...ANSI_COLOR_KEYS, ...Object.values(GHOSTTY_COLOR_KEYS)]) {
+      const value: unknown = item.theme[key];
+      if (typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value)) theme[key] = value.toLowerCase();
+    }
+    result.set(item.name, { name: item.name, theme });
+  }
+  return [...result.values()];
+}
+
+export function isTerminalColorScheme(
+  value: unknown,
+  custom: readonly StoredTerminalTheme[] = [],
+): value is TerminalColorScheme {
   return (
     value === "appearance" ||
     (typeof value === "string" &&
-      Object.prototype.hasOwnProperty.call(TERMINAL_THEMES, value))
+      (Object.prototype.hasOwnProperty.call(TERMINAL_THEMES, value) ||
+        BASE24_TERMINAL_THEMES.has(value) ||
+        custom.some(({ name }) => customTerminalThemeId(name) === value)))
   );
 }
 
 export function resolveTerminalTheme(
   scheme: TerminalColorScheme,
   appearance: ResolvedAppearance,
+  custom: readonly StoredTerminalTheme[] = [],
 ): TerminalThemeDefinition {
-  if (scheme !== "appearance") return TERMINAL_THEMES[scheme];
+  if (scheme.startsWith("ghostty:")) {
+    const selected = custom.find(({ name }) => customTerminalThemeId(name) === scheme);
+    if (selected) return { label: selected.name, swatch: selected.theme.background, theme: selected.theme };
+  } else if (scheme.startsWith("base24:")) {
+    const selected = BASE24_TERMINAL_THEMES.get(scheme);
+    if (selected) return selected;
+  } else if (scheme !== "appearance") {
+    return TERMINAL_THEMES[scheme as keyof typeof TERMINAL_THEMES];
+  }
   return appearance === "dark" ? TERMINAL_THEMES.fineshellDark : TERMINAL_THEMES.graphiteLight;
 }
