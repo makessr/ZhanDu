@@ -1,9 +1,8 @@
 import { useMemo } from "react";
-import { VChartSimple, type AreaChartProps, type BarChartProps } from "@visactor/react-vchart";
+import { VChartSimple, type AreaChartProps } from "@visactor/react-vchart";
 import {
   VChart,
   registerAreaChart,
-  registerBarChart,
   registerCartesianBandAxis,
   registerCartesianLinearAxis,
   registerDiscreteLegend,
@@ -21,7 +20,6 @@ import {
 
 VChart.useRegisters([
   registerAreaChart,
-  registerBarChart,
   registerCartesianBandAxis,
   registerCartesianLinearAxis,
   registerDiscreteLegend,
@@ -29,16 +27,10 @@ VChart.useRegisters([
   registerTooltip,
 ]);
 
-type MonitorChartProps = ({ type: "area" } & AreaChartProps) | ({ type: "bar" } & BarChartProps);
+type MonitorChartProps = { type: "area" } & AreaChartProps;
 
 function MonitorChart({ className, height, ...spec }: MonitorChartProps) {
   return <VChartSimple vchartConstructor={VChart} className={className} style={{ height }} spec={spec} />;
-}
-
-interface UtilizationDatum {
-  metric: string;
-  value: number;
-  displayValue: string;
 }
 
 function enforcePercentTooltipContent(content?: ITooltipLineActual[]) {
@@ -70,45 +62,6 @@ function tooltipMetric(datum?: Record<string, unknown>) {
 
 function tooltipRate(datum?: Record<string, unknown>) {
   return formatMonitorRate(Number(datum?.value));
-}
-
-export function UtilizationChart({ utilizationData }: { utilizationData: UtilizationDatum[] }) {
-  const appearance = useResolvedAppearance();
-  const chartTextColor = appearance === "dark" ? "#c9cdd4" : "#4e5969";
-  return (
-    <MonitorChart
-      type="bar"
-      animation={false}
-      axes={[
-        {
-          orient: "left",
-          type: "band",
-          label: { style: { fill: chartTextColor, fontSize: 11 } },
-          tick: { visible: false },
-        },
-        {
-          max: 100,
-          min: 0,
-          orient: "bottom",
-          type: "linear",
-          label: { visible: false },
-          tick: { visible: false },
-        },
-      ]}
-      bar={{ style: { cornerRadius: 2 } }}
-      className="monitor-chart"
-      color={["#165dff", "#00b42a", "#f7ba1e"]}
-      data={[{ id: "utilization", values: utilizationData }]}
-      direction="horizontal"
-      height={105}
-      padding={{ bottom: 8, left: 0, right: 0, top: 4 }}
-      seriesField="metric"
-      theme={appearance}
-      tooltip={PERCENT_TOOLTIP}
-      xField="value"
-      yField="metric"
-    />
-  );
 }
 
 export function ResourceTrendChart({ monitorHistory }: { monitorHistory: ServerMonitorHistoryPoint[] }) {

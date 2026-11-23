@@ -209,6 +209,7 @@ export interface ServerMonitorSnapshot {
   memoryTotalBytes: number;
   memoryUsedBytes: number;
   memoryUsagePercent: number;
+  swap?: { totalBytes: number; usedBytes: number; usagePercent: number };
   diskTotalBytes: number;
   diskUsedBytes: number;
   diskUsagePercent: number;

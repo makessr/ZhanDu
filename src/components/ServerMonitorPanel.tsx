@@ -63,9 +63,6 @@ import { isTerminalSessionOperational } from "../terminal-utils";
 import { useResolvedAppearance } from "../hooks/useResolvedAppearance";
 
 const loadCharts = () => import("./ServerMonitorCharts");
-const UtilizationChart = lazy(() =>
-  loadCharts().then(({ UtilizationChart }) => ({ default: UtilizationChart })),
-);
 const ResourceTrendChart = lazy(() =>
   loadCharts().then(({ ResourceTrendChart }) => ({ default: ResourceTrendChart })),
 );
@@ -387,33 +384,19 @@ function ServerMonitorPanel({
     if (traceResult?.target !== nextTarget) setTraceResult(null);
   };
 
-  const utilizationData = useMemo(
-    () =>
-      monitorSnapshot
-        ? [
-            {
-              metric: "CPU",
-              value: Math.round(monitorSnapshot.cpuUsagePercent),
-              displayValue: formatMonitorPercent(monitorSnapshot.cpuUsagePercent),
-            },
-            {
-              metric: "内存",
-              value: Math.round(monitorSnapshot.memoryUsagePercent),
-              displayValue: formatMonitorPercent(monitorSnapshot.memoryUsagePercent),
-            },
-            {
-              metric: "磁盘",
-              value: Math.round(monitorSnapshot.diskUsagePercent),
-              displayValue: formatMonitorPercent(monitorSnapshot.diskUsagePercent),
-            },
-          ]
-        : [
-            { metric: "CPU", value: 0, displayValue: "-" },
-            { metric: "内存", value: 0, displayValue: "-" },
-            { metric: "磁盘", value: 0, displayValue: "-" },
-          ],
-    [monitorSnapshot],
-  );
+  const resourceMeters = [
+    { label: "CPU", usage: monitorSnapshot?.cpuUsagePercent },
+    {
+      label: "内存",
+      usage: monitorSnapshot?.memoryUsagePercent,
+      bytes: monitorSnapshot && [monitorSnapshot.memoryUsedBytes, monitorSnapshot.memoryTotalBytes],
+    },
+    {
+      label: "交换",
+      usage: monitorSnapshot?.swap?.usagePercent,
+      bytes: monitorSnapshot?.swap && [monitorSnapshot.swap.usedBytes, monitorSnapshot.swap.totalBytes],
+    },
+  ];
   const latestHistoryPoint = monitorHistory[monitorHistory.length - 1];
   const filteredConnections = useMemo(() => {
     const connections = connectionsResult?.connections ?? [];
@@ -579,19 +562,32 @@ function ServerMonitorPanel({
       <div className="monitor-chart-section">
         <div className="monitor-chart-heading">
           <Typography.Text bold>资源占用</Typography.Text>
-          <Typography.Text type="secondary">
-            {monitorSnapshot
-              ? `内存 ${formatMonitorBytes(monitorSnapshot.memoryUsedBytes)} / ${formatMonitorBytes(monitorSnapshot.memoryTotalBytes)}`
-              : "内存 - / -"}
-          </Typography.Text>
         </div>
-        <div className="monitor-current-values">
-          {utilizationData.map((item) => (
-            <span key={item.metric}>
-              <span>{item.metric}</span>
-              <strong>{item.displayValue}</strong>
-            </span>
-          ))}
+        <div className="monitor-resource-meters">
+          {resourceMeters.map(({ label, usage, bytes }) => {
+            const percent = typeof usage === "number" && Number.isFinite(usage)
+              ? Math.min(100, Math.max(0, usage))
+              : undefined;
+            const value = percent === undefined ? "—" : formatMonitorPercent(percent);
+            const amount = bytes?.map(formatMonitorBytes).join(" / ");
+            const text = amount ? `${value}  ${amount}` : value;
+            return (
+              <div className="monitor-resource-row" key={label}>
+                <span>{label}</span>
+                <div
+                  aria-label={label}
+                  aria-valuenow={percent}
+                  aria-valuetext={percent === undefined ? undefined : text}
+                  className="monitor-resource-track"
+                  role={percent === undefined ? undefined : "meter"}
+                  title={text}
+                >
+                  <span aria-hidden className="monitor-resource-fill" style={{ width: `${percent ?? 0}%` }} />
+                  <span className="monitor-resource-value">{text}</span>
+                </div>
+              </div>
+            );
+          })}
         </div>
         <Button
           aria-expanded={chartsVisible}
@@ -602,11 +598,6 @@ function ServerMonitorPanel({
         >
           {chartsVisible ? "隐藏图表" : "显示图表"}
         </Button>
-        {visible && windowVisible && connected && chartsVisible && (
-          <Suspense fallback={null}>
-            <UtilizationChart utilizationData={utilizationData} />
-          </Suspense>
-        )}
       </div>
 
       <div className="monitor-chart-section">

@@ -137,6 +137,8 @@ SSH 工作区可保存当前窗口的已保存主机会话及分屏布局，之�
 
 SFTP 文件名筛选可从文件管理工具栏的搜索按钮打开，只筛选当前目录，支持文件名和目录名的部分匹配。
 
+工作区深色外观使用中性灰，浅色监控区和 SFTP 文件列表共享工作区底色。终端留白跟随所选终端配色。服务器监控用紧凑横条显示 CPU、内存和交换空间，历史趋势仍可按需展开。
+
 在「设置 → 终端 → 终端主题库」可以搜索主题名称或作者，并预览前景、背景、光标和 16 色 ANSI 色板。主题库离线提供栈渡原有配色及 253 套 [Base24 主题](https://github.com/tinted-theming/schemes/tree/dc265204c014922f11e2cbea72b8fc40aba4f8ee/base24)，也支持跟随界面外观。保存后，已打开的会话会更新配色。[Base24 随附许可](public/licenses/tinted-schemes.txt)
 
 可选择「导入 Ghostty 主题」打开单个主题文件，或使用「刷新主题目录」重新读取本地主题。支持 Ghostty 的十六进制前景、背景、光标、选区和 ANSI 0–15 色。自动扫描 `$XDG_CONFIG_HOME/ghostty/themes`、`~/.config/ghostty/themes` 和 Windows 的 `%LOCALAPPDATA%\ghostty\themes`。选中的 Ghostty 主题会随设置保存为颜色副本，原文件移动后仍可使用。同名文件可重新导入以更新副本。

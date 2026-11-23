@@ -11,7 +11,7 @@ html {
 }
 
 html[data-appearance="dark"] {
-  background: #17171a;
+  background: #151517;
 }
 
 body {
@@ -34,15 +34,15 @@ body {
 }
 
 body[arco-theme="dark"] {
-  --workspace-page: #101a28;
-  --workspace-surface: #162234;
-  --workspace-chrome: #18273b;
-  --workspace-group: #1d2d44;
-  --workspace-border: #2a3e58;
-  --workspace-ink: #e4edf9;
-  --workspace-muted: #a9bad0;
-  --workspace-accent: #a3ccff;
-  --workspace-active: #283f60;
+  --workspace-page: #18181b;
+  --workspace-surface: #1c1c20;
+  --workspace-chrome: #202023;
+  --workspace-group: #26262a;
+  --workspace-border: #34343a;
+  --workspace-ink: #f0f0f2;
+  --workspace-muted: #b1b1b9;
+  --workspace-accent: #9fbcf0;
+  --workspace-active: #32323a;
   --fs-drop-overlay: rgb(35 35 36 / 94%);
   --fs-scrollbar-thumb: rgb(255 255 255 / 26%);
   --fs-scrollbar-thumb-hover: rgb(255 255 255 / 40%);
@@ -513,7 +513,7 @@ body.ai-sidebar-resizing::after {
   min-height: 0;
   padding: 16px;
   overflow: auto;
-  background: var(--workspace-surface);
+  background: var(--workspace-page);
 }
 
 .server-monitor {
@@ -656,6 +656,47 @@ body.ai-sidebar-resizing::after {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+.monitor-resource-meters {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 8px;
+  color: var(--workspace-ink);
+  font-size: 12px;
+}
+
+.monitor-resource-track {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--workspace-border);
+  background: var(--workspace-group);
+  font-variant-numeric: tabular-nums;
+}
+
+.monitor-resource-row {
+  display: contents;
+}
+
+.monitor-resource-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: rgb(232 136 72 / 30%);
+}
+
+body[arco-theme="dark"] .monitor-resource-fill {
+  background: rgb(207 91 44 / 42%);
+}
+
+.monitor-resource-value {
+  position: relative;
+  display: block;
+  padding-inline: 5px;
+  line-height: 16px;
+  white-space: nowrap;
 }
 
 .monitor-current-values > span {

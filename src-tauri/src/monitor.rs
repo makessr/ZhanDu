@@ -31,7 +31,7 @@ else
   printf '0'
 fi
 printf '\nmemory_kib='
-awk '/^MemTotal:/ { total=$2 } /^MemAvailable:/ { available=$2 } END { printf "%.0f,%.0f", total, available }' /proc/meminfo 2>/dev/null || printf '0,0'
+awk '/^MemTotal:/ { total=$2 } /^MemAvailable:/ { available=$2 } /^SwapTotal:/ { swap_total=$2; has_swap=1 } /^SwapFree:/ { swap_free=$2 } END { printf "%.0f,%.0f", total, available; if (has_swap) printf "\nswap_kib=%.0f,%.0f", swap_total, swap_free }' /proc/meminfo 2>/dev/null || printf '0,0'
 printf '\ndisk_kib='
 df -Pk / 2>/dev/null | awk 'NR==2 { printf "%s,%s,%s", $2, $3, $4 }'
 printf '\nload_average='
@@ -95,6 +95,14 @@ fi
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct SwapUsage {
+    total_bytes: u64,
+    used_bytes: u64,
+    usage_percent: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct ServerMonitorSnapshot {
     hostname: String,
     operating_system: String,
@@ -104,6 +112,8 @@ pub(crate) struct ServerMonitorSnapshot {
     memory_total_bytes: u64,
     memory_used_bytes: u64,
     memory_usage_percent: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    swap: Option<SwapUsage>,
     disk_total_bytes: u64,
     disk_used_bytes: u64,
     disk_usage_percent: f64,
@@ -551,6 +561,18 @@ pub(crate) fn parse_monitor_output(output: &str) -> Result<ServerMonitorSnapshot
         .saturating_mul(1024);
     let disk_total_bytes = disk_total_kib.saturating_mul(1024);
     let disk_used_bytes = disk_used_kib.saturating_mul(1024);
+    let swap = values
+        .get("swap_kib")
+        .and_then(|value| parse_pair(Some(value), "swap_kib").ok())
+        .map(|(total, free)| {
+            let total_bytes = total.saturating_mul(1024);
+            let used_bytes = total.saturating_sub(free).saturating_mul(1024);
+            SwapUsage {
+                total_bytes,
+                used_bytes,
+                usage_percent: percent(used_bytes, total_bytes),
+            }
+        });
 
     Ok(ServerMonitorSnapshot {
         hostname,
@@ -561,6 +583,7 @@ pub(crate) fn parse_monitor_output(output: &str) -> Result<ServerMonitorSnapshot
         memory_total_bytes,
         memory_used_bytes,
         memory_usage_percent: percent(memory_used_bytes, memory_total_bytes),
+        swap,
         disk_total_bytes,
         disk_used_bytes,
         disk_usage_percent: percent(disk_used_bytes, disk_total_bytes),
@@ -774,6 +797,7 @@ kernel=6.8.0-60-generic
 uptime_seconds=86461
 cpu_percent=37.50
 memory_kib=8192000,3072000
+swap_kib=2048,1024
 disk_kib=104857600,52428800,52428800
 load_average=0.42,0.35,0.30
 network_bytes=15728640,6291456
@@ -790,6 +814,11 @@ network_bytes=15728640,6291456
                 memory_total_bytes: 8_388_608_000,
                 memory_used_bytes: 5_242_880_000,
                 memory_usage_percent: 62.5,
+                swap: Some(SwapUsage {
+                    total_bytes: 2_097_152,
+                    used_bytes: 1_048_576,
+                    usage_percent: 50.0,
+                }),
                 disk_total_bytes: 107_374_182_400,
                 disk_used_bytes: 53_687_091_200,
                 disk_usage_percent: 50.0,

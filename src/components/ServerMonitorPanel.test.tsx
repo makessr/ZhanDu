@@ -5,7 +5,6 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { HostRecord, TerminalSession } from "../models";
 
 mock.module("./ServerMonitorCharts", () => ({
-  UtilizationChart: () => <div data-testid="bar-chart" />,
   ResourceTrendChart: () => <div data-testid="area-chart" />,
   NetworkTrendChart: () => <div data-testid="network-chart" />,
 }));
@@ -40,6 +39,10 @@ describe("ServerMonitorPanel", () => {
       hostname: "test-host",
       loadAverage: [0, 0, 0],
       cpuUsagePercent: 5,
+      memoryUsagePercent: 46,
+      memoryUsedBytes: 2 ** 30,
+      memoryTotalBytes: 2 ** 31,
+      swap: { usagePercent: 0, usedBytes: 1_048_576, totalBytes: 2 ** 32 },
     }));
     mockIPC((command) => {
       if (command === "ssh_monitor_snapshot") return collect();
@@ -64,21 +67,24 @@ describe("ServerMonitorPanel", () => {
       view.rerender(<ServerMonitorPanel {...props} visible />);
       expect(await screen.findByText("test-host")).not.toBeNull();
       expect(collect).toHaveBeenCalledTimes(1);
-      expect(screen.queryByTestId("bar-chart")).toBeNull();
+      expect(screen.getByRole("meter", { name: "CPU" }).getAttribute("aria-valuenow")).toBe("5");
+      expect(screen.getByRole("meter", { name: "内存" }).getAttribute("aria-valuetext")).toContain("1.0 GB / 2.0 GB");
+      expect(screen.getByRole("meter", { name: "交换" }).getAttribute("aria-valuenow")).toBe("0");
+      expect(screen.queryByTestId("area-chart")).toBeNull();
       fireEvent.click(screen.getByRole("button", { name: "显示图表" }));
-      expect(await screen.findByTestId("bar-chart")).not.toBeNull();
+      expect(await screen.findByTestId("area-chart")).not.toBeNull();
       await act(async () => {
         hidden = true;
         document.dispatchEvent(new Event("visibilitychange"));
       });
-      expect(screen.queryByTestId("bar-chart")).toBeNull();
+      expect(screen.queryByTestId("area-chart")).toBeNull();
       expect(collect).toHaveBeenCalledTimes(1);
       await act(async () => {
         hidden = false;
         document.dispatchEvent(new Event("visibilitychange"));
       });
       expect(collect).toHaveBeenCalledTimes(2);
-      expect(await screen.findByTestId("bar-chart")).not.toBeNull();
+      expect(await screen.findByTestId("area-chart")).not.toBeNull();
     } finally {
       view.unmount();
       if (originalHidden) Object.defineProperty(document, "hidden", originalHidden);
