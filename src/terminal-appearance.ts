@@ -7,13 +7,18 @@ const MAX_IMAGE_DATA_LENGTH = 512 * 1024;
 const IMAGE_DATA = /^data:image\/(?:webp|jpeg);base64,[A-Za-z0-9+/]+={0,2}$/;
 
 export function sanitizeTerminalBackgroundImage(value: unknown): string {
-  return typeof value === "string" && value.length <= MAX_IMAGE_DATA_LENGTH &&
-    IMAGE_DATA.test(value) ? value : "";
+  return typeof value === "string" &&
+    value.length <= MAX_IMAGE_DATA_LENGTH &&
+    IMAGE_DATA.test(value)
+    ? value
+    : "";
 }
 
 export function sanitizeTerminalFontNames(value: unknown): string {
   if (typeof value !== "string") return "";
-  return value.slice(0, 180).split(",")
+  return value
+    .slice(0, 180)
+    .split(",")
     .map((font) => font.trim().replace(/^["']|["']$/g, ""))
     .filter((font) => /^[\p{L}\p{M}\p{N} ._-]+$/u.test(font))
     .join(", ");

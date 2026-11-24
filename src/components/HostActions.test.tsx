@@ -38,15 +38,11 @@ describe("HostActions", () => {
     await user.click(screen.getByRole("button", { name: "连接" }));
     expect(onConnect).toHaveBeenCalledWith(HOST);
 
-    await user.click(
-      screen.getByRole("button", { name: "更多 生产服务器 操作" }),
-    );
+    await user.click(screen.getByRole("button", { name: "更多 生产服务器 操作" }));
     await user.click(await screen.findByText("编辑"));
     await waitFor(() => expect(onEdit).toHaveBeenCalledWith(HOST));
 
-    await user.click(
-      screen.getByRole("button", { name: "更多 生产服务器 操作" }),
-    );
+    await user.click(screen.getByRole("button", { name: "更多 生产服务器 操作" }));
     await user.click(await screen.findByText("复制"));
     await waitFor(() => expect(onCopy).toHaveBeenCalledWith(HOST));
   });
@@ -63,10 +59,7 @@ describe("HostActions", () => {
       />,
     );
 
-    expect(
-      (screen.getByRole("button", { name: "连接" }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(true);
+    expect((screen.getByRole("button", { name: "连接" }) as HTMLButtonElement).disabled).toBe(true);
     expect(
       (
         screen.getByRole("button", {

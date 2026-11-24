@@ -1,7 +1,4 @@
-import type {
-  AgentActionExecutionResult,
-  AgentActionTransition,
-} from "./tauri-protocol";
+import type { AgentActionExecutionResult, AgentActionTransition } from "./tauri-protocol";
 
 export interface AiActionTransitionDetail {
   error?: string;

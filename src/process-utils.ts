@@ -1,9 +1,6 @@
 import type { ServerProcess } from "./models";
 
-export function filterServerProcesses(
-  processes: ServerProcess[],
-  query: string,
-) {
+export function filterServerProcesses(processes: ServerProcess[], query: string) {
   const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
   if (!normalizedQuery) return processes;
   return processes.filter((process) =>
@@ -14,9 +11,7 @@ export function filterServerProcesses(
       process.state,
       process.name,
       process.command,
-    ].some((value) =>
-      String(value).toLocaleLowerCase("zh-CN").includes(normalizedQuery),
-    ),
+    ].some((value) => String(value).toLocaleLowerCase("zh-CN").includes(normalizedQuery)),
   );
 }
 

@@ -17,9 +17,9 @@ describe("ReleaseNotesMarkdown", () => {
     expect(screen.getAllByRole("listitem")).toHaveLength(2);
     expect(screen.getByText("旧功能").tagName).toBe("DEL");
     expect(screen.getByText("新功能").tagName).toBe("STRONG");
-    expect(
-      screen.getByRole("link", { name: "查看版本" }).getAttribute("href"),
-    ).toBe("https://example.com/release");
+    expect(screen.getByRole("link", { name: "查看版本" }).getAttribute("href")).toBe(
+      "https://example.com/release",
+    );
   });
 
   test("does not create raw HTML elements from release metadata", async () => {
@@ -28,9 +28,7 @@ describe("ReleaseNotesMarkdown", () => {
     );
 
     await waitFor(() => {
-      expect(
-        container.querySelector(".release-notes-markdown-fallback"),
-      ).toBeNull();
+      expect(container.querySelector(".release-notes-markdown-fallback")).toBeNull();
     });
     expect(container.textContent).toContain("更新内容");
     expect(document.querySelector("script")).toBeNull();

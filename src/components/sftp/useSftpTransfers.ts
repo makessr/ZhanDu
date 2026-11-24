@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Message } from "@arco-design/web-react";
 import { isTauri } from "@tauri-apps/api/core";
-import {
-  diagnosticInvoke as invoke,
-  recordDiagnostic,
-} from "../../diagnostics";
-import {
-  isActiveSftpTransfer,
-  summarizeSftpTransferBatch,
-} from "../../sftp-utils";
+import { diagnosticInvoke as invoke, recordDiagnostic } from "../../diagnostics";
+import { isActiveSftpTransfer, summarizeSftpTransferBatch } from "../../sftp-utils";
 import { commandErrorMessage, listenProtocolEvent } from "../../tauri-protocol";
 import type { RemoteArchiveFormat } from "../../sftp-utils";
 import type { TransferActivityRecord } from "../TransferActivityList";
@@ -60,9 +54,7 @@ export default function useSftpTransfers({
   onSessionFailure,
   uploadRetryAttempts,
 }: SftpTransfersOptions) {
-  const [transfers, setTransfers] = useState<
-    Record<string, TransferActivityRecord>
-  >({});
+  const [transfers, setTransfers] = useState<Record<string, TransferActivityRecord>>({});
   const transfersRef = useRef(transfers);
   const startingTransfersRef = useRef(new Set<string>());
   const retryingTransfersRef = useRef(new Set<string>());
@@ -111,8 +103,7 @@ export default function useSftpTransfers({
           transferredBytes >= previous.sampledBytes &&
           (elapsedSeconds >= 0.25 || payload.status !== "running");
         const currentSpeed = shouldSample
-          ? (transferredBytes - previous.sampledBytes) /
-            Math.max(elapsedSeconds, 0.001)
+          ? (transferredBytes - previous.sampledBytes) / Math.max(elapsedSeconds, 0.001)
           : previous.bytesPerSecond;
         const bytesPerSecond =
           payload.status === "paused" ||
@@ -132,9 +123,7 @@ export default function useSftpTransfers({
             transferredBytes,
             totalBytes: payload.totalBytes || previous.totalBytes,
             sampledAt: shouldSample ? now : previous.sampledAt,
-            sampledBytes: shouldSample
-              ? transferredBytes
-              : previous.sampledBytes,
+            sampledBytes: shouldSample ? transferredBytes : previous.sampledBytes,
             bytesPerSecond,
           },
         };
@@ -166,18 +155,13 @@ export default function useSftpTransfers({
                 overwrite: transfer.overwrite,
               });
             } else {
-              await invoke(
-                transfer.direction === "upload"
-                  ? "sftp_upload"
-                  : "sftp_download",
-                {
-                  sessionId: transfer.sessionId,
-                  transferId: transfer.transferId,
-                  localPath: transfer.localPath,
-                  remotePath: transfer.remotePath,
-                  overwrite: transfer.overwrite,
-                },
-              );
+              await invoke(transfer.direction === "upload" ? "sftp_upload" : "sftp_download", {
+                sessionId: transfer.sessionId,
+                transferId: transfer.transferId,
+                localPath: transfer.localPath,
+                remotePath: transfer.remotePath,
+                overwrite: transfer.overwrite,
+              });
             }
             if (!transfer.batchId) {
               Message.success(
@@ -214,14 +198,9 @@ export default function useSftpTransfers({
                   },
                 };
               });
-              await new Promise((resolve) =>
-                window.setTimeout(resolve, UPLOAD_RETRY_DELAY_MS),
-              );
+              await new Promise((resolve) => window.setTimeout(resolve, UPLOAD_RETRY_DELAY_MS));
               retryingTransfersRef.current.delete(transfer.transferId);
-              if (
-                transfersRef.current[transfer.transferId]?.status ===
-                "cancelled"
-              ) {
+              if (transfersRef.current[transfer.transferId]?.status === "cancelled") {
                 return;
               }
               setTransfers((current) => {
@@ -281,15 +260,12 @@ export default function useSftpTransfers({
     }
 
     for (const batchId of finalizedUploadBatchesRef.current) {
-      if (!batches.has(batchId))
-        finalizedUploadBatchesRef.current.delete(batchId);
+      if (!batches.has(batchId)) finalizedUploadBatchesRef.current.delete(batchId);
     }
 
     for (const [batchId, batch] of batches) {
       if (finalizedUploadBatchesRef.current.has(batchId)) continue;
-      const summary = summarizeSftpTransferBatch(
-        batch.map((transfer) => transfer.status),
-      );
+      const summary = summarizeSftpTransferBatch(batch.map((transfer) => transfer.status));
       if (!summary.finished) continue;
 
       finalizedUploadBatchesRef.current.add(batchId);
@@ -317,10 +293,7 @@ export default function useSftpTransfers({
         transfer.status === "paused" ||
         retryingTransfersRef.current.has(transfer.transferId)
       ) {
-        activeCounts.set(
-          transfer.sessionId,
-          (activeCounts.get(transfer.sessionId) ?? 0) + 1,
-        );
+        activeCounts.set(transfer.sessionId, (activeCounts.get(transfer.sessionId) ?? 0) + 1);
       }
     }
 
@@ -371,30 +344,27 @@ export default function useSftpTransfers({
     setTransfers((current) => ({ ...current, [transferId]: record }));
   }, []);
 
-  const queueArchiveDownload = useCallback(
-    (options: QueueSftpArchiveOptions) => {
-      const transferId = options.transferId ?? createTransferId();
-      const record: TransferActivityRecord = {
-        sessionId: options.sessionId,
-        transferId,
-        direction: "download",
-        fileName: options.archiveName,
-        transferredBytes: 0,
-        totalBytes: 0,
-        status: "queued",
-        localPath: options.localPath,
-        remotePath: options.sourcePaths[0] ?? "",
-        overwrite: true,
-        sampledAt: Date.now(),
-        sampledBytes: 0,
-        bytesPerSecond: 0,
-        archiveFormat: options.format,
-        archiveSourcePaths: [...options.sourcePaths],
-      };
-      setTransfers((current) => ({ ...current, [transferId]: record }));
-    },
-    [],
-  );
+  const queueArchiveDownload = useCallback((options: QueueSftpArchiveOptions) => {
+    const transferId = options.transferId ?? createTransferId();
+    const record: TransferActivityRecord = {
+      sessionId: options.sessionId,
+      transferId,
+      direction: "download",
+      fileName: options.archiveName,
+      transferredBytes: 0,
+      totalBytes: 0,
+      status: "queued",
+      localPath: options.localPath,
+      remotePath: options.sourcePaths[0] ?? "",
+      overwrite: true,
+      sampledAt: Date.now(),
+      sampledBytes: 0,
+      bytesPerSecond: 0,
+      archiveFormat: options.format,
+      archiveSourcePaths: [...options.sourcePaths],
+    };
+    setTransfers((current) => ({ ...current, [transferId]: record }));
+  }, []);
 
   const retry = useCallback(
     (transfer: TransferActivityRecord) => {
@@ -431,10 +401,7 @@ export default function useSftpTransfers({
       });
       setTransfers((current) => {
         const previous = current[transfer.transferId];
-        if (
-          !previous ||
-          (previous.status !== "running" && previous.status !== "waiting")
-        ) {
+        if (!previous || (previous.status !== "running" && previous.status !== "waiting")) {
           return current;
         }
         return {
@@ -526,16 +493,10 @@ export default function useSftpTransfers({
     setTransfers((current) =>
       Object.fromEntries(
         Object.entries(current).map(([transferId, transfer]) => {
-          if (
-            transfer.sessionId === sessionId &&
-            isActiveSftpTransfer(transfer.status)
-          ) {
+          if (transfer.sessionId === sessionId && isActiveSftpTransfer(transfer.status)) {
             retryingTransfersRef.current.delete(transferId);
             startingTransfersRef.current.delete(transferId);
-            return [
-              transferId,
-              { ...transfer, status: "cancelled", bytesPerSecond: 0 },
-            ];
+            return [transferId, { ...transfer, status: "cancelled", bytesPerSecond: 0 }];
           }
           return [transferId, transfer];
         }),
@@ -548,8 +509,7 @@ export default function useSftpTransfers({
       Object.fromEntries(
         Object.entries(current).filter(
           ([, transfer]) =>
-            transfer.sessionId !== sessionId ||
-            isActiveSftpTransfer(transfer.status),
+            transfer.sessionId !== sessionId || isActiveSftpTransfer(transfer.status),
         ),
       ),
     );

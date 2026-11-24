@@ -71,10 +71,7 @@ type ApplyResult = "applied" | "conflict" | "failed";
 type RollbackResult = "rolled-back" | "conflict" | "failed";
 
 function isFileOperationConflict(message: string) {
-  return (
-    message.includes("远程文件已被其他程序修改") ||
-    message.includes("远程目标已存在")
-  );
+  return message.includes("远程文件已被其他程序修改") || message.includes("远程目标已存在");
 }
 
 export function useAiFileChangeWorkflow({
@@ -87,8 +84,7 @@ export function useAiFileChangeWorkflow({
   updateFileOperationProposal,
 }: UseAiFileChangeWorkflowOptions) {
   const [applying, setApplying] = useState(false);
-  const [fileChangeReview, setFileChangeReview] =
-    useState<FileChangeReviewState | null>(null);
+  const [fileChangeReview, setFileChangeReview] = useState<FileChangeReviewState | null>(null);
 
   const reviewedMessage = fileChangeReview
     ? messages.find((message) => message.id === fileChangeReview.messageId)
@@ -111,30 +107,23 @@ export function useAiFileChangeWorkflow({
   const reviewedItem = fileChangeReviewItems.find(
     (item) => item.key === fileChangeReview?.activeKey,
   );
-  const reviewedFileEditProposal = reviewedItem?.kind === "edit"
-    ? reviewedItem.proposal
-    : undefined;
-  const reviewedFileEditContent = reviewedItem?.kind === "edit"
-    ? reviewedItem.content
-    : "";
+  const reviewedFileEditProposal =
+    reviewedItem?.kind === "edit" ? reviewedItem.proposal : undefined;
+  const reviewedFileEditContent = reviewedItem?.kind === "edit" ? reviewedItem.content : "";
   const reviewedFileEditError = reviewedFileEditProposal
     ? proposedFileContentError(
         reviewedFileEditContent,
         reviewedFileEditProposal.originalFile.content,
       )
     : null;
-  const reviewedFileOperationProposal = reviewedItem?.kind === "operation"
-    ? reviewedItem.proposal
-    : undefined;
+  const reviewedFileOperationProposal =
+    reviewedItem?.kind === "operation" ? reviewedItem.proposal : undefined;
 
   useEffect(() => {
     setFileChangeReview(null);
   }, [sessionId]);
 
-  const markReviewItemReviewed = (
-    messageId: string,
-    item: AiFileChangeReviewItem,
-  ) => {
+  const markReviewItemReviewed = (messageId: string, item: AiFileChangeReviewItem) => {
     if (item.kind === "edit") {
       updateFileEditProposal(messageId, item.proposal.id, (current) => ({
         ...current,
@@ -148,10 +137,7 @@ export function useAiFileChangeWorkflow({
     }
   };
 
-  const openFileEditReview = (
-    messageId: string,
-    proposal: AiFileEditProposal,
-  ) => {
+  const openFileEditReview = (messageId: string, proposal: AiFileEditProposal) => {
     updateFileEditProposal(messageId, proposal.id, (current) => ({
       ...current,
       reviewed: true,
@@ -163,10 +149,7 @@ export function useAiFileChangeWorkflow({
     });
   };
 
-  const openFileOperationReview = (
-    messageId: string,
-    proposal: AiFileOperationProposal,
-  ) => {
+  const openFileOperationReview = (messageId: string, proposal: AiFileOperationProposal) => {
     updateFileOperationProposal(messageId, proposal.id, (current) => ({
       ...current,
       reviewed: true,
@@ -203,17 +186,16 @@ export function useAiFileChangeWorkflow({
       return {
         ...current,
         activeKey: key,
-        editDrafts: item.kind === "edit" && !(item.proposal.id in current.editDrafts)
-          ? { ...current.editDrafts, [item.proposal.id]: item.proposal.content }
-          : current.editDrafts,
+        editDrafts:
+          item.kind === "edit" && !(item.proposal.id in current.editDrafts)
+            ? { ...current.editDrafts, [item.proposal.id]: item.proposal.content }
+            : current.editDrafts,
       };
     });
   };
 
   const advanceToNextUnreviewed = (activeKey: AiFileChangeReviewItem["key"]) => {
-    const activeIndex = fileChangeReviewItems.findIndex(
-      (item) => item.key === activeKey,
-    );
+    const activeIndex = fileChangeReviewItems.findIndex((item) => item.key === activeKey);
     const candidates = [
       ...fileChangeReviewItems.slice(activeIndex + 1),
       ...fileChangeReviewItems.slice(0, Math.max(activeIndex, 0)),
@@ -226,13 +208,18 @@ export function useAiFileChangeWorkflow({
       return;
     }
     markReviewItemReviewed(fileChangeReview.messageId, next);
-    setFileChangeReview((current) => current ? {
-      ...current,
-      activeKey: next.key,
-      editDrafts: next.kind === "edit" && !(next.proposal.id in current.editDrafts)
-        ? { ...current.editDrafts, [next.proposal.id]: next.proposal.content }
-        : current.editDrafts,
-    } : current);
+    setFileChangeReview((current) =>
+      current
+        ? {
+            ...current,
+            activeKey: next.key,
+            editDrafts:
+              next.kind === "edit" && !(next.proposal.id in current.editDrafts)
+                ? { ...current.editDrafts, [next.proposal.id]: next.proposal.content }
+                : current.editDrafts,
+          }
+        : current,
+    );
   };
 
   const applyFileEditProposal = async (
@@ -242,20 +229,11 @@ export function useAiFileChangeWorkflow({
     userConfirmed = true,
   ): Promise<ApplyResult> => {
     try {
-      const contentError = proposedFileContentError(
-        content,
-        proposal.originalFile.content,
-      );
+      const contentError = proposedFileContentError(content, proposal.originalFile.content);
       if (contentError) throw new Error(contentError);
       const execution = userConfirmed
         ? await onExecuteAction(messageId, proposal.id, false, content)
-        : await onExecuteAction(
-            messageId,
-            proposal.id,
-            false,
-            content,
-            false,
-          );
+        : await onExecuteAction(messageId, proposal.id, false, content, false);
       if (execution.actionType !== "file_edit" || !execution.file) {
         throw new Error("AI 文件修改返回了无效结果");
       }
@@ -266,12 +244,7 @@ export function useAiFileChangeWorkflow({
         size: execution.file.size,
       };
       updateFileEditProposal(messageId, proposal.id, (current) =>
-        markAiFileEditApplied(
-          current,
-          content,
-          updatedFile,
-          new Date().toISOString(),
-        ),
+        markAiFileEditApplied(current, content, updatedFile, new Date().toISOString()),
       );
       return "applied";
     } catch (error) {
@@ -311,9 +284,7 @@ export function useAiFileChangeWorkflow({
       const conflict = message.includes("远程文件已被其他程序修改");
       updateFileEditProposal(messageId, proposal.id, (current) => ({
         ...current,
-        rollbackError: conflict
-          ? "远端内容在应用后又发生变化，已阻止回滚"
-          : message,
+        rollbackError: conflict ? "远端内容在应用后又发生变化，已阻止回滚" : message,
       }));
       return conflict ? "conflict" : "failed";
     }
@@ -331,13 +302,7 @@ export function useAiFileChangeWorkflow({
       }
       const execution = userConfirmed
         ? await onExecuteAction(messageId, proposal.id)
-        : await onExecuteAction(
-            messageId,
-            proposal.id,
-            false,
-            undefined,
-            false,
-          );
+        : await onExecuteAction(messageId, proposal.id, false, undefined, false);
       if (execution.actionType !== "file_operation") {
         throw new Error("AI 文件操作返回了无效结果");
       }
@@ -345,8 +310,7 @@ export function useAiFileChangeWorkflow({
         file: execution.file
           ? {
               content: execution.file.content,
-              name:
-                execution.file.path.split("/").pop() || execution.file.path,
+              name: execution.file.path.split("/").pop() || execution.file.path,
               path: execution.file.path,
               size: execution.file.size,
             }
@@ -387,9 +351,7 @@ export function useAiFileChangeWorkflow({
       const conflict = isFileOperationConflict(message);
       updateFileOperationProposal(messageId, proposal.id, (current) => ({
         ...current,
-        rollbackError: conflict
-          ? "远端文件在应用后又发生变化，已阻止回滚"
-          : message,
+        rollbackError: conflict ? "远端文件在应用后又发生变化，已阻止回滚" : message,
       }));
       return conflict ? "conflict" : "failed";
     }
@@ -413,10 +375,7 @@ export function useAiFileChangeWorkflow({
     );
     setApplying(false);
     if (result === "applied") {
-      onNotice(
-        "success",
-        `已更新 ${reviewedFileEditProposal.originalFile.name}`,
-      );
+      onNotice("success", `已更新 ${reviewedFileEditProposal.originalFile.name}`);
       advanceToNextUnreviewed(fileChangeReview.activeKey);
     } else if (result === "conflict") {
       onNotice("error", "远程文件已变化，请重新发送给 AI");
@@ -490,11 +449,7 @@ export function useAiFileChangeWorkflow({
     if (applying || proposal.status !== "pending") return "failed";
     setApplying(true);
     try {
-      const result = await applyFileOperationProposal(
-        messageId,
-        proposal,
-        userConfirmed,
-      );
+      const result = await applyFileOperationProposal(messageId, proposal, userConfirmed);
       if (result === "applied") {
         onNotice(
           "success",
@@ -511,13 +466,9 @@ export function useAiFileChangeWorkflow({
     }
   };
 
-  const confirmRollbackFileEdit = (
-    messageId: string,
-    proposal: AiFileEditProposal,
-  ) => {
+  const confirmRollbackFileEdit = (messageId: string, proposal: AiFileEditProposal) => {
     onConfirm({
-      content:
-        "将恢复应用 AI 修改前的文件内容。若远端文件之后又被修改，本次回滚会自动停止。",
+      content: "将恢复应用 AI 修改前的文件内容。若远端文件之后又被修改，本次回滚会自动停止。",
       okText: "确认回滚",
       onConfirm: async () => {
         if (applying) return;
@@ -536,13 +487,9 @@ export function useAiFileChangeWorkflow({
     });
   };
 
-  const confirmRollbackFileOperation = (
-    messageId: string,
-    proposal: AiFileOperationProposal,
-  ) => {
+  const confirmRollbackFileOperation = (messageId: string, proposal: AiFileOperationProposal) => {
     onConfirm({
-      content:
-        "将恢复这次文件操作前的状态。若远端文件之后又发生变化，本次回滚会自动停止。",
+      content: "将恢复这次文件操作前的状态。若远端文件之后又发生变化，本次回滚会自动停止。",
       okText: "确认回滚",
       onConfirm: async () => {
         setApplying(true);
@@ -560,10 +507,7 @@ export function useAiFileChangeWorkflow({
     });
   };
 
-  const confirmApplyAllFileEdits = (
-    messageId: string,
-    proposals: AiFileEditProposal[],
-  ) => {
+  const confirmApplyAllFileEdits = (messageId: string, proposals: AiFileEditProposal[]) => {
     const pending = proposals.filter((proposal) => proposal.status === "pending");
     if (!pending.length || pending.some((proposal) => !proposal.reviewed)) return;
     onConfirm({
@@ -574,13 +518,7 @@ export function useAiFileChangeWorkflow({
         const results: ApplyResult[] = [];
         try {
           for (const proposal of pending) {
-            results.push(
-              await applyFileEditProposal(
-                messageId,
-                proposal,
-                proposal.content,
-              ),
-            );
+            results.push(await applyFileEditProposal(messageId, proposal, proposal.content));
           }
         } finally {
           setApplying(false);
@@ -600,10 +538,7 @@ export function useAiFileChangeWorkflow({
     });
   };
 
-  const confirmRollbackAllFileEdits = (
-    messageId: string,
-    proposals: AiFileEditProposal[],
-  ) => {
+  const confirmRollbackAllFileEdits = (messageId: string, proposals: AiFileEditProposal[]) => {
     const applied = proposals.filter(
       (proposal) => proposal.status === "applied" && proposal.appliedFile,
     );
@@ -621,9 +556,7 @@ export function useAiFileChangeWorkflow({
         } finally {
           setApplying(false);
         }
-        const rolledBack = results.filter(
-          (result) => result === "rolled-back",
-        ).length;
+        const rolledBack = results.filter((result) => result === "rolled-back").length;
         const conflicts = results.filter((result) => result === "conflict").length;
         const failed = results.length - rolledBack - conflicts;
         if (rolledBack) {
@@ -662,10 +595,7 @@ export function useAiFileChangeWorkflow({
         const applied = results.filter((result) => result === "applied").length;
         if (applied) onNotice("success", `已执行 ${applied} 个文件操作`);
         if (applied !== results.length) {
-          onNotice(
-            "warning",
-            `有 ${results.length - applied} 个文件操作未执行`,
-          );
+          onNotice("warning", `有 ${results.length - applied} 个文件操作未执行`);
         }
       },
       title: "应用全部文件操作？",
@@ -686,24 +616,17 @@ export function useAiFileChangeWorkflow({
         const results: RollbackResult[] = [];
         try {
           for (const proposal of [...applied].reverse()) {
-            results.push(
-              await rollbackFileOperationProposal(messageId, proposal),
-            );
+            results.push(await rollbackFileOperationProposal(messageId, proposal));
           }
         } finally {
           setApplying(false);
         }
-        const rolledBack = results.filter(
-          (result) => result === "rolled-back",
-        ).length;
+        const rolledBack = results.filter((result) => result === "rolled-back").length;
         if (rolledBack) {
           onNotice("success", `已回滚 ${rolledBack} 个文件操作`);
         }
         if (rolledBack !== results.length) {
-          onNotice(
-            "warning",
-            `有 ${results.length - rolledBack} 个文件操作未回滚`,
-          );
+          onNotice("warning", `有 ${results.length - rolledBack} 个文件操作未回滚`);
         }
       },
       title: "回滚这组文件操作？",

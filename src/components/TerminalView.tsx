@@ -32,10 +32,7 @@ import {
 } from "@xterm/addon-search";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
-import type {
-  TerminalCommandHistoryRecord,
-  TerminalSession,
-} from "../models";
+import type { TerminalCommandHistoryRecord, TerminalSession } from "../models";
 import { terminalFontCss, type AppSettings } from "../app-settings";
 import { terminalWallpaperStyle } from "../terminal-appearance";
 import { isSingleTerminalCommand } from "../terminal-command-bar";
@@ -69,10 +66,7 @@ import {
   terminalFontZoomWheelAction,
   type TerminalFontZoomAction,
 } from "../terminal-font-zoom";
-import {
-  TerminalLogBatcher,
-  terminalLogStatusMessage,
-} from "../terminal-logging";
+import { TerminalLogBatcher, terminalLogStatusMessage } from "../terminal-logging";
 import { diagnosticInvoke as invoke } from "../diagnostics";
 import { listenProtocolEvent } from "../tauri-protocol";
 import ConnectionStatusOverlay from "./ConnectionStatusOverlay";
@@ -98,18 +92,12 @@ type ShellIntegrationMutation = "install" | "uninstall";
 
 const TERMINAL_GRID_INSET_PROPERTY = "--terminal-grid-extra-top";
 
-function fitTerminalGrid(
-  container: HTMLDivElement,
-  terminal: Terminal,
-  fitAddon: FitAddon,
-) {
+function fitTerminalGrid(container: HTMLDivElement, terminal: Terminal, fitAddon: FitAddon) {
   container.style.setProperty(TERMINAL_GRID_INSET_PROPERTY, "0px");
   fitAddon.fit();
 
   const terminalElement = terminal.element;
-  const screenElement = terminalElement?.querySelector<HTMLElement>(
-    ".xterm-screen",
-  );
+  const screenElement = terminalElement?.querySelector<HTMLElement>(".xterm-screen");
   if (!terminalElement || !screenElement) return;
 
   const terminalStyle = window.getComputedStyle(terminalElement);
@@ -121,10 +109,7 @@ function fitTerminalGrid(
     paddingTop,
     screenHeight: screenElement.getBoundingClientRect().height,
   });
-  container.style.setProperty(
-    TERMINAL_GRID_INSET_PROPERTY,
-    `${extraTop}px`,
-  );
+  container.style.setProperty(TERMINAL_GRID_INSET_PROPERTY, `${extraTop}px`);
   if (extraTop > 0) fitAddon.fit();
 }
 
@@ -135,20 +120,16 @@ const EMPTY_SEARCH_RESULT: ISearchResultChangeEvent = {
   resultIndex: -1,
 };
 
-const TERMINAL_SEARCH_DECORATIONS: NonNullable<ISearchOptions["decorations"]> =
-  {
-    activeMatchBackground: "#165dff",
-    activeMatchBorder: "#94bfff",
-    activeMatchColorOverviewRuler: "#165dff",
-    matchBackground: "#6b5700",
-    matchBorder: "#fadc19",
-    matchOverviewRuler: "#fadc19",
-  };
+const TERMINAL_SEARCH_DECORATIONS: NonNullable<ISearchOptions["decorations"]> = {
+  activeMatchBackground: "#165dff",
+  activeMatchBorder: "#94bfff",
+  activeMatchColorOverviewRuler: "#165dff",
+  matchBackground: "#6b5700",
+  matchBorder: "#fadc19",
+  matchOverviewRuler: "#fadc19",
+};
 
-function searchOptions(
-  caseSensitive: boolean,
-  incremental = false,
-): ISearchOptions {
+function searchOptions(caseSensitive: boolean, incremental = false): ISearchOptions {
   return {
     caseSensitive,
     decorations: TERMINAL_SEARCH_DECORATIONS,
@@ -193,23 +174,21 @@ function TerminalView({
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const searchAddonRef = useRef<SearchAddon | null>(null);
-  const historyCompletionRef = useRef<TerminalHistoryCompletionAddon | null>(
-    null,
-  );
+  const historyCompletionRef = useRef<TerminalHistoryCompletionAddon | null>(null);
   const searchInputRef = useRef<RefInputType>(null);
   const commandInputRef = useRef<HTMLInputElement>(null);
   const connectedRef = useRef(isTerminalSessionOperational(session.status));
   const shellIntegrationInstalledRef = useRef(false);
   const shellIntegrationNonceRef = useRef(createShellIntegrationNonce());
-  const shellIntegrationStateRef = useRef<
-    "disabled" | "installing" | "ready" | "unavailable"
-  >("disabled");
+  const shellIntegrationStateRef = useRef<"disabled" | "installing" | "ready" | "unavailable">(
+    "disabled",
+  );
   const shellIntegrationMutationRef = useRef<ShellIntegrationMutation>();
   const shellIntegrationEchoFilterRef = useRef<ShellIntegrationEchoFilter>();
   const shellIntegrationTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const startShellIntegrationMutationRef = useRef<
-    (mutation: ShellIntegrationMutation) => void
-  >(() => undefined);
+  const startShellIntegrationMutationRef = useRef<(mutation: ShellIntegrationMutation) => void>(
+    () => undefined,
+  );
   const settleShellIntegrationMutationRef = useRef<
     (result: "ready" | "disabled" | "unavailable") => void
   >(() => undefined);
@@ -217,9 +196,7 @@ function TerminalView({
   const terminalHistoryWriteRef = useRef<Promise<void>>(Promise.resolve());
   const currentDirectoryRef = useRef("");
   const inputStateRef = useRef({ ...EMPTY_TERMINAL_INPUT_STATE });
-  const recordTerminalHistoryRef = useRef<(command: string) => void>(
-    () => undefined,
-  );
+  const recordTerminalHistoryRef = useRef<(command: string) => void>(() => undefined);
   const recentOutputChangeRef = useRef(onRecentOutputChange);
   const collectRecentOutputRef = useRef(collectRecentOutput);
   const selectionChangeRef = useRef(onSelectionChange);
@@ -237,8 +214,7 @@ function TerminalView({
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchCaseSensitive, setSearchCaseSensitive] = useState(false);
-  const [searchResult, setSearchResult] =
-    useState<ISearchResultChangeEvent>(EMPTY_SEARCH_RESULT);
+  const [searchResult, setSearchResult] = useState<ISearchResultChangeEvent>(EMPTY_SEARCH_RESULT);
   const [terminalReady, setTerminalReady] = useState(false);
 
   searchVisibleRef.current = searchVisible;
@@ -343,16 +319,9 @@ function TerminalView({
     terminalHistoryWriteRef.current = terminalHistoryWriteRef.current
       .catch(() => undefined)
       .then(async () => {
-        const configuration = await recordTerminalCommandHistory(
-          hostId,
-          command,
-          cwd,
-        );
-        terminalCommandHistoryRef.current =
-          configuration.terminalCommandHistory;
-        historyCompletionRef.current?.setHistory(
-          configuration.terminalCommandHistory,
-        );
+        const configuration = await recordTerminalCommandHistory(hostId, command, cwd);
+        terminalCommandHistoryRef.current = configuration.terminalCommandHistory;
+        historyCompletionRef.current?.setHistory(configuration.terminalCommandHistory);
       })
       .catch(() => undefined);
   };
@@ -385,10 +354,7 @@ function TerminalView({
   };
 
   startShellIntegrationMutationRef.current = (mutation) => {
-    if (
-      !isTerminalSessionOperational(session.status) ||
-      shellIntegrationMutationRef.current
-    ) {
+    if (!isTerminalSessionOperational(session.status) || shellIntegrationMutationRef.current) {
       return;
     }
     historyCompletionRef.current?.setPromptReady(false);
@@ -400,9 +366,7 @@ function TerminalView({
     const command =
       mutation === "install"
         ? buildShellIntegrationInstallCommand(shellIntegrationNonceRef.current)
-        : buildShellIntegrationUninstallCommand(
-            shellIntegrationNonceRef.current,
-          );
+        : buildShellIntegrationUninstallCommand(shellIntegrationNonceRef.current);
     shellIntegrationEchoFilterRef.current = createShellIntegrationEchoFilter(
       shellIntegrationNonceRef.current,
       mutation,
@@ -475,10 +439,7 @@ function TerminalView({
       hostId: session.host.id,
       getCurrentDirectory: () => currentDirectoryRef.current || undefined,
       onAccept: (suffix) => {
-        inputStateRef.current = appendInjectedTerminalInput(
-          inputStateRef.current,
-          suffix,
-        );
+        inputStateRef.current = appendInjectedTerminalInput(inputStateRef.current, suffix);
         historyCompletionAddon.synchronizeInput(
           inputStateRef.current.value,
           inputStateRef.current.reliable,
@@ -523,8 +484,7 @@ function TerminalView({
 
     const loadTerminalHistory = () =>
       loadConfiguration().then((configuration) => {
-        terminalCommandHistoryRef.current =
-          configuration.terminalCommandHistory;
+        terminalCommandHistoryRef.current = configuration.terminalCommandHistory;
         historyCompletionAddon.setHistory(configuration.terminalCommandHistory);
       });
     void loadTerminalHistory().catch(() => undefined);
@@ -556,10 +516,7 @@ function TerminalView({
       if (!connectedRef.current || shellIntegrationMutationRef.current) return;
       const tracked = trackTerminalInput(inputStateRef.current, data);
       inputStateRef.current = tracked.state;
-      historyCompletionAddon.synchronizeInput(
-        tracked.state.value,
-        tracked.state.reliable,
-      );
+      historyCompletionAddon.synchronizeInput(tracked.state.value, tracked.state.reliable);
       if (data.includes("\r") || data.includes("\n")) {
         historyCompletionAddon.setPromptReady(false);
       }
@@ -573,19 +530,14 @@ function TerminalView({
     });
     const resizeDisposable = terminal.onResize(({ cols, rows }) => {
       if (!connectedRef.current) return;
-      void invoke("ssh_resize", { sessionId: session.id, cols, rows }).catch(
-        () => undefined,
-      );
+      void invoke("ssh_resize", { sessionId: session.id, cols, rows }).catch(() => undefined);
     });
     const searchDisposable = searchAddon.onDidChangeResults((result) => {
       setSearchResult(result);
     });
     const selectionDisposable = terminal.onSelectionChange(() => {
       selectionChangeRef.current(terminal.getSelection());
-      if (
-        !settingsRef.current.terminalCopyOnSelect ||
-        !terminal.hasSelection()
-      ) {
+      if (!settingsRef.current.terminalCopyOnSelect || !terminal.hasSelection()) {
         return;
       }
       void writeClipboard(terminal.getSelection()).catch(() => undefined);
@@ -593,10 +545,7 @@ function TerminalView({
     const shellIntegrationDisposable = terminal.parser.registerOscHandler(
       FINESHELL_OSC_ID,
       (data) => {
-        const message = parseShellIntegrationMessage(
-          data,
-          shellIntegrationNonceRef.current,
-        );
+        const message = parseShellIntegrationMessage(data, shellIntegrationNonceRef.current);
         if (!message) return false;
         if (message.kind === "ready") {
           settleShellIntegrationMutationRef.current("ready");
@@ -608,9 +557,7 @@ function TerminalView({
           historyCompletionAddon.setPromptReady(false);
           currentDirectoryRef.current = "";
           currentDirectoryChangeRef.current(session.id, "");
-          queueMicrotask(() =>
-            startShellIntegrationMutationRef.current("install"),
-          );
+          queueMicrotask(() => startShellIntegrationMutationRef.current("install"));
           return true;
         }
         if (message.kind === "cwd") {
@@ -647,19 +594,13 @@ function TerminalView({
       if (payload.sessionId === session.id) {
         let data: Uint8Array<ArrayBufferLike> = decodeSshOutput(payload.data);
         if (shellIntegrationEchoFilterRef.current) {
-          const filtered = filterShellIntegrationEcho(
-            shellIntegrationEchoFilterRef.current,
-            data,
-          );
+          const filtered = filterShellIntegrationEcho(shellIntegrationEchoFilterRef.current, data);
           data = filtered.data;
           shellIntegrationEchoFilterRef.current = filtered.filter;
         }
         if (data.length > 0) {
           terminalLoggerRef.current?.append(data);
-          terminal.write(
-            data,
-            collectRecentOutputRef.current ? scheduleRecentOutput : undefined,
-          );
+          terminal.write(data, collectRecentOutputRef.current ? scheduleRecentOutput : undefined);
         }
       }
     }).then((stopListening) => {
@@ -765,8 +706,7 @@ function TerminalView({
     const fitAddon = fitAddonRef.current;
     if (!terminal || !fitAddon) return;
 
-    const wasAtBottom =
-      terminal.buffer.active.viewportY === terminal.buffer.active.baseY;
+    const wasAtBottom = terminal.buffer.active.viewportY === terminal.buffer.active.baseY;
 
     terminal.options.cursorBlink = settings.terminalCursorBlink;
     terminal.options.cursorStyle = settings.terminalCursorStyle;
@@ -834,11 +774,7 @@ function TerminalView({
     if (!active) return;
 
     const handleWindowKeyDown = (event: KeyboardEvent) => {
-      if (
-        (event.metaKey || event.ctrlKey) &&
-        !event.altKey &&
-        event.key.toLowerCase() === "f"
-      ) {
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "f") {
         event.preventDefault();
         event.stopPropagation();
         setSearchVisible(true);
@@ -859,8 +795,7 @@ function TerminalView({
     };
 
     window.addEventListener("keydown", handleWindowKeyDown, true);
-    return () =>
-      window.removeEventListener("keydown", handleWindowKeyDown, true);
+    return () => window.removeEventListener("keydown", handleWindowKeyDown, true);
   }, [active, searchVisible]);
 
   useEffect(() => {
@@ -910,9 +845,13 @@ function TerminalView({
   }
 
   function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
-    if (settings.terminalCommandBarVisible && event.shiftKey &&
-      (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "l" &&
-      !commandInputRef.current?.disabled) {
+    if (
+      settings.terminalCommandBarVisible &&
+      event.shiftKey &&
+      (event.ctrlKey || event.metaKey) &&
+      event.key.toLowerCase() === "l" &&
+      !commandInputRef.current?.disabled
+    ) {
       event.preventDefault();
       event.stopPropagation();
       if (event.target === commandInputRef.current) terminalRef.current?.focus();
@@ -938,9 +877,11 @@ function TerminalView({
       throw new Error("当前会话无法发送这条命令");
     }
     const history = historyCompletionRef.current;
-    if (terminal.buffer.active.type === "alternate" ||
+    if (
+      terminal.buffer.active.type === "alternate" ||
       shellIntegrationMutationRef.current ||
-      (shellIntegrationStateRef.current === "ready" && !history?.isPromptReady)) {
+      (shellIntegrationStateRef.current === "ready" && !history?.isPromptReady)
+    ) {
       throw new Error("请等待终端回到 Shell 提示符再发送");
     }
     if (!inputStateRef.current.reliable || inputStateRef.current.value) {
@@ -948,7 +889,10 @@ function TerminalView({
     }
     history?.setPromptReady(false);
     try {
-      await invoke("ssh_write", { sessionId: session.id, data: Array.from(new TextEncoder().encode(command + "\r")) });
+      await invoke("ssh_write", {
+        sessionId: session.id,
+        data: Array.from(new TextEncoder().encode(command + "\r")),
+      });
       recordTerminalHistoryRef.current(command);
     } catch (error) {
       history?.setPromptReady(true);
@@ -1024,13 +968,10 @@ function TerminalView({
     }
   }
 
-  const currentSearchResult =
-    searchResult.resultIndex >= 0 ? searchResult.resultIndex + 1 : 0;
+  const currentSearchResult = searchResult.resultIndex >= 0 ? searchResult.resultIndex + 1 : 0;
   const reconnecting = session.status === "reconnecting";
   const connectionUnavailable =
-    session.status === "failed" ||
-    session.status === "disconnected" ||
-    reconnecting;
+    session.status === "failed" || session.status === "disconnected" || reconnecting;
   const connectionDescription = reconnecting
     ? "正在重新连接服务器"
     : session.error || "终端连接已断开";

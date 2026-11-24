@@ -18,9 +18,9 @@ async function writeClipboard(value: string) {
 
 export default function useTransferRecordActions() {
   const [homeDirectory, setHomeDirectory] = useState<string>();
-  const [missingTransferIds, setMissingTransferIds] = useState<
-    ReadonlySet<string>
-  >(() => new Set());
+  const [missingTransferIds, setMissingTransferIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
 
   useEffect(() => {
     if (!isTauri()) return;
@@ -36,10 +36,7 @@ export default function useTransferRecordActions() {
   }, []);
 
   const runLocalFileCommand = useCallback(
-    async (
-      command: "local_file_reveal" | "local_file_open",
-      transfer: TransferActivityRecord,
-    ) => {
+    async (command: "local_file_reveal" | "local_file_open", transfer: TransferActivityRecord) => {
       try {
         await invokeProtocolCommand(command, { path: transfer.localPath });
         setMissingTransferIds((current) => {
@@ -49,13 +46,8 @@ export default function useTransferRecordActions() {
           return next;
         });
       } catch (error) {
-        if (
-          error instanceof FineShellCommandError &&
-          error.code === "not_found"
-        ) {
-          setMissingTransferIds((current) =>
-            new Set(current).add(transfer.transferId),
-          );
+        if (error instanceof FineShellCommandError && error.code === "not_found") {
+          setMissingTransferIds((current) => new Set(current).add(transfer.transferId));
           Message.warning("文件已被移动或删除");
           return;
         }
@@ -66,14 +58,12 @@ export default function useTransferRecordActions() {
   );
 
   const revealLocal = useCallback(
-    (transfer: TransferActivityRecord) =>
-      runLocalFileCommand("local_file_reveal", transfer),
+    (transfer: TransferActivityRecord) => runLocalFileCommand("local_file_reveal", transfer),
     [runLocalFileCommand],
   );
 
   const openLocal = useCallback(
-    (transfer: TransferActivityRecord) =>
-      runLocalFileCommand("local_file_open", transfer),
+    (transfer: TransferActivityRecord) => runLocalFileCommand("local_file_open", transfer),
     [runLocalFileCommand],
   );
 

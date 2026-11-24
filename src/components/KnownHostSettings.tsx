@@ -14,16 +14,11 @@ import type { TableColumnProps } from "@arco-design/web-react";
 import { IconCopy, IconDelete, IconSearch } from "@arco-design/web-react/icon";
 import { isTauri } from "@tauri-apps/api/core";
 import { writeText as writeClipboardText } from "@tauri-apps/plugin-clipboard-manager";
-import {
-  loadConfiguration,
-} from "../config-database";
+import { loadConfiguration } from "../config-database";
 import { removeKnownHostFingerprints } from "../configuration-mutations";
 import { knownHostTargetKey } from "../known-hosts";
 import type { HostRecord, KnownHostRecord } from "../models";
-import {
-  emitProtocolEventTo,
-  listenProtocolEvent,
-} from "../tauri-protocol";
+import { emitProtocolEventTo, listenProtocolEvent } from "../tauri-protocol";
 
 interface KnownHostView extends KnownHostRecord {
   linkedHostNames: string[];
@@ -102,10 +97,7 @@ function KnownHostSettings() {
         return {
           ...record,
           linkedHostNames: hosts
-            .filter(
-              (host) =>
-                knownHostTargetKey(host.address, host.port) === targetKey,
-            )
+            .filter((host) => knownHostTargetKey(host.address, host.port) === targetKey)
             .map((host) => host.name),
         };
       }),
@@ -116,28 +108,21 @@ function KnownHostSettings() {
     const keyword = query.trim().toLowerCase();
     if (!keyword) return records;
     return records.filter((record) =>
-      [
-        record.address,
-        String(record.port),
-        record.fingerprint,
-        ...record.linkedHostNames,
-      ].some((value) => value.toLowerCase().includes(keyword)),
+      [record.address, String(record.port), record.fingerprint, ...record.linkedHostNames].some(
+        (value) => value.toLowerCase().includes(keyword),
+      ),
     );
   }, [query, records]);
 
   const unlinkedIds = useMemo(
     () =>
-      records
-        .filter((record) => record.linkedHostNames.length === 0)
-        .map((record) => record.id),
+      records.filter((record) => record.linkedHostNames.length === 0).map((record) => record.id),
     [records],
   );
 
   async function notifyConfigurationChanged() {
     if (!isTauri()) return;
-    await emitProtocolEventTo("main", "configuration:changed").catch(
-      () => undefined,
-    );
+    await emitProtocolEventTo("main", "configuration:changed").catch(() => undefined);
   }
 
   async function removeRecords(ids: string[], successMessage: string) {
@@ -170,10 +155,7 @@ function KnownHostSettings() {
         title: "主机",
         render: (_, record) => (
           <div className="known-host-target-cell">
-            <Typography.Text
-              bold
-              title={formatEndpoint(record.address, record.port)}
-            >
+            <Typography.Text bold title={formatEndpoint(record.address, record.port)}>
               {formatEndpoint(record.address, record.port)}
             </Typography.Text>
             <Typography.Text type="secondary">
@@ -190,9 +172,7 @@ function KnownHostSettings() {
         width: 300,
         render: (_, record) => (
           <div className="known-host-fingerprint-cell">
-            <Typography.Text title={record.fingerprint}>
-              {record.fingerprint}
-            </Typography.Text>
+            <Typography.Text title={record.fingerprint}>{record.fingerprint}</Typography.Text>
             <Typography.Text
               title={`首次 ${formatTimestamp(record.firstSeenAt)} · 最近验证 ${formatTimestamp(record.lastVerifiedAt)}`}
               type="secondary"
@@ -219,9 +199,7 @@ function KnownHostSettings() {
             <Popconfirm
               content="移除后，下次连接该服务器时需要重新确认指纹。"
               disabled={acting}
-              onOk={() =>
-                void removeRecords([record.id], "已移除已知主机记录")
-              }
+              onOk={() => void removeRecords([record.id], "已移除已知主机记录")}
               title={`移除 ${formatEndpoint(record.address, record.port)}？`}
             >
               <Button
@@ -250,15 +228,10 @@ function KnownHostSettings() {
         <Popconfirm
           content="未关联记录包含通过快速连接保存、但没有对应主机配置的指纹。"
           disabled={acting || unlinkedIds.length === 0}
-          onOk={() =>
-            void removeRecords(unlinkedIds, "已清理未关联的已知主机记录")
-          }
+          onOk={() => void removeRecords(unlinkedIds, "已清理未关联的已知主机记录")}
           title={`清理 ${unlinkedIds.length} 条未关联记录？`}
         >
-          <Button
-            disabled={acting || unlinkedIds.length === 0}
-            icon={<IconDelete />}
-          >
+          <Button disabled={acting || unlinkedIds.length === 0} icon={<IconDelete />}>
             清理未关联
           </Button>
         </Popconfirm>

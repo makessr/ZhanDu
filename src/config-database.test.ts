@@ -4,10 +4,7 @@ import {
   parseConfigurationExport,
   serializeConfigurationExport,
 } from "./config-database";
-import {
-  createDeletedHostRecord,
-  isDeletedHostExpired,
-} from "./configuration-mutations";
+import { createDeletedHostRecord, isDeletedHostExpired } from "./configuration-mutations";
 import { DEFAULT_APP_SETTINGS } from "./app-settings";
 
 describe("migrateLegacyConfiguration", () => {
@@ -109,24 +106,11 @@ describe("deleted host retention", () => {
   };
 
   test("keeps deleted hosts recoverable for thirty days", () => {
-    const deletedHost = createDeletedHostRecord(
-      host,
-      new Date("2026-07-01T00:00:00.000Z"),
-    );
+    const deletedHost = createDeletedHostRecord(host, new Date("2026-07-01T00:00:00.000Z"));
 
     expect(deletedHost.expiresAt).toBe("2026-07-31T00:00:00.000Z");
-    expect(
-      isDeletedHostExpired(
-        deletedHost,
-        new Date("2026-07-30T23:59:59.999Z"),
-      ),
-    ).toBe(false);
-    expect(
-      isDeletedHostExpired(
-        deletedHost,
-        new Date("2026-07-31T00:00:00.000Z"),
-      ),
-    ).toBe(true);
+    expect(isDeletedHostExpired(deletedHost, new Date("2026-07-30T23:59:59.999Z"))).toBe(false);
+    expect(isDeletedHostExpired(deletedHost, new Date("2026-07-31T00:00:00.000Z"))).toBe(true);
   });
 });
 
@@ -299,13 +283,9 @@ describe("configuration import and export", () => {
 
   test("rejects unrelated and newer configuration documents", () => {
     expect(() => parseConfigurationExport("not-json")).toThrow("有效的 JSON");
-    expect(() => parseConfigurationExport('{"format":"other"}')).toThrow(
-      "不是 FineShell 配置文件",
-    );
+    expect(() => parseConfigurationExport('{"format":"other"}')).toThrow("不是 FineShell 配置文件");
     expect(() =>
-      parseConfigurationExport(
-        '{"format":"fineshell-config","schemaVersion":99}',
-      ),
+      parseConfigurationExport('{"format":"fineshell-config","schemaVersion":99}'),
     ).toThrow("版本不受支持");
   });
 
@@ -427,11 +407,7 @@ describe("configuration import and export", () => {
   test("preserves FineShell-managed key references without exporting key contents", () => {
     const contents = serializeConfigurationExport(
       {
-        ...migrateLegacyConfiguration(
-          null,
-          null,
-          "2026-07-27T00:00:00.000Z",
-        ),
+        ...migrateLegacyConfiguration(null, null, "2026-07-27T00:00:00.000Z"),
         sshKeys: [
           {
             id: "ssh-key-managed",

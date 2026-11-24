@@ -104,25 +104,38 @@ describe("SessionTabs", () => {
     };
     localStorage.removeItem(workspacesKey);
     try {
-      const original = render(<SessionTabs {...props} activeSessionId={second.id} sessions={[SESSION, second]} />);
+      const original = render(
+        <SessionTabs {...props} activeSessionId={second.id} sessions={[SESSION, second]} />,
+      );
       fireEvent.click(screen.getByRole("button", { name: "终端布局" }));
       fireEvent.click(screen.getByText("上下分屏"));
       fireEvent.click(screen.getByRole("button", { name: "SSH 工作区" }));
-      fireEvent.change(screen.getByRole("textbox", { name: "工作区名称" }), { target: { value: "运维" } });
+      fireEvent.change(screen.getByRole("textbox", { name: "工作区名称" }), {
+        target: { value: "运维" },
+      });
       fireEvent.click(screen.getByRole("button", { name: "保存当前会话" }));
       const [saved] = JSON.parse(localStorage.getItem(workspacesKey)!);
       expect(saved.hostIds).toEqual([HOST.id, second.host.id]);
       expect(saved.panes).toEqual([1, 0]);
       expect(saved.layout).toBe("rows");
       original.unmount();
-      const fresh = render(<SessionTabs {...props} hasActiveSession={false} activeSessionId={null} sessions={[]} />);
+      const fresh = render(
+        <SessionTabs {...props} hasActiveSession={false} activeSessionId={null} sessions={[]} />,
+      );
       fireEvent.click(screen.getByRole("button", { name: "SSH 工作区" }));
       fireEvent.click(screen.getByRole("button", { name: "打开" }));
       await waitFor(() => expect(activate).toHaveBeenCalledWith("fresh-second"));
       expect(start).toHaveBeenCalledWith([HOST.id, second.host.id]);
-      fresh.rerender(<SessionTabs {...props} activeSessionId="fresh-second" sessions={[
-        { ...SESSION, id: "fresh-first" }, { ...second, id: "fresh-second" },
-      ]} />);
+      fresh.rerender(
+        <SessionTabs
+          {...props}
+          activeSessionId="fresh-second"
+          sessions={[
+            { ...SESSION, id: "fresh-first" },
+            { ...second, id: "fresh-second" },
+          ]}
+        />,
+      );
       expect(fresh.container.querySelector(".terminal-panes-rows")).not.toBeNull();
       expect(screen.getAllByRole("region").map((pane) => pane.style.order)).toEqual(["1", "0"]);
     } finally {
@@ -153,16 +166,10 @@ describe("SessionTabs", () => {
   });
 
   test("keeps the AI toggle fixed outside the scrollable tabs", () => {
-    const { container, onToggleAiAssistant } = renderTabs(
-      "session-1",
-      undefined,
-      true,
-    );
+    const { container, onToggleAiAssistant } = renderTabs("session-1", undefined, true);
     const button = screen.getByRole("button", { name: "关闭 AI 助手" });
 
-    expect(container.querySelector(".terminal-tabs")?.contains(button)).toBe(
-      false,
-    );
+    expect(container.querySelector(".terminal-tabs")?.contains(button)).toBe(false);
     expect(button.getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(button);
     expect(onToggleAiAssistant).toHaveBeenCalledTimes(1);

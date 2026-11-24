@@ -2,6 +2,14 @@
 
 栈渡桌面端通过 HTTPS 登录同步服务。SQLite 保存邮箱、登录密码的校验哈希、设备会话、加密的主机数据及被加密包裹的主密钥。用户的主密码或旧恢复密钥原文不上传，服务端数据库备份也不包含它。
 
+## 部署安全基线
+
+- **必须使用 HTTPS**。客户端只接受 `https://` 服务地址；仅当主机为 `localhost`、`127.0.0.1` 或 `[::1]` 时才允许明文 HTTP，用于本机开发。
+- 同步服务只监听宿主机回环地址 `127.0.0.1:8787`，TLS 由同机反向代理终止。不要把 8787 直接暴露到公网。
+- 数据库目录和 `sync.env` 仅服务账户可读写（`0700` / `0600`）；数据库备份包含账号与会话数据，按敏感文件保存。
+- 公网部署建议把 `FINESHELL_SYNC_REGISTRATION` 设为 `invite` 或 `closed`，不要长期开放自助注册。
+- 认证限流保存在单个进程的内存中，重启后清零，也不能在多个实例间共享；部署细节见[客户端来源限流](#客户端来源限流)。
+
 ## 选择部署方式
 
 | 场景 | 从哪里开始 |
@@ -89,6 +97,14 @@ location ^~ /v1/ {
 systemd 部署中，若 Nginx 通过回环连接服务，且使用上面的配置覆盖 `X-Real-IP`，可以在 `sync.env` 加上 `FINESHELL_SYNC_TRUST_LOOPBACK_PROXY=1` 并重启。仅 DNS 时，Nginx 的 `$remote_addr` 可直接用于来源限流。
 
 开启 Cloudflare 代理后，Nginx 默认看到的是 Cloudflare 节点 IP。需要按访客 IP 限流时，先按 Cloudflare 的 Nginx 指南配置 `real_ip_header CF-Connecting-IP`，并用 `set_real_ip_from` 限定为 Cloudflare 官方地址段，验证后继续由 Nginx 将 `$remote_addr` 写入 `X-Real-IP`。Compose 使用桥接网络并发布宿主机的回环端口，容器收到的连接未必来自回环，保持 Compose 的默认设置即可。 [Cloudflare 恢复客户端 IP 指南](https://developers.cloudflare.com/support/troubleshooting/restoring-visitor-ips/restoring-original-visitor-ips/)
+
+#### 限流状态与多实例
+
+认证尝试窗口（按邮箱，每分钟 8 次）和按来源的请求限流都保存在进程内存中：
+
+- 服务重启后计数清零，攻击者可通过触发重启绕过窗口；
+- 多个实例各自计数，无法共享额度；
+- 需要更强的限流或水平扩容时，请在反向代理层增加 `limit_req` 等规则，或把限流迁到外部存储后再运行多个实例。
 
 ### 上线验证与排错
 
@@ -264,6 +280,30 @@ pwsh -File ./sync-server/deploy/backup-to-windows.ps1 `
 2. 停止目标同步服务。将原有 SQLite 数据库以及同目录下存在的 `-wal`、`-shm` 文件一起移到单独的归档目录。
 3. 将验证后的恢复文件放到服务配置的数据库路径，确保服务用户对目录和数据库拥有读写权限。原实例上可以参照归档数据库的属主和权限来设置。
 4. 启动服务，检查 `/healthz`，让客户端重新登录并核对同步。若客户端提示云端版本落后，可从持有较新且已验证快照的设备在同步设置中确认恢复。备份之后新建、且未被快照保留的账号需要单独找回。
+
+## 账号注销与数据保留
+
+当前版本没有自助注销入口。客户端「退出登录」只撤销本机保存的会话并停止自动同步，不会删除服务端账号或云端快照。运营者在收到注销请求后按以下步骤处理：
+
+1. 先按[在线快照](#在线快照)备份数据库，确认待删除账号的邮箱；
+2. 停止同步服务；
+3. 用 SQLite 删除账号及其会话。`accounts` 与 `sessions` 均以账号主键关联，删除顺序如下：
+
+```bash
+sqlite3 /var/lib/fineshell-sync/vault.sqlite <<'SQL'
+BEGIN IMMEDIATE;
+DELETE FROM sessions WHERE account_id = (SELECT id FROM accounts WHERE email = 'user@example.com');
+DELETE FROM accounts WHERE email = 'user@example.com';
+COMMIT;
+SQL
+```
+
+4. 启动服务并检查 `/healthz`。剩余邀请码与邮箱验证记录不影响其他账号，可按需清理 `invites`、`email_verifications`。
+
+数据保留说明：
+
+- 删除账号不会清理已经生成的数据库快照、可移植备份和系统日志；这些副本按各自的保留策略（备份脚本默认保留最近 30 天）自然过期，需要立即清除时请同时处理归档目录。
+- 服务端只保存密文快照与会话元数据，但删除动作本身可被流量日志（反向代理访问日志）记录；如需最小化元数据，请同步配置代理日志保留时间。
 
 ## Windows 或本机开发
 

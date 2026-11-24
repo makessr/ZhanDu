@@ -4,13 +4,18 @@ import type { TableColumnProps } from "@arco-design/web-react";
 const minColumnWidth = 64;
 const maxColumnWidth = 1200;
 
-export function ColumnResizeHandle({ label, width, onResize }: {
+export function ColumnResizeHandle({
+  label,
+  width,
+  onResize,
+}: {
   label: string;
   width: number;
   onResize: (width: number) => void;
 }) {
   const drag = useRef<{ startX: number; width: number } | null>(null);
-  const resize = (value: number) => onResize(Math.min(maxColumnWidth, Math.max(minColumnWidth, value)));
+  const resize = (value: number) =>
+    onResize(Math.min(maxColumnWidth, Math.max(minColumnWidth, value)));
   return (
     <span
       aria-label={label + "列宽"}
@@ -38,7 +43,9 @@ export function ColumnResizeHandle({ label, width, onResize }: {
           resize(drag.current.width + event.clientX - drag.current.startX);
         }
       }}
-      onLostPointerCapture={() => { drag.current = null; }}
+      onLostPointerCapture={() => {
+        drag.current = null;
+      }}
       role="separator"
       tabIndex={0}
       title="拖动调整列宽"
@@ -56,14 +63,16 @@ export function useResizableColumns<T>(columns: TableColumnProps<T>[]) {
       key,
       width,
       headerCellStyle: { ...column.headerCellStyle, position: "relative" as const },
-      title: <>
-        {column.title}
-        <ColumnResizeHandle
-          label={typeof column.title === "string" ? column.title : key}
-          width={width}
-          onResize={(value) => setWidths((current) => ({ ...current, [key]: value }))}
-        />
-      </>,
+      title: (
+        <>
+          {column.title}
+          <ColumnResizeHandle
+            label={typeof column.title === "string" ? column.title : key}
+            width={width}
+            onResize={(value) => setWidths((current) => ({ ...current, [key]: value }))}
+          />
+        </>
+      ),
     };
   });
   return {

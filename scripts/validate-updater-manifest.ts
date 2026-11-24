@@ -28,11 +28,7 @@ const REQUIRED_PLATFORM_GROUPS = [
     label: "Linux ARM64",
   },
   {
-    keys: [
-      "windows-x86_64-nsis",
-      "windows-x86_64-msi",
-      "windows-x86_64",
-    ],
+    keys: ["windows-x86_64-nsis", "windows-x86_64-msi", "windows-x86_64"],
     label: "Windows x64",
   },
   {
@@ -52,12 +48,7 @@ function expectedVersionFromTag(releaseTag: string) {
   return releaseTag.slice(1);
 }
 
-function validatePlatform(
-  key: string,
-  value: unknown,
-  releaseTag: string,
-  repository: string,
-) {
+function validatePlatform(key: string, value: unknown, releaseTag: string, repository: string) {
   if (!isRecord(value)) {
     throw new Error(`更新清单平台 ${key} 格式无效`);
   }
@@ -79,13 +70,9 @@ function validatePlatform(
   if (url.protocol !== "https:") {
     throw new Error(`更新清单平台 ${key} 的下载地址必须使用 HTTPS`);
   }
-  const match = url.pathname.match(
-    /^\/([\w.-]+\/[\w.-]+)\/releases\/download\/([^/]+)\/[^/]+$/,
-  );
+  const match = url.pathname.match(/^\/([\w.-]+\/[\w.-]+)\/releases\/download\/([^/]+)\/[^/]+$/);
   if (url.origin !== "https://github.com" || !match || match[2] !== releaseTag) {
-    throw new Error(
-      `更新清单平台 ${key} 必须使用当前版本的 GitHub Release 公开下载地址`,
-    );
+    throw new Error(`更新清单平台 ${key} 必须使用当前版本的 GitHub Release 公开下载地址`);
   }
   if (match[1].toLowerCase() !== repository.toLowerCase()) {
     throw new Error(`更新清单平台 ${key} 的下载地址必须属于发布仓库 ${repository}`);
@@ -115,15 +102,14 @@ export function validateUpdaterManifest(
     validatePlatform(key, platform, releaseTag, repository);
   });
 
-  const required = platformSet === "windows"
-    ? REQUIRED_PLATFORM_GROUPS.filter(({ label }) => label.startsWith("Windows"))
-    : REQUIRED_PLATFORM_GROUPS;
+  const required =
+    platformSet === "windows"
+      ? REQUIRED_PLATFORM_GROUPS.filter(({ label }) => label.startsWith("Windows"))
+      : REQUIRED_PLATFORM_GROUPS;
   const matchedPlatforms = required.map(({ keys, label }) => {
     const key = keys.find((candidate) => candidate in manifest.platforms!);
     if (!key) {
-      throw new Error(
-        `更新清单缺少 ${label}，需要以下平台键之一：${keys.join(", ")}`,
-      );
+      throw new Error(`更新清单缺少 ${label}，需要以下平台键之一：${keys.join(", ")}`);
     }
     return key;
   });

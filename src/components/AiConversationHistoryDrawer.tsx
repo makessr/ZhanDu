@@ -1,16 +1,5 @@
-import {
-  Button,
-  Drawer,
-  Empty,
-  Spin,
-  Tooltip,
-  Typography,
-} from "@arco-design/web-react";
-import {
-  IconDelete,
-  IconDownload,
-  IconEdit,
-} from "@arco-design/web-react/icon";
+import { Button, Drawer, Empty, Spin, Tooltip, Typography } from "@arco-design/web-react";
+import { IconDelete, IconDownload, IconEdit } from "@arco-design/web-react/icon";
 
 export interface AiConversationHistoryItem {
   id: string;
@@ -63,9 +52,7 @@ function AiConversationHistoryDrawer({
       title={
         <div className="ai-conversation-history-drawer-title">
           <span>对话历史</span>
-          <Typography.Text type="secondary">
-            {conversations.length} 条
-          </Typography.Text>
+          <Typography.Text type="secondary">{conversations.length} 条</Typography.Text>
         </div>
       }
       visible={visible}

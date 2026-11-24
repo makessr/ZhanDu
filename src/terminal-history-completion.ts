@@ -1,10 +1,4 @@
-import type {
-  IDecoration,
-  IDisposable,
-  IMarker,
-  ITerminalAddon,
-  Terminal,
-} from "@xterm/xterm";
+import type { IDecoration, IDisposable, IMarker, ITerminalAddon, Terminal } from "@xterm/xterm";
 import type { TerminalCommandHistoryRecord } from "./models";
 import { isApplePlatform } from "./platform-utils";
 import { findTerminalHistoryCompletion } from "./terminal-command-history";
@@ -46,9 +40,7 @@ export class TerminalHistoryCompletionAddon implements ITerminalAddon {
   private marker?: IMarker;
   private readonly disposables: IDisposable[] = [];
 
-  public constructor(
-    private readonly options: TerminalHistoryCompletionOptions,
-  ) {}
+  public constructor(private readonly options: TerminalHistoryCompletionOptions) {}
 
   public get suggestion() {
     return this.suggestionValue;
@@ -63,9 +55,7 @@ export class TerminalHistoryCompletionAddon implements ITerminalAddon {
       throw new Error("TerminalHistoryCompletionAddon is already active");
     }
     if (!terminal.options.allowProposedApi) {
-      throw new Error(
-        "TerminalHistoryCompletionAddon requires allowProposedApi for decorations",
-      );
+      throw new Error("TerminalHistoryCompletionAddon requires allowProposedApi for decorations");
     }
     this.terminal = terminal;
     this.disposables.push(
@@ -269,23 +259,15 @@ export class TerminalHistoryCompletionAddon implements ITerminalAddon {
     if (inputStartLine < anchor.marker.line) return undefined;
 
     let commandLine = "";
-    for (
-      let lineIndex = inputStartLine;
-      lineIndex <= cursorLine;
-      lineIndex += 1
-    ) {
+    for (let lineIndex = inputStartLine; lineIndex <= cursorLine; lineIndex += 1) {
       const line = buffer.getLine(lineIndex);
       if (!line) return undefined;
       const startColumn = lineIndex === inputStartLine ? anchor.x : 0;
-      const endColumn =
-        lineIndex === cursorLine ? buffer.cursorX : terminal.cols;
+      const endColumn = lineIndex === cursorLine ? buffer.cursorX : terminal.cols;
       if (endColumn < startColumn) return undefined;
       commandLine += line.translateToString(true, startColumn, endColumn);
     }
-    if (
-      commandLine.length > 4_096 ||
-      /[\u0000-\u001f\u007f]/u.test(commandLine)
-    ) {
+    if (commandLine.length > 4_096 || /[\u0000-\u001f\u007f]/u.test(commandLine)) {
       return undefined;
     }
     return commandLine;
@@ -331,10 +313,7 @@ export class TerminalHistoryCompletionAddon implements ITerminalAddon {
     }
 
     const cursorX = terminal.buffer.active.cursorX;
-    const fitted = fitGhostText(
-      suggestion,
-      Math.max(1, terminal.cols - cursorX),
-    );
+    const fitted = fitGhostText(suggestion, Math.max(1, terminal.cols - cursorX));
     if (!fitted.text) return;
     const marker = terminal.registerMarker(0);
     const decoration = terminal.registerDecoration({
@@ -354,9 +333,7 @@ export class TerminalHistoryCompletionAddon implements ITerminalAddon {
       element.style.color = this.options.ghostTextColor ?? "#86909c";
       element.style.fontFamily = terminal.options.fontFamily ?? "monospace";
       element.style.fontSize = `${fontSize}px`;
-      element.style.fontWeight = String(
-        terminal.options.fontWeight ?? "normal",
-      );
+      element.style.fontWeight = String(terminal.options.fontWeight ?? "normal");
       element.style.fontVariantLigatures = "none";
       element.style.letterSpacing = `${terminal.options.letterSpacing ?? 0}px`;
       element.style.lineHeight = String(terminal.options.lineHeight ?? 1);
@@ -423,10 +400,7 @@ function characterCellWidth(character: string) {
 }
 
 function textCellWidth(value: string) {
-  return Array.from(value).reduce(
-    (width, character) => width + characterCellWidth(character),
-    0,
-  );
+  return Array.from(value).reduce((width, character) => width + characterCellWidth(character), 0);
 }
 
 function takeCells(value: string, limit: number) {
@@ -443,8 +417,7 @@ function takeCells(value: string, limit: number) {
 
 function fitGhostText(value: string, availableCells: number) {
   const width = textCellWidth(value);
-  if (width <= availableCells)
-    return { text: value, width: Math.max(1, width) };
+  if (width <= availableCells) return { text: value, width: Math.max(1, width) };
   if (availableCells <= 3) {
     const text = ".".repeat(availableCells);
     return { text, width: availableCells };

@@ -577,6 +577,9 @@ pub(crate) async fn sftp_download(
                 };
                 let result = download_file(&sftp, &task);
                 let _ = sftp.shutdown();
+                if result.is_ok() {
+                    crate::local_files::record_completed_transfer(PathBuf::from(&local_path));
+                }
                 result
             })();
             report_transfer_result(&reporter, &control, &result);
@@ -652,6 +655,9 @@ pub(crate) async fn sftp_download_archive(
                 let _ = sftp.unlink(Path::new(&remote_archive_path));
                 let _ = sftp.rmdir(Path::new(&temporary_directory));
                 let _ = sftp.shutdown();
+                if result.is_ok() {
+                    crate::local_files::record_completed_transfer(PathBuf::from(&local_path));
+                }
                 result
             })();
             report_transfer_result(&reporter, &control, &result);

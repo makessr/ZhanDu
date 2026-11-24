@@ -3,9 +3,7 @@ import { Button, Tooltip } from "@arco-design/web-react";
 import { IconDelete } from "@arco-design/web-react/icon";
 import type { ExternalEditPayload } from "../../tauri-protocol";
 import { isActiveSftpTransfer } from "../../sftp-utils";
-import TransferActivityList, {
-  type TransferActivityRecord,
-} from "../TransferActivityList";
+import TransferActivityList, { type TransferActivityRecord } from "../TransferActivityList";
 import useTransferRecordActions from "./useTransferRecordActions";
 
 interface SftpTransferDrawerProps {
@@ -73,7 +71,13 @@ export default function SftpTransferDrawer({
     >
       {embedded && (
         <div className="workspace-tool-actions">
-          <Button disabled={!transfers.some((item) => !isActiveSftpTransfer(item.status))} onClick={onClearFinished} size="mini">清除已完成</Button>
+          <Button
+            disabled={!transfers.some((item) => !isActiveSftpTransfer(item.status))}
+            onClick={onClearFinished}
+            size="mini"
+          >
+            清除已完成
+          </Button>
         </div>
       )}
       <TransferActivityList

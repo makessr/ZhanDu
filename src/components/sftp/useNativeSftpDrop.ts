@@ -11,10 +11,7 @@ interface NativeSftpDropOptions {
   ready: boolean;
 }
 
-export default function useNativeSftpDrop({
-  onUploadPaths,
-  ready,
-}: NativeSftpDropOptions) {
+export default function useNativeSftpDrop({ onUploadPaths, ready }: NativeSftpDropOptions) {
   const [active, setActive] = useState(false);
   const [targetPath, setTargetPath] = useState<string>();
   const dropZoneRef = useRef<HTMLDivElement>(null);
@@ -31,9 +28,7 @@ export default function useNativeSftpDrop({
     let scaleFactor = 1;
     const currentWindow = getCurrentWindow();
 
-    const handleDragDrop: Parameters<
-      typeof currentWindow.onDragDropEvent
-    >[0] = ({ payload }) => {
+    const handleDragDrop: Parameters<typeof currentWindow.onDragDropEvent>[0] = ({ payload }) => {
       if (payload.type === "leave") {
         setActive(false);
         setTargetPath(undefined);
@@ -41,25 +36,16 @@ export default function useNativeSftpDrop({
       }
       const rect = dropZoneRef.current?.getBoundingClientRect();
       const point = rect
-        ? resolveNativeDropPoint(
-            payload.position,
-            scaleFactor,
-            rect,
-            isApplePlatform(),
-          )
+        ? resolveNativeDropPoint(payload.position, scaleFactor, rect, isApplePlatform())
         : undefined;
       const x = point?.x ?? 0;
       const y = point?.y ?? 0;
       const inside = Boolean(readyRef.current && point?.inside);
       const row = inside
-        ? document
-            .elementFromPoint(x, y)
-            ?.closest<HTMLElement>("[data-sftp-entry-id]")
+        ? document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-sftp-entry-id]")
         : undefined;
       const targetDirectory =
-        row?.dataset.sftpEntryKind === "directory"
-          ? row.dataset.sftpEntryPath
-          : undefined;
+        row?.dataset.sftpEntryKind === "directory" ? row.dataset.sftpEntryPath : undefined;
 
       if (payload.type === "drop") {
         setActive(false);

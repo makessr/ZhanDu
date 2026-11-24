@@ -6,10 +6,7 @@ import {
 } from "./ai-approval-queue";
 import type { AiCommandProposal } from "./ai-command-proposals";
 
-function command(
-  id: string,
-  status: AiCommandProposal["status"],
-): AiCommandProposal {
+function command(id: string, status: AiCommandProposal["status"]): AiCommandProposal {
   return {
     assessment: { canInsert: true, label: "低风险", risk: "safe" },
     command: "uname -a",
@@ -61,12 +58,8 @@ describe("AI approval queue", () => {
       },
     };
 
-    expect(aiApprovalRequiresUserDecision(commandItem, "on_request")).toBe(
-      true,
-    );
-    expect(aiApprovalRequiresUserDecision(commandItem, "auto_safe")).toBe(
-      false,
-    );
+    expect(aiApprovalRequiresUserDecision(commandItem, "on_request")).toBe(true);
+    expect(aiApprovalRequiresUserDecision(commandItem, "auto_safe")).toBe(false);
     expect(aiApprovalRequiresUserDecision(editItem, "auto_safe")).toBe(true);
     expect(aiApprovalRequiresUserDecision(deleteItem, "auto_safe")).toBe(true);
     expect(
@@ -86,12 +79,8 @@ describe("AI approval queue", () => {
         "auto_safe",
       ),
     ).toBe(true);
-    expect(aiApprovalRequiresUserDecision(commandItem, "full_access")).toBe(
-      false,
-    );
-    expect(aiApprovalRequiresUserDecision(deleteItem, "full_access")).toBe(
-      false,
-    );
+    expect(aiApprovalRequiresUserDecision(commandItem, "full_access")).toBe(false);
+    expect(aiApprovalRequiresUserDecision(deleteItem, "full_access")).toBe(false);
     expect(
       aiApprovalRequiresUserDecision(
         {
@@ -148,10 +137,7 @@ describe("AI approval queue", () => {
       "plan-1",
     );
 
-    expect(queue.map((item) => item.kind)).toEqual([
-      "diagnostic",
-      "command",
-    ]);
+    expect(queue.map((item) => item.kind)).toEqual(["diagnostic", "command"]);
     expect(queue[0]).toMatchObject({
       kind: "diagnostic",
       messageId: "message-1",
@@ -247,10 +233,6 @@ describe("AI approval queue", () => {
       true,
     );
 
-    expect(queue.map((item) => item.kind)).toEqual([
-      "command",
-      "file-edit",
-      "file-operation",
-    ]);
+    expect(queue.map((item) => item.kind)).toEqual(["command", "file-edit", "file-operation"]);
   });
 });

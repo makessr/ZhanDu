@@ -363,7 +363,10 @@
   border-radius: 4px;
   color: var(--workspace-ink);
   background: var(--workspace-surface);
-  font: 12px ui-monospace, Consolas, monospace;
+  font:
+    12px ui-monospace,
+    Consolas,
+    monospace;
 }
 
 .terminal-command-choices,
@@ -388,7 +391,10 @@
   border-radius: 2px;
   color: inherit;
   background: transparent;
-  font: 12px ui-monospace, Consolas, monospace;
+  font:
+    12px ui-monospace,
+    Consolas,
+    monospace;
   text-align: start;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -452,10 +458,7 @@
 
 .terminal-view .xterm-scrollable-element > .scrollbar.vertical > .slider,
 .terminal-view .xterm-scrollable-element > .scrollbar.vertical > .slider:hover,
-.terminal-view
-  .xterm-scrollable-element
-  > .scrollbar.vertical
-  > .slider.active {
+.terminal-view .xterm-scrollable-element > .scrollbar.vertical > .slider.active {
   background: var(--fs-scrollbar-thumb) !important;
 }
 

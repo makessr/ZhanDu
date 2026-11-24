@@ -42,16 +42,8 @@ describe("credential registry", () => {
   });
 
   test("keeps only credentials confirmed by the native keychain", () => {
-    const linked = createCredentialReference(
-      "hostPassword",
-      "host-1",
-      "主机：生产机",
-    );
-    const orphan = createCredentialReference(
-      "proxyPassword",
-      "proxy-old",
-      "代理：已删除",
-    );
+    const linked = createCredentialReference("hostPassword", "host-1", "主机：生产机");
+    const orphan = createCredentialReference("proxyPassword", "proxy-old", "代理：已删除");
     const reconciled = reconcileCredentialReferences(
       [orphan],
       [linked],

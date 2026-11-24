@@ -1,20 +1,5 @@
-import {
-  isValidElement,
-  memo,
-  useEffect,
-  useState,
-  type ReactNode,
-  type RefObject,
-} from "react";
-import {
-  Button,
-  Message,
-  Space,
-  Spin,
-  Tag,
-  Tooltip,
-  Typography,
-} from "@arco-design/web-react";
+import { isValidElement, memo, useEffect, useState, type ReactNode, type RefObject } from "react";
+import { Button, Message, Space, Spin, Tag, Tooltip, Typography } from "@arco-design/web-react";
 import {
   IconCloud,
   IconCode,
@@ -31,11 +16,7 @@ import remarkGfm from "remark-gfm";
 import type { AiCommandProposal } from "../ai-command-proposals";
 import type { AiFileEditProposal } from "../ai-file-edits";
 import type { AiFileOperationProposal } from "../ai-file-operations";
-import {
-  AI_PROMPT_PRESETS,
-  type AiPromptPreset,
-  type AiPromptPresetId,
-} from "../ai-presets";
+import { AI_PROMPT_PRESETS, type AiPromptPreset, type AiPromptPresetId } from "../ai-presets";
 import type { AiToolRun } from "../ai-tools";
 import type { AiMessage } from "../hooks/useAiConversations";
 import { commandErrorMessage } from "../tauri-protocol";
@@ -44,7 +25,42 @@ import AiDiagnosticPlanList from "./AiDiagnosticPlanList";
 import AiFileChangePanels from "./AiFileChangePanels";
 import AiToolRunList from "./AiToolRunList";
 
-interface AiMessageTimelineProps {
+export interface AiMessageTimelineActions {
+  addToolRunToDraft: (run: AiToolRun) => void;
+  analyzeCommand: (messageId: string, proposal: AiCommandProposal) => void;
+  applyAllFileEdits: (messageId: string, proposals: AiFileEditProposal[]) => void;
+  applyAllFileOperations: (messageId: string, proposals: AiFileOperationProposal[]) => void;
+  copyCode: (value: string) => Promise<void>;
+  copyCommand: (command: string) => void | Promise<void>;
+  copyCommands: (proposals: AiCommandProposal[]) => void | Promise<void>;
+  cancelDiagnosticPlan: (planId: string) => void;
+  confirmDiagnosticPlan: (planId: string, selectedCallIds: string[]) => void;
+  reviseDiagnosticPlan: (planId: string, feedback: string) => void;
+  approveCommandProposal: (messageId: string, proposal: AiCommandProposal) => void | Promise<void>;
+  openFileEditReview: (messageId: string, proposal: AiFileEditProposal) => void;
+  openFileOperationReview: (messageId: string, proposal: AiFileOperationProposal) => void;
+  rejectCommand: (messageId: string, proposalId: string) => unknown | Promise<unknown>;
+  reviseCommand: (
+    messageId: string,
+    proposal: AiCommandProposal,
+    feedback: string,
+  ) => void | Promise<void>;
+  rejectFileEdit: (messageId: string, proposalId: string) => void;
+  rejectFileOperation: (messageId: string, proposalId: string) => void;
+  retryFileEdit: (messageId: string, proposalId: string) => void;
+  retryFileOperation: (messageId: string, proposalId: string) => void;
+  retryMessage: (messageIndex: number) => void;
+  rollbackAllFileEdits: (messageId: string, proposals: AiFileEditProposal[]) => void;
+  rollbackAllFileOperations: (messageId: string, proposals: AiFileOperationProposal[]) => void;
+  rollbackFileEdit: (messageId: string, proposal: AiFileEditProposal) => void;
+  rollbackFileOperation: (messageId: string, proposal: AiFileOperationProposal) => void;
+  selectPreset: (preset: AiPromptPreset) => void;
+  stopDiagnosticPlan: (planId: string) => void;
+  toggleToolRun: (key: string) => void;
+}
+
+export interface AiMessageTimelineProps {
+  actions: AiMessageTimelineActions;
   activeConversationAvailable: boolean;
   applyingFileChanges: boolean;
   canInsertCommand: boolean;
@@ -57,64 +73,6 @@ interface AiMessageTimelineProps {
   hostName: string;
   loading: boolean;
   messages: AiMessage[];
-  onAddToolRunToDraft: (run: AiToolRun) => void;
-  onAnalyzeCommand: (messageId: string, proposal: AiCommandProposal) => void;
-  onApplyAllFileEdits: (
-    messageId: string,
-    proposals: AiFileEditProposal[],
-  ) => void;
-  onApplyAllFileOperations: (
-    messageId: string,
-    proposals: AiFileOperationProposal[],
-  ) => void;
-  onCopyCode: (value: string) => Promise<void>;
-  onCopyCommand: (command: string) => void | Promise<void>;
-  onCopyCommands: (proposals: AiCommandProposal[]) => void | Promise<void>;
-  onCancelDiagnosticPlan: (planId: string) => void;
-  onConfirmDiagnosticPlan: (planId: string, selectedCallIds: string[]) => void;
-  onReviseDiagnosticPlan: (planId: string, feedback: string) => void;
-  onApproveCommandProposal: (
-    messageId: string,
-    proposal: AiCommandProposal,
-  ) => void | Promise<void>;
-  onOpenFileEditReview: (
-    messageId: string,
-    proposal: AiFileEditProposal,
-  ) => void;
-  onOpenFileOperationReview: (
-    messageId: string,
-    proposal: AiFileOperationProposal,
-  ) => void;
-  onRejectCommand: (
-    messageId: string,
-    proposalId: string,
-  ) => unknown | Promise<unknown>;
-  onReviseCommand: (
-    messageId: string,
-    proposal: AiCommandProposal,
-    feedback: string,
-  ) => void | Promise<void>;
-  onRejectFileEdit: (messageId: string, proposalId: string) => void;
-  onRejectFileOperation: (messageId: string, proposalId: string) => void;
-  onRetryFileEdit: (messageId: string, proposalId: string) => void;
-  onRetryFileOperation: (messageId: string, proposalId: string) => void;
-  onRetryMessage: (messageIndex: number) => void;
-  onRollbackAllFileEdits: (
-    messageId: string,
-    proposals: AiFileEditProposal[],
-  ) => void;
-  onRollbackAllFileOperations: (
-    messageId: string,
-    proposals: AiFileOperationProposal[],
-  ) => void;
-  onRollbackFileEdit: (messageId: string, proposal: AiFileEditProposal) => void;
-  onRollbackFileOperation: (
-    messageId: string,
-    proposal: AiFileOperationProposal,
-  ) => void;
-  onSelectPreset: (preset: AiPromptPreset) => void;
-  onStopDiagnosticPlan: (planId: string) => void;
-  onToggleToolRun: (key: string) => void;
   scrollRef: RefObject<HTMLDivElement>;
   sending: boolean;
   sessionId: string | null;
@@ -133,25 +91,13 @@ function textContent(node: ReactNode): string {
 
 function codeLanguage(node: ReactNode) {
   if (!isValidElement<{ className?: string }>(node)) return "";
-  return (
-    node.props.className?.match(/language-([\w-]+)/)?.[1]?.toLowerCase() ?? ""
-  );
+  return node.props.className?.match(/language-([\w-]+)/)?.[1]?.toLowerCase() ?? "";
 }
 
 function isShellLanguage(language: string) {
   return (
     !language ||
-    [
-      "bash",
-      "bat",
-      "cmd",
-      "console",
-      "fish",
-      "powershell",
-      "sh",
-      "shell",
-      "zsh",
-    ].includes(language)
+    ["bash", "bat", "cmd", "console", "fish", "powershell", "sh", "shell", "zsh"].includes(language)
   );
 }
 
@@ -175,12 +121,7 @@ function containsOnlyDockedApproval(
   dockedFileEditProposalIds?: ReadonlySet<string>,
   dockedFileOperationProposalIds?: ReadonlySet<string>,
 ) {
-  if (
-    message.role !== "assistant" ||
-    message.content ||
-    message.reasoning ||
-    message.failed
-  ) {
+  if (message.role !== "assistant" || message.content || message.reasoning || message.failed) {
     return false;
   }
   const hasDockedCommand = message.commandProposals?.some((proposal) =>
@@ -192,30 +133,19 @@ function containsOnlyDockedApproval(
   const hasDockedFileEdit = message.fileEditProposals?.some((proposal) =>
     dockedFileEditProposalIds?.has(proposal.id),
   );
-  const hasDockedFileOperation = message.fileOperationProposals?.some(
-    (proposal) => dockedFileOperationProposalIds?.has(proposal.id),
+  const hasDockedFileOperation = message.fileOperationProposals?.some((proposal) =>
+    dockedFileOperationProposalIds?.has(proposal.id),
   );
-  if (
-    !hasDockedCommand &&
-    !hasDockedDiagnostic &&
-    !hasDockedFileEdit &&
-    !hasDockedFileOperation
-  ) {
+  if (!hasDockedCommand && !hasDockedDiagnostic && !hasDockedFileEdit && !hasDockedFileOperation) {
     return false;
   }
 
   return !(
-    message.commandProposals?.some(
-      (proposal) => !dockedCommandProposalIds?.has(proposal.id),
-    ) ||
+    message.commandProposals?.some((proposal) => !dockedCommandProposalIds?.has(proposal.id)) ||
     message.commandRecords?.length ||
-    message.diagnosticPlans?.some(
-      (plan) => !dockedDiagnosticPlanIds?.has(plan.id),
-    ) ||
+    message.diagnosticPlans?.some((plan) => !dockedDiagnosticPlanIds?.has(plan.id)) ||
     message.toolRuns?.some((run) => !run.planId) ||
-    message.fileEditProposals?.some(
-      (proposal) => !dockedFileEditProposalIds?.has(proposal.id),
-    ) ||
+    message.fileEditProposals?.some((proposal) => !dockedFileEditProposalIds?.has(proposal.id)) ||
     message.fileOperationProposals?.some(
       (proposal) => !dockedFileOperationProposalIds?.has(proposal.id),
     ) ||
@@ -223,13 +153,7 @@ function containsOnlyDockedApproval(
   );
 }
 
-function AiReasoningDisclosure({
-  active,
-  reasoning,
-}: {
-  active: boolean;
-  reasoning: string;
-}) {
+function AiReasoningDisclosure({ active, reasoning }: { active: boolean; reasoning: string }) {
   const [expanded, setExpanded] = useState(active);
 
   useEffect(() => {
@@ -290,15 +214,9 @@ function messageHasActiveWorkflow(message: AiMessage) {
     message.diagnosticPlans?.some(
       (plan) => plan.status === "pending" || plan.status === "running",
     ) ||
-    message.toolRuns?.some(
-      (run) => run.status === "pending" || run.status === "running",
-    ) ||
-    message.fileEditProposals?.some(
-      (proposal) => proposal.status === "pending",
-    ) ||
-    message.fileOperationProposals?.some(
-      (proposal) => proposal.status === "pending",
-    ),
+    message.toolRuns?.some((run) => run.status === "pending" || run.status === "running") ||
+    message.fileEditProposals?.some((proposal) => proposal.status === "pending") ||
+    message.fileOperationProposals?.some((proposal) => proposal.status === "pending"),
   );
 }
 
@@ -322,11 +240,7 @@ function messageIsActivelyStreaming(
 
 function AiStreamingIndicator() {
   return (
-    <div
-      aria-label="AI 正在生成"
-      className="ai-streaming-indicator"
-      role="status"
-    >
+    <div aria-label="AI 正在生成" className="ai-streaming-indicator" role="status">
       <span>正在生成</span>
       <span aria-hidden="true" className="ai-streaming-dots">
         <i />
@@ -352,54 +266,51 @@ const AiMarkdown = memo(
     onCopyCode: (value: string) => Promise<void>;
   }) {
     return (
-    <ReactMarkdown
-      components={{
-        pre: ({ children: codeNode }) => {
-          const command = textContent(codeNode).trim();
-          const language = codeLanguage(codeNode);
-          const isCommand = isShellLanguage(language);
-          return (
-            <div className="ai-code-block">
-              <div className="ai-code-block-header">
-                <span className="ai-code-block-label">
-                  {isCommand ? "命令建议" : "代码"}
-                  <Tag size="small">
-                    {isCommand ? "仅供查看" : language || "代码"}
-                  </Tag>
-                </span>
-                <Space size="mini">
-                  <Tooltip content="复制">
-                    <Button
-                      aria-label="复制代码"
-                      icon={<IconCopy />}
-                      onClick={() =>
-                        void onCopyCode(command)
-                          .then(() => Message.success("已复制"))
-                          .catch((error) =>
-                            Message.error(commandErrorMessage(error)),
-                          )
-                      }
-                      size="mini"
-                      type="text"
-                    />
-                  </Tooltip>
-                </Space>
+      <ReactMarkdown
+        components={{
+          pre: ({ children: codeNode }) => {
+            const command = textContent(codeNode).trim();
+            const language = codeLanguage(codeNode);
+            const isCommand = isShellLanguage(language);
+            return (
+              <div className="ai-code-block">
+                <div className="ai-code-block-header">
+                  <span className="ai-code-block-label">
+                    {isCommand ? "命令建议" : "代码"}
+                    <Tag size="small">{isCommand ? "仅供查看" : language || "代码"}</Tag>
+                  </span>
+                  <Space size="mini">
+                    <Tooltip content="复制">
+                      <Button
+                        aria-label="复制代码"
+                        icon={<IconCopy />}
+                        onClick={() =>
+                          void onCopyCode(command)
+                            .then(() => Message.success("已复制"))
+                            .catch((error) => Message.error(commandErrorMessage(error)))
+                        }
+                        size="mini"
+                        type="text"
+                      />
+                    </Tooltip>
+                  </Space>
+                </div>
+                <pre>{codeNode}</pre>
               </div>
-              <pre>{codeNode}</pre>
-            </div>
-          );
-        },
-      }}
-      remarkPlugins={REMARK_PLUGINS}
-    >
-      {children}
-    </ReactMarkdown>
+            );
+          },
+        }}
+        remarkPlugins={REMARK_PLUGINS}
+      >
+        {children}
+      </ReactMarkdown>
     );
   },
   (previous, next) => previous.children === next.children,
 );
 
 function AiMessageTimeline({
+  actions,
   activeConversationAvailable,
   applyingFileChanges,
   canInsertCommand,
@@ -412,33 +323,6 @@ function AiMessageTimeline({
   hostName,
   loading,
   messages,
-  onAddToolRunToDraft,
-  onAnalyzeCommand,
-  onApplyAllFileEdits,
-  onApplyAllFileOperations,
-  onCopyCode,
-  onCopyCommand,
-  onCopyCommands,
-  onCancelDiagnosticPlan,
-  onConfirmDiagnosticPlan,
-  onReviseDiagnosticPlan,
-  onApproveCommandProposal,
-  onOpenFileEditReview,
-  onOpenFileOperationReview,
-  onRejectCommand,
-  onReviseCommand,
-  onRejectFileEdit,
-  onRejectFileOperation,
-  onRetryFileEdit,
-  onRetryFileOperation,
-  onRetryMessage,
-  onRollbackAllFileEdits,
-  onRollbackAllFileOperations,
-  onRollbackFileEdit,
-  onRollbackFileOperation,
-  onSelectPreset,
-  onStopDiagnosticPlan,
-  onToggleToolRun,
   scrollRef,
   sending,
   sessionId,
@@ -461,10 +345,7 @@ function AiMessageTimeline({
             return null;
           }
           return (
-            <div
-              className={`ai-message ai-message-${message.role}`}
-              key={message.id}
-            >
+            <div className={`ai-message ai-message-${message.role}`} key={message.id}>
               <div className="ai-message-role">
                 {message.role === "assistant" ? <IconRobot /> : null}
                 <Typography.Text type="secondary">
@@ -478,30 +359,23 @@ function AiMessageTimeline({
               </div>
               {message.role === "assistant" && message.reasoning && (
                 <AiReasoningDisclosure
-                  active={messageIsActivelyThinking(
-                    message,
-                    index,
-                    messages.length,
-                    sending,
-                  )}
+                  active={messageIsActivelyThinking(message, index, messages.length, sending)}
                   reasoning={message.reasoning}
                 />
               )}
               {message.role === "assistant" &&
                 Boolean(
-                  message.diagnosticPlans?.some(
-                    (plan) => !dockedDiagnosticPlanIds?.has(plan.id),
-                  ),
+                  message.diagnosticPlans?.some((plan) => !dockedDiagnosticPlanIds?.has(plan.id)),
                 ) && (
                   <AiDiagnosticPlanList
                     expandedRuns={expandedToolRuns}
                     messageId={message.id}
-                    onAddToDraft={onAddToolRunToDraft}
-                    onCancel={onCancelDiagnosticPlan}
-                    onConfirm={onConfirmDiagnosticPlan}
-                    onRevise={onReviseDiagnosticPlan}
-                    onStop={onStopDiagnosticPlan}
-                    onToggleRun={onToggleToolRun}
+                    onAddToDraft={actions.addToolRunToDraft}
+                    onCancel={actions.cancelDiagnosticPlan}
+                    onConfirm={actions.confirmDiagnosticPlan}
+                    onRevise={actions.reviseDiagnosticPlan}
+                    onStop={actions.stopDiagnosticPlan}
+                    onToggleRun={actions.toggleToolRun}
                     plans={(message.diagnosticPlans ?? []).filter(
                       (plan) => !dockedDiagnosticPlanIds?.has(plan.id),
                     )}
@@ -514,8 +388,8 @@ function AiMessageTimeline({
                   <AiToolRunList
                     expandedRuns={expandedToolRuns}
                     messageId={message.id}
-                    onAddToDraft={onAddToolRunToDraft}
-                    onToggle={onToggleToolRun}
+                    onAddToDraft={actions.addToolRunToDraft}
+                    onToggle={actions.toggleToolRun}
                     runs={message.toolRuns?.filter((run) => !run.planId) ?? []}
                     sending={sending}
                   />
@@ -525,19 +399,13 @@ function AiMessageTimeline({
                   canInsertCommand={canInsertCommand}
                   hasRecentTerminalOutput={hasRecentTerminalOutput}
                   hostName={hostName}
-                  onApprove={(proposal) =>
-                    onApproveCommandProposal(message.id, proposal)
-                  }
-                  onAnalyze={(proposal) =>
-                    onAnalyzeCommand(message.id, proposal)
-                  }
-                  onCopy={onCopyCommand}
-                  onCopyAll={onCopyCommands}
-                  onReject={(proposalId) =>
-                    onRejectCommand(message.id, proposalId)
-                  }
+                  onApprove={(proposal) => actions.approveCommandProposal(message.id, proposal)}
+                  onAnalyze={(proposal) => actions.analyzeCommand(message.id, proposal)}
+                  onCopy={actions.copyCommand}
+                  onCopyAll={actions.copyCommands}
+                  onReject={(proposalId) => actions.rejectCommand(message.id, proposalId)}
                   onRevise={(proposal, feedback) =>
-                    onReviseCommand(message.id, proposal, feedback)
+                    actions.reviseCommand(message.id, proposal, feedback)
                   }
                   proposals={message.commandProposals?.filter(
                     (proposal) => !dockedCommandProposalIds?.has(proposal.id),
@@ -554,45 +422,34 @@ function AiMessageTimeline({
                   editProposals={message.fileEditProposals?.filter(
                     (proposal) => !dockedFileEditProposalIds?.has(proposal.id),
                   )}
-                  onApplyAllEdits={(proposals) =>
-                    onApplyAllFileEdits(message.id, proposals)
-                  }
+                  onApplyAllEdits={(proposals) => actions.applyAllFileEdits(message.id, proposals)}
                   onApplyAllOperations={(proposals) =>
-                    onApplyAllFileOperations(message.id, proposals)
+                    actions.applyAllFileOperations(message.id, proposals)
                   }
-                  onOpenEditReview={(proposal) =>
-                    onOpenFileEditReview(message.id, proposal)
-                  }
+                  onOpenEditReview={(proposal) => actions.openFileEditReview(message.id, proposal)}
                   onOpenOperationReview={(proposal) =>
-                    onOpenFileOperationReview(message.id, proposal)
+                    actions.openFileOperationReview(message.id, proposal)
                   }
-                  onRejectEdit={(proposalId) =>
-                    onRejectFileEdit(message.id, proposalId)
-                  }
+                  onRejectEdit={(proposalId) => actions.rejectFileEdit(message.id, proposalId)}
                   onRejectOperation={(proposalId) =>
-                    onRejectFileOperation(message.id, proposalId)
+                    actions.rejectFileOperation(message.id, proposalId)
                   }
-                  onRetryEdit={(proposalId) =>
-                    onRetryFileEdit(message.id, proposalId)
-                  }
+                  onRetryEdit={(proposalId) => actions.retryFileEdit(message.id, proposalId)}
                   onRetryOperation={(proposalId) =>
-                    onRetryFileOperation(message.id, proposalId)
+                    actions.retryFileOperation(message.id, proposalId)
                   }
                   onRollbackAllEdits={(proposals) =>
-                    onRollbackAllFileEdits(message.id, proposals)
+                    actions.rollbackAllFileEdits(message.id, proposals)
                   }
                   onRollbackAllOperations={(proposals) =>
-                    onRollbackAllFileOperations(message.id, proposals)
+                    actions.rollbackAllFileOperations(message.id, proposals)
                   }
-                  onRollbackEdit={(proposal) =>
-                    onRollbackFileEdit(message.id, proposal)
-                  }
+                  onRollbackEdit={(proposal) => actions.rollbackFileEdit(message.id, proposal)}
                   onRollbackOperation={(proposal) =>
-                    onRollbackFileOperation(message.id, proposal)
+                    actions.rollbackFileOperation(message.id, proposal)
                   }
                   operationProposals={message.fileOperationProposals?.filter(
-                    (proposal) =>
-                      !dockedFileOperationProposalIds?.has(proposal.id),
+                    (proposal) => !dockedFileOperationProposalIds?.has(proposal.id),
                   )}
                 />
               )}
@@ -600,24 +457,17 @@ function AiMessageTimeline({
                 {message.role === "assistant" ? (
                   <>
                     {message.content && (
-                      <AiMarkdown onCopyCode={onCopyCode}>
-                        {message.content}
-                      </AiMarkdown>
+                      <AiMarkdown onCopyCode={actions.copyCode}>{message.content}</AiMarkdown>
                     )}
-                    {messageIsActivelyStreaming(
-                      message,
-                      index,
-                      messages.length,
-                      sending,
-                    ) && <AiStreamingIndicator />}
+                    {messageIsActivelyStreaming(message, index, messages.length, sending) && (
+                      <AiStreamingIndicator />
+                    )}
                     {message.failed && (
                       <div className="ai-message-failure">
-                        <Typography.Text type="error">
-                          {message.error}
-                        </Typography.Text>
+                        <Typography.Text type="error">{message.error}</Typography.Text>
                         <Button
                           icon={<IconRefresh />}
-                          onClick={() => onRetryMessage(index)}
+                          onClick={() => actions.retryMessage(index)}
                           size="mini"
                           type="text"
                         >
@@ -642,7 +492,7 @@ function AiMessageTimeline({
               <Button
                 icon={promptPresetIcon(preset.id)}
                 key={preset.id}
-                onClick={() => onSelectPreset(preset)}
+                onClick={() => actions.selectPreset(preset)}
                 type="secondary"
               >
                 {preset.label}

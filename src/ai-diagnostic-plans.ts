@@ -3,12 +3,7 @@ import { redactAiContext } from "./ai-utils";
 
 export const MAX_AI_DIAGNOSTIC_PLAN_STEPS = 6;
 
-export type AiDiagnosticPlanStatus =
-  | "pending"
-  | "running"
-  | "completed"
-  | "partial"
-  | "cancelled";
+export type AiDiagnosticPlanStatus = "pending" | "running" | "completed" | "partial" | "cancelled";
 
 export interface AiDiagnosticPlan {
   createdAt: string;
@@ -54,9 +49,7 @@ export function completeAiDiagnosticPlan(
   };
 }
 
-export function sanitizePersistedAiDiagnosticPlans(
-  value: unknown,
-): AiDiagnosticPlan[] | undefined {
+export function sanitizePersistedAiDiagnosticPlans(value: unknown): AiDiagnosticPlan[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const plans = value
     .map((item): AiDiagnosticPlan | undefined => {
@@ -68,9 +61,7 @@ export function sanitizePersistedAiDiagnosticPlans(
         !id ||
         !createdAt ||
         !Number.isFinite(Date.parse(createdAt)) ||
-        (status !== "completed" &&
-          status !== "partial" &&
-          status !== "cancelled") ||
+        (status !== "completed" && status !== "partial" && status !== "cancelled") ||
         !Array.isArray(item.stepCallIds)
       ) {
         return undefined;

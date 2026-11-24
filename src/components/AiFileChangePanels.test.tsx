@@ -1,14 +1,9 @@
 import { describe, expect, mock, test } from "bun:test";
 import { fireEvent, render, screen } from "@testing-library/react";
-import type {
-  AiFileChangeRecord,
-  AiFileEditProposal,
-} from "../ai-file-edits";
+import type { AiFileChangeRecord, AiFileEditProposal } from "../ai-file-edits";
 import type { AiFileOperationProposal } from "../ai-file-operations";
 import type { AiRemoteFileContext } from "../ai-utils";
-import AiFileChangePanels, {
-  aiFileProposalStatus,
-} from "./AiFileChangePanels";
+import AiFileChangePanels, { aiFileProposalStatus } from "./AiFileChangePanels";
 
 const FILE: AiRemoteFileContext = {
   content: "port=80\n",
@@ -17,10 +12,7 @@ const FILE: AiRemoteFileContext = {
   size: 8,
 };
 
-function editProposal(
-  id: string,
-  reviewed = true,
-): AiFileEditProposal {
+function editProposal(id: string, reviewed = true): AiFileEditProposal {
   return {
     content: "port=8080\n",
     id,
@@ -43,11 +35,13 @@ function operationProposal(): AiFileOperationProposal {
   };
 }
 
-function renderPanels(options: {
-  changes?: AiFileChangeRecord[];
-  editProposals?: AiFileEditProposal[];
-  operationProposals?: AiFileOperationProposal[];
-} = {}) {
+function renderPanels(
+  options: {
+    changes?: AiFileChangeRecord[];
+    editProposals?: AiFileEditProposal[];
+    operationProposals?: AiFileOperationProposal[];
+  } = {},
+) {
   const callbacks = {
     onApplyAllEdits: mock(() => undefined),
     onApplyAllOperations: mock(() => undefined),
@@ -98,10 +92,9 @@ describe("AiFileChangePanels", () => {
       editProposals: [editProposal("edit-1"), editProposal("edit-2", false)],
     });
 
-    expect(
-      (screen.getByRole("button", { name: "应用全部" }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(true);
+    expect((screen.getByRole("button", { name: "应用全部" }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
   });
 
   test("renders file operations and delegates review without writing directly", () => {

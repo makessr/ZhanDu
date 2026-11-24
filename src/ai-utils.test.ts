@@ -25,9 +25,7 @@ describe("AI terminal command safety", () => {
   });
 
   test("rejects multiline and control-character payloads", () => {
-    expect(() => normalizeAiTerminalCommand("pwd\nwhoami")).toThrow(
-      "多行命令不能直接提交到终端",
-    );
+    expect(() => normalizeAiTerminalCommand("pwd\nwhoami")).toThrow("多行命令不能直接提交到终端");
     expect(() => normalizeAiTerminalCommand("printf '\u0007'")).toThrow(
       "多行命令不能直接提交到终端",
     );
@@ -103,24 +101,15 @@ describe("AI terminal command safety", () => {
   });
 
   test("warns before sensitive remote files are attached", () => {
-    expect(aiRemoteFileSensitivityWarning("/srv/app/.env", "PORT=3000")).toBe(
-      "环境变量文件",
-    );
+    expect(aiRemoteFileSensitivityWarning("/srv/app/.env", "PORT=3000")).toBe("环境变量文件");
     expect(
-      aiRemoteFileSensitivityWarning(
-        "/srv/app/settings.txt",
-        "AWS_SECRET_ACCESS_KEY=secret-value",
-      ),
+      aiRemoteFileSensitivityWarning("/srv/app/settings.txt", "AWS_SECRET_ACCESS_KEY=secret-value"),
     ).toBe("检测到可能的凭据内容");
-    expect(
-      aiRemoteFileSensitivityWarning("/srv/app/readme.md", "hello"),
-    ).toBeNull();
-    expect(
-      aiRemoteFileSensitivityWarning("/srv/app/config", "server=true"),
-    ).toBeNull();
-    expect(
-      aiRemoteFileSensitivityWarning("/home/max/.kube/config", "clusters: []"),
-    ).toBe("Kubernetes 配置");
+    expect(aiRemoteFileSensitivityWarning("/srv/app/readme.md", "hello")).toBeNull();
+    expect(aiRemoteFileSensitivityWarning("/srv/app/config", "server=true")).toBeNull();
+    expect(aiRemoteFileSensitivityWarning("/home/max/.kube/config", "clusters: []")).toBe(
+      "Kubernetes 配置",
+    );
   });
 
   test("builds only selected context sections within the configured limit", () => {
@@ -227,9 +216,7 @@ describe("AI terminal command safety", () => {
     });
     const context = buildAiContextPayload([source], [source.id], 180);
 
-    expect(source.id).toBe(
-      aiRemoteFileContextSourceId("/etc/nginx/nginx.conf"),
-    );
+    expect(source.id).toBe(aiRemoteFileContextSourceId("/etc/nginx/nginx.conf"));
     expect(source.label).toBe("文件:/etc/nginx/nginx.conf");
     expect(context).toContain("远程路径: /etc/nginx/nginx.conf");
     expect(context).toContain("server {");
@@ -238,9 +225,7 @@ describe("AI terminal command safety", () => {
   });
 
   test("deduplicates and bounds remote file context collections", () => {
-    const current = [
-      { content: "old", name: "a.conf", path: "/etc/a.conf", size: 3 },
-    ];
+    const current = [{ content: "old", name: "a.conf", path: "/etc/a.conf", size: 3 }];
     expect(
       mergeAiRemoteFileContexts(current, [
         { content: "new", name: "a.conf", path: "/etc/a.conf", size: 3 },
@@ -284,10 +269,7 @@ describe("AI terminal command safety", () => {
     ];
 
     expect(
-      aiContextMentionIds(
-        "分析 @最近终端输出 和 @当前远程目录\n@服务器状态",
-        sources,
-      ),
+      aiContextMentionIds("分析 @最近终端输出 和 @当前远程目录\n@服务器状态", sources),
     ).toEqual(["terminal-output", "sftp-path"]);
     expect(aiContextMentionIds("分析 @最近终端输出详情", sources)).toEqual([]);
   });
@@ -305,9 +287,7 @@ describe("AI terminal command safety", () => {
       path: "/srv/b/app.conf",
       size: 6,
     });
-    expect(
-      aiContextMentionIds(`检查 @${second.label}`, [first, second]),
-    ).toEqual([second.id]);
+    expect(aiContextMentionIds(`检查 @${second.label}`, [first, second])).toEqual([second.id]);
   });
 
   test("appends missing context mentions without duplicates", () => {
@@ -330,12 +310,8 @@ describe("AI terminal command safety", () => {
       { id: "sftp-path" as const, label: "当前远程目录", content: "/srv/app" },
     ];
 
-    expect(separateAiContextMentions("@最近终端输出查看", sources)).toBe(
-      "@最近终端输出 查看",
-    );
-    expect(separateAiContextMentions("分析 @当前远程目录", sources)).toBe(
-      "分析 @当前远程目录 ",
-    );
+    expect(separateAiContextMentions("@最近终端输出查看", sources)).toBe("@最近终端输出 查看");
+    expect(separateAiContextMentions("分析 @当前远程目录", sources)).toBe("分析 @当前远程目录 ");
     expect(separateAiContextMentions("联系 @max", sources)).toBe("联系 @max");
 
     const nestedSources = [
@@ -363,9 +339,7 @@ describe("AI terminal command safety", () => {
       { id: "sftp-path" as const, label: "当前远程目录", content: "/srv/app" },
     ];
 
-    expect(
-      stripAiContextMentions("请分析 @最近终端输出\n\n@当前远程目录", sources),
-    ).toBe("请分析");
+    expect(stripAiContextMentions("请分析 @最近终端输出\n\n@当前远程目录", sources)).toBe("请分析");
     expect(stripAiContextMentions("联系 @max", sources)).toBe("联系 @max");
   });
 
@@ -374,9 +348,10 @@ describe("AI terminal command safety", () => {
       canInsert: true,
       risk: "safe",
     });
-    expect(
-      assessAiTerminalCommand("sudo systemctl restart nginx"),
-    ).toMatchObject({ canInsert: true, risk: "caution" });
+    expect(assessAiTerminalCommand("sudo systemctl restart nginx")).toMatchObject({
+      canInsert: true,
+      risk: "caution",
+    });
     expect(assessAiTerminalCommand("rm -rf /tmp/cache")).toMatchObject({
       canInsert: true,
       risk: "danger",

@@ -50,11 +50,7 @@ function createConversationCallbacks() {
     },
   );
   const updateMessages = mock(
-    (
-      _hostId: string,
-      _conversationId: string,
-      update: (messages: AiMessage[]) => AiMessage[],
-    ) => {
+    (_hostId: string, _conversationId: string, update: (messages: AiMessage[]) => AiMessage[]) => {
       current = { ...current, messages: update(current.messages) };
       return current;
     },
@@ -103,11 +99,7 @@ const aiSettings: Pick<
   aiCommandProposalsEnabled: true,
 };
 
-function agentTask(
-  id: string,
-  status: AgentTask["status"] = "running",
-  sequence = 2,
-): AgentTask {
+function agentTask(id: string, status: AgentTask["status"] = "running", sequence = 2): AgentTask {
   return {
     activeStepId: null,
     approvalMode: "on_request",
@@ -147,58 +139,56 @@ function agentTask(
 describe("useAiRequestOrchestrator", () => {
   test("leaves tool-loop finalization to the Rust agent runtime", async () => {
     const requests: Array<{ toolRounds: unknown[] }> = [];
-    const invokeMock = mock(
-      async (command: string, args?: Record<string, unknown>) => {
-        if (command === "ai_task_action_results") {
-          const request = args?.request as {
-            calls: Array<{ id: string; name: string }>;
-          };
-          return request.calls.map((call) => ({
-            callId: call.id,
-            content: JSON.stringify({
-              decision: "approved_and_completed",
-              message: "远程文件已更新",
-              ok: true,
-            }),
-            name: call.name,
-          }));
-        }
-        if (command !== "ai_chat_start") {
-          throw new Error(`unexpected command: ${command}`);
-        }
-        const request = args?.request as { toolRounds: unknown[] };
-        requests.push(request);
-        if (request.toolRounds.length >= 8) {
-          return {
-            content: "已根据现有诊断结果完成总结，未执行更多工具。",
-            toolCalls: [],
-          };
-        }
-        const index = request.toolRounds.length;
-        const path = `/tmp/round-${index}.txt`;
-        const content = `round-${index}`;
-        return {
-          actionIntents: [
-            {
-              arguments: { content, path },
-              expectedEffect: "完整替换指定远程文件的内容",
-              id: `call-edit-${index}`,
-              reason: `修改 ${path}`,
-              risk: "reversible_write",
-              tool: "propose_file_edit",
-            },
-          ],
-          content: "",
-          toolCalls: [
-            {
-              arguments: JSON.stringify({ content, path }),
-              id: `call-edit-${index}`,
-              name: "propose_file_edit",
-            },
-          ],
+    const invokeMock = mock(async (command: string, args?: Record<string, unknown>) => {
+      if (command === "ai_task_action_results") {
+        const request = args?.request as {
+          calls: Array<{ id: string; name: string }>;
         };
-      },
-    );
+        return request.calls.map((call) => ({
+          callId: call.id,
+          content: JSON.stringify({
+            decision: "approved_and_completed",
+            message: "远程文件已更新",
+            ok: true,
+          }),
+          name: call.name,
+        }));
+      }
+      if (command !== "ai_chat_start") {
+        throw new Error(`unexpected command: ${command}`);
+      }
+      const request = args?.request as { toolRounds: unknown[] };
+      requests.push(request);
+      if (request.toolRounds.length >= 8) {
+        return {
+          content: "已根据现有诊断结果完成总结，未执行更多工具。",
+          toolCalls: [],
+        };
+      }
+      const index = request.toolRounds.length;
+      const path = `/tmp/round-${index}.txt`;
+      const content = `round-${index}`;
+      return {
+        actionIntents: [
+          {
+            arguments: { content, path },
+            expectedEffect: "完整替换指定远程文件的内容",
+            id: `call-edit-${index}`,
+            reason: `修改 ${path}`,
+            risk: "reversible_write",
+            tool: "propose_file_edit",
+          },
+        ],
+        content: "",
+        toolCalls: [
+          {
+            arguments: JSON.stringify({ content, path }),
+            id: `call-edit-${index}`,
+            name: "propose_file_edit",
+          },
+        ],
+      };
+    });
     const callbacks = createConversationCallbacks();
     const { result } = renderHook(() =>
       useAiRequestOrchestrator({
@@ -232,9 +222,7 @@ describe("useAiRequestOrchestrator", () => {
 
     for (let index = 0; index < 8; index += 1) {
       await waitFor(() =>
-        expect(
-          callbacks.current().messages[1]?.fileEditProposals,
-        ).toHaveLength(index + 1),
+        expect(callbacks.current().messages[1]?.fileEditProposals).toHaveLength(index + 1),
       );
       act(() => {
         expect(
@@ -250,9 +238,7 @@ describe("useAiRequestOrchestrator", () => {
     });
 
     expect(requests).toHaveLength(9);
-    expect(requests.every((request) => !("finalizeReason" in request))).toBe(
-      true,
-    );
+    expect(requests.every((request) => !("finalizeReason" in request))).toBe(true);
     expect(requests[requests.length - 1]?.toolRounds).toHaveLength(8);
     expect(callbacks.current().messages[1]).toMatchObject({
       content: "已根据现有诊断结果完成总结，未执行更多工具。",
@@ -268,83 +254,81 @@ describe("useAiRequestOrchestrator", () => {
         results: Array<{ content: string }>;
       }>;
     }> = [];
-    const invoke = mock(
-      async (command: string, args?: Record<string, unknown>) => {
-        if (command === "ai_task_action_results") {
-          return [
-            {
-              callId: "command-approval-1",
-              content: JSON.stringify({
-                decision: "approved_and_completed",
-                exitCode: 0,
-                ok: true,
-                output: "Mem: 1.8Gi used, 2.0Gi free",
-              }),
-              name: "propose_terminal_command",
-            },
-          ];
-        }
-        if (command !== "ai_chat_start") {
-          throw new Error(`unexpected command: ${command}`);
-        }
-        const request = args?.request as (typeof requests)[number];
-        requests.push(request);
-        if (request.toolRounds.length) {
-          return {
-            content: "命令执行成功，当前内存状态正常。",
-            telemetry: {
-              durationMs: 450,
-              requestCount: 1,
-              usage: {
-                cachedInputTokens: 20,
-                inputTokens: 200,
-                outputTokens: 40,
-                reasoningTokens: 10,
-                totalTokens: 240,
-              },
-            },
-            toolCalls: [],
-          };
-        }
+    const invoke = mock(async (command: string, args?: Record<string, unknown>) => {
+      if (command === "ai_task_action_results") {
+        return [
+          {
+            callId: "command-approval-1",
+            content: JSON.stringify({
+              decision: "approved_and_completed",
+              exitCode: 0,
+              ok: true,
+              output: "Mem: 1.8Gi used, 2.0Gi free",
+            }),
+            name: "propose_terminal_command",
+          },
+        ];
+      }
+      if (command !== "ai_chat_start") {
+        throw new Error(`unexpected command: ${command}`);
+      }
+      const request = args?.request as (typeof requests)[number];
+      requests.push(request);
+      if (request.toolRounds.length) {
         return {
-          actionIntents: [
-            {
-              arguments: { command: "systemctl restart nginx", purpose: "重启 Nginx" },
-              expectedEffect: "在当前终端会话中填入命令，等待用户手动提交",
-              id: "command-approval-1",
-              reason: "重启 Nginx",
-              risk: "elevated",
-              tool: "execute_terminal_command",
-            },
-          ],
-          content: "需要执行一项终端操作。",
-          reasoningContent: "inspect service state before continuing",
+          content: "命令执行成功，当前内存状态正常。",
           telemetry: {
-            durationMs: 300,
-            requestCount: 2,
+            durationMs: 450,
+            requestCount: 1,
             usage: {
-              cachedInputTokens: 10,
-              inputTokens: 100,
-              outputTokens: 20,
-              reasoningTokens: 5,
-              totalTokens: 120,
+              cachedInputTokens: 20,
+              inputTokens: 200,
+              outputTokens: 40,
+              reasoningTokens: 10,
+              totalTokens: 240,
             },
           },
-          toolCalls: [
-            {
-              arguments: JSON.stringify({
-                command: "systemctl restart nginx",
-                purpose: "重启 Nginx",
-                risk: "caution",
-                risk_reason: "会重启正在运行的服务",
-              }),
-              id: "command-approval-1",
-              name: "propose_terminal_command",
-            },
-          ],
+          toolCalls: [],
         };
-      },
-    ) as unknown as AiRequestInvoke;
+      }
+      return {
+        actionIntents: [
+          {
+            arguments: { command: "systemctl restart nginx", purpose: "重启 Nginx" },
+            expectedEffect: "在当前终端会话中填入命令，等待用户手动提交",
+            id: "command-approval-1",
+            reason: "重启 Nginx",
+            risk: "elevated",
+            tool: "execute_terminal_command",
+          },
+        ],
+        content: "需要执行一项终端操作。",
+        reasoningContent: "inspect service state before continuing",
+        telemetry: {
+          durationMs: 300,
+          requestCount: 2,
+          usage: {
+            cachedInputTokens: 10,
+            inputTokens: 100,
+            outputTokens: 20,
+            reasoningTokens: 5,
+            totalTokens: 120,
+          },
+        },
+        toolCalls: [
+          {
+            arguments: JSON.stringify({
+              command: "systemctl restart nginx",
+              purpose: "重启 Nginx",
+              risk: "caution",
+              risk_reason: "会重启正在运行的服务",
+            }),
+            id: "command-approval-1",
+            name: "propose_terminal_command",
+          },
+        ],
+      };
+    }) as unknown as AiRequestInvoke;
     const callbacks = createConversationCallbacks();
     const persistConversation = mock(async () => undefined);
     const { result } = renderHook(() =>
@@ -364,9 +348,7 @@ describe("useAiRequestOrchestrator", () => {
     act(() => {
       send = result.current.sendMessage(baseSendOptions);
     });
-    await waitFor(() =>
-      expect(callbacks.current().messages[1]?.commandProposals).toHaveLength(1),
-    );
+    await waitFor(() => expect(callbacks.current().messages[1]?.commandProposals).toHaveLength(1));
     expect(invoke).toHaveBeenCalledTimes(1);
     expect(result.current.sending).toBe(true);
     expect(callbacks.current().messages[1]?.content).toBe("");
@@ -401,9 +383,7 @@ describe("useAiRequestOrchestrator", () => {
         output: "Mem: 1.8Gi used, 2.0Gi free",
       }),
     );
-    expect(callbacks.current().messages[1]?.content).toBe(
-      "命令执行成功，当前内存状态正常。",
-    );
+    expect(callbacks.current().messages[1]?.content).toBe("命令执行成功，当前内存状态正常。");
     expect(callbacks.current().messages[1]?.telemetry).toEqual({
       durationMs: 750,
       requestCount: 3,
@@ -422,65 +402,63 @@ describe("useAiRequestOrchestrator", () => {
     const requests: Array<{
       toolRounds: Array<{ results: Array<{ content: string }> }>;
     }> = [];
-    const invoke = mock(
-      async (command: string, args?: Record<string, unknown>) => {
-        if (command === "ai_task_action_results") {
-          const request = args?.request as {
-            decisions: Array<{ feedback?: string }>;
-          };
-          return [
-            {
-              callId: "command-revision-1",
-              content: JSON.stringify({
-                decision: "revision_requested",
-                feedback: request.decisions[0]?.feedback,
-                ok: false,
-              }),
-              name: "propose_terminal_command",
-            },
-          ];
-        }
-        if (command !== "ai_chat_start") {
-          throw new Error(`unexpected command: ${command}`);
-        }
-        const request = args?.request as (typeof requests)[number];
-        requests.push(request);
-        if (request.toolRounds.length) {
-          return {
-            content: "已按你的要求调整为只读检查，不会重启服务。",
-            toolCalls: [],
-          };
-        }
-        return {
-          actionIntents: [
-            {
-              arguments: {
-                command: "systemctl restart nginx",
-                purpose: "重启 Nginx",
-              },
-              expectedEffect: "重启 Nginx 服务",
-              id: "command-revision-1",
-              reason: "尝试恢复服务",
-              risk: "elevated",
-              tool: "execute_terminal_command",
-            },
-          ],
-          content: "需要执行一项终端操作。",
-          toolCalls: [
-            {
-              arguments: JSON.stringify({
-                command: "systemctl restart nginx",
-                purpose: "重启 Nginx",
-                risk: "caution",
-                risk_reason: "会重启正在运行的服务",
-              }),
-              id: "command-revision-1",
-              name: "propose_terminal_command",
-            },
-          ],
+    const invoke = mock(async (command: string, args?: Record<string, unknown>) => {
+      if (command === "ai_task_action_results") {
+        const request = args?.request as {
+          decisions: Array<{ feedback?: string }>;
         };
-      },
-    ) as unknown as AiRequestInvoke;
+        return [
+          {
+            callId: "command-revision-1",
+            content: JSON.stringify({
+              decision: "revision_requested",
+              feedback: request.decisions[0]?.feedback,
+              ok: false,
+            }),
+            name: "propose_terminal_command",
+          },
+        ];
+      }
+      if (command !== "ai_chat_start") {
+        throw new Error(`unexpected command: ${command}`);
+      }
+      const request = args?.request as (typeof requests)[number];
+      requests.push(request);
+      if (request.toolRounds.length) {
+        return {
+          content: "已按你的要求调整为只读检查，不会重启服务。",
+          toolCalls: [],
+        };
+      }
+      return {
+        actionIntents: [
+          {
+            arguments: {
+              command: "systemctl restart nginx",
+              purpose: "重启 Nginx",
+            },
+            expectedEffect: "重启 Nginx 服务",
+            id: "command-revision-1",
+            reason: "尝试恢复服务",
+            risk: "elevated",
+            tool: "execute_terminal_command",
+          },
+        ],
+        content: "需要执行一项终端操作。",
+        toolCalls: [
+          {
+            arguments: JSON.stringify({
+              command: "systemctl restart nginx",
+              purpose: "重启 Nginx",
+              risk: "caution",
+              risk_reason: "会重启正在运行的服务",
+            }),
+            id: "command-revision-1",
+            name: "propose_terminal_command",
+          },
+        ],
+      };
+    }) as unknown as AiRequestInvoke;
     const callbacks = createConversationCallbacks();
     const { result } = renderHook(() =>
       useAiRequestOrchestrator({
@@ -499,9 +477,7 @@ describe("useAiRequestOrchestrator", () => {
     act(() => {
       send = result.current.sendMessage(baseSendOptions);
     });
-    await waitFor(() =>
-      expect(callbacks.current().messages[1]?.commandProposals).toHaveLength(1),
-    );
+    await waitFor(() => expect(callbacks.current().messages[1]?.commandProposals).toHaveLength(1));
 
     act(() => {
       expect(
@@ -534,12 +510,10 @@ describe("useAiRequestOrchestrator", () => {
 
   test("streams only the active request and persists its completed answer", async () => {
     const response = deferred<AiChatResult>();
-    const invokeMock = mock(
-      async (command: string, _args?: Record<string, unknown>) => {
-        if (command === "ai_chat_start") return response.promise;
-        return undefined;
-      },
-    );
+    const invokeMock = mock(async (command: string, _args?: Record<string, unknown>) => {
+      if (command === "ai_chat_start") return response.promise;
+      return undefined;
+    });
     const invoke = invokeMock as unknown as AiRequestInvoke;
     let onStream: Parameters<AiStreamListener>[0] = () => undefined;
     const listenToStream = mock(async (callback: typeof onStream) => {
@@ -639,9 +613,7 @@ describe("useAiRequestOrchestrator", () => {
       onStream({ delta: "忽略", requestId: "obsolete-request" });
     });
     // Deltas are coalesced and applied on the next animation frame.
-    await waitFor(() =>
-      expect(callbacks.current().messages[1]?.reasoning).toBe("检查服务器指标"),
-    );
+    await waitFor(() => expect(callbacks.current().messages[1]?.reasoning).toBe("检查服务器指标"));
     expect(callbacks.current().messages[1]?.content).toBe("正在分析");
 
     await act(async () => {
@@ -663,12 +635,14 @@ describe("useAiRequestOrchestrator", () => {
       if (command === "ai_task_sync") {
         return {
           task: restoredTask,
-          events: [{
-          kind: "task_failed",
-          protocolVersion: PROTOCOL_VERSION,
-          sequence: 6,
-          task: replayedTask,
-          }],
+          events: [
+            {
+              kind: "task_failed",
+              protocolVersion: PROTOCOL_VERSION,
+              sequence: 6,
+              task: replayedTask,
+            },
+          ],
         };
       }
       throw new Error(`unexpected command: ${command}`);
@@ -738,26 +712,24 @@ describe("useAiRequestOrchestrator", () => {
 
   test("resolves an interrupted task and keeps the recovery prompt internal", async () => {
     let chatRequest: Record<string, unknown> | undefined;
-    const invokeMock = mock(
-      async (command: string, args?: Record<string, unknown>) => {
-        if (command === "ai_task_recovery_decide") {
-          return {
-            completedActions: [],
-            decision: "continue_analysis",
-            hostId: "host-1",
-            interruptionReason: "应用重启",
-            objective: "检查系统状态",
-            previousTaskId: "task-restored",
-            uncertainActions: [],
-          };
-        }
-        if (command === "ai_chat_start") {
-          chatRequest = args?.request as Record<string, unknown>;
-          return { content: "继续完成", toolCalls: [] };
-        }
-        throw new Error(`unexpected command: ${command}`);
-      },
-    );
+    const invokeMock = mock(async (command: string, args?: Record<string, unknown>) => {
+      if (command === "ai_task_recovery_decide") {
+        return {
+          completedActions: [],
+          decision: "continue_analysis",
+          hostId: "host-1",
+          interruptionReason: "应用重启",
+          objective: "检查系统状态",
+          previousTaskId: "task-restored",
+          uncertainActions: [],
+        };
+      }
+      if (command === "ai_chat_start") {
+        chatRequest = args?.request as Record<string, unknown>;
+        return { content: "继续完成", toolCalls: [] };
+      }
+      throw new Error(`unexpected command: ${command}`);
+    });
     const callbacks = createConversationCallbacks();
     const { result } = renderHook(() =>
       useAiRequestOrchestrator({
@@ -787,19 +759,16 @@ describe("useAiRequestOrchestrator", () => {
     });
 
     expect(callbacks.current().messages[0]?.content).toBe("继续分析");
-    expect(chatRequest?.messages).toEqual([
-      { content: "内部恢复上下文", role: "user" },
-    ]);
-    expect(
-      (chatRequest?.task as { objective?: string } | undefined)?.objective,
-    ).toBe("内部恢复上下文");
+    expect(chatRequest?.messages).toEqual([{ content: "内部恢复上下文", role: "user" }]);
+    expect((chatRequest?.task as { objective?: string } | undefined)?.objective).toBe(
+      "内部恢复上下文",
+    );
   });
 
   test("renders backend diagnostic plans and sends approval decisions to Rust", async () => {
     const response = deferred<AiChatResult>();
-    const invokeMock = mock(
-      async (command: string, _args?: Record<string, unknown>) =>
-        command === "ai_chat_start" ? response.promise : undefined,
+    const invokeMock = mock(async (command: string, _args?: Record<string, unknown>) =>
+      command === "ai_chat_start" ? response.promise : undefined,
     );
     const invoke = invokeMock as unknown as AiRequestInvoke;
     let onTask: Parameters<AiTaskListener>[0] = () => undefined;
@@ -903,9 +872,7 @@ describe("useAiRequestOrchestrator", () => {
       });
       await send;
     });
-    expect(callbacks.current().messages[1]?.diagnosticPlans?.[0]?.status).toBe(
-      "completed",
-    );
+    expect(callbacks.current().messages[1]?.diagnosticPlans?.[0]?.status).toBe("completed");
   });
 
   test("tells the user when switching sessions interrupts a request", async () => {
@@ -983,14 +950,12 @@ describe("useAiRequestOrchestrator", () => {
   });
 
   test("summarizes older messages in the background after saving the answer", async () => {
-    const invokeMock = mock(
-      async (_command: string, args?: Record<string, unknown>) => {
-        const request = args?.request as { requestId: string };
-        return request.requestId.startsWith("ai-summary-")
-          ? { content: "## 目标\n确认服务状态", toolCalls: [] }
-          : { content: "本次回答", toolCalls: [] };
-      },
-    );
+    const invokeMock = mock(async (_command: string, args?: Record<string, unknown>) => {
+      const request = args?.request as { requestId: string };
+      return request.requestId.startsWith("ai-summary-")
+        ? { content: "## 目标\n确认服务状态", toolCalls: [] }
+        : { content: "本次回答", toolCalls: [] };
+    });
     const callbacks = createConversationCallbacks();
     const persistConversation = mock(async () => undefined);
     const history: AiMessage[] = Array.from({ length: 18 }, (_, index) => ({
@@ -1028,13 +993,11 @@ describe("useAiRequestOrchestrator", () => {
 
   test("keeps the completed conversation when background summarization fails", async () => {
     const summaryError = new Error("summary unavailable");
-    const invokeMock = mock(
-      async (_command: string, args?: Record<string, unknown>) => {
-        const request = args?.request as { requestId: string };
-        if (request.requestId.startsWith("ai-summary-")) throw summaryError;
-        return { content: "本次回答", toolCalls: [] };
-      },
-    );
+    const invokeMock = mock(async (_command: string, args?: Record<string, unknown>) => {
+      const request = args?.request as { requestId: string };
+      if (request.requestId.startsWith("ai-summary-")) throw summaryError;
+      return { content: "本次回答", toolCalls: [] };
+    });
     const callbacks = createConversationCallbacks();
     const onSummaryError = mock(() => undefined);
     const history: AiMessage[] = Array.from({ length: 18 }, (_, index) => ({
@@ -1062,19 +1025,15 @@ describe("useAiRequestOrchestrator", () => {
     await waitFor(() => expect(onSummaryError).toHaveBeenCalledWith(summaryError));
     expect(callbacks.current().summary).toBeUndefined();
     const completedMessages = callbacks.current().messages;
-    expect(completedMessages[completedMessages.length - 1]?.content).toBe(
-      "本次回答",
-    );
+    expect(completedMessages[completedMessages.length - 1]?.content).toBe("本次回答");
   });
 
   test("cancels the active backend request and marks a rejected request as stopped", async () => {
     const response = deferred<AiChatResult>();
-    const invokeMock = mock(
-      async (command: string, _args?: Record<string, unknown>) => {
-        if (command === "ai_chat_start") return response.promise;
-        return undefined;
-      },
-    );
+    const invokeMock = mock(async (command: string, _args?: Record<string, unknown>) => {
+      if (command === "ai_chat_start") return response.promise;
+      return undefined;
+    });
     const invoke = invokeMock as unknown as AiRequestInvoke;
     const callbacks = createConversationCallbacks();
     const { result } = renderHook(() =>
@@ -1116,11 +1075,13 @@ describe("useAiRequestOrchestrator", () => {
       }
       return {
         content: "",
-        toolCalls: [{
-          arguments: "{}",
-          id: "call-status",
-          name: "get_server_status",
-        }],
+        toolCalls: [
+          {
+            arguments: "{}",
+            id: "call-status",
+            name: "get_server_status",
+          },
+        ],
       };
     });
     const callbacks = createConversationCallbacks();
@@ -1141,9 +1102,7 @@ describe("useAiRequestOrchestrator", () => {
       await result.current.sendMessage(baseSendOptions);
     });
 
-    expect(invokeMock.mock.calls.map((call) => call[0])).toEqual([
-      "ai_chat_start",
-    ]);
+    expect(invokeMock.mock.calls.map((call) => call[0])).toEqual(["ai_chat_start"]);
     expect(callbacks.current().messages[1]).toEqual(
       expect.objectContaining({
         failed: true,

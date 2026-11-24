@@ -30,6 +30,8 @@ v0.6.2 已在栈渡仓库公开，v0.6.1 已在 FineShell 仓库公开。已安�
 
 GitHub Actions 需要配置仓库密钥 `TAURI_SIGNING_PRIVATE_KEY`，用于生成可由客户端验证的更新签名。工作流使用仓库提供的 `GITHUB_TOKEN` 创建发布 PR、Release 和构建产物，无需额外访问令牌。
 
+签名密钥放在名为 `release` 的 GitHub Environment 中（`Release` 工作流的构建作业声明了 `environment: release`），并为该环境配置必需的审核人和仅允许 `main` 分支的部署规则，避免其他分支的构建读取签名私钥。
+
 如果签名私钥受密码保护，同时配置 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。仓库变量 `FINESHELL_RELEASE_PLATFORMS` 可设为 `windows`，仅发布 Windows x64 和 ARM64，校验阶段也会使用相同的平台范围。默认值 `all` 保留完整平台矩阵。
 
 仓库的 Actions 设置需要允许 GitHub Actions 创建 Pull Request。`main` 分支保护继续负责审核发布 PR，工作流不会直接向 `main` 提交。

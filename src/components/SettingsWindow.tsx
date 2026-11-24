@@ -15,29 +15,18 @@ import {
   Switch,
   Typography,
 } from "@arco-design/web-react";
-import {
-  IconDelete,
-  IconFolder,
-  IconInfoCircle,
-  IconLaunch,
-} from "@arco-design/web-react/icon";
+import { IconDelete, IconFolder, IconInfoCircle, IconLaunch } from "@arco-design/web-react/icon";
 import WorkspaceIcon from "./WorkspaceIcon";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
-import {
-  DEFAULT_APP_SETTINGS,
-  appSettingsEqual,
-  type AppSettings,
-} from "../app-settings";
+import { DEFAULT_APP_SETTINGS, appSettingsEqual, type AppSettings } from "../app-settings";
 import { setAppearanceMode } from "../appearance";
 import { loadConfiguration } from "../config-database";
 import { updateAppSettings } from "../configuration-mutations";
-import {
-  configureDiagnosticLogging,
-  diagnosticInvoke,
-  recordDiagnostic,
-} from "../diagnostics";
+import { configureDiagnosticLogging, diagnosticInvoke, recordDiagnostic } from "../diagnostics";
+import LocalDataUnlock from "./LocalDataUnlock";
+import { LocalDataLockedError, unlockLocalData } from "../local-encryption";
 import {
   applicationUpdater,
   isApplicationUpdateInstalling,
@@ -130,22 +119,18 @@ function editorNameFromPath(path: string) {
 }
 
 function SettingsWindow() {
-  const [activeSection, setActiveSection] =
-    useState<SettingsSection>("terminal");
+  const [activeSection, setActiveSection] = useState<SettingsSection>("terminal");
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
-  const [savedSettings, setSavedSettings] =
-    useState<AppSettings>(DEFAULT_APP_SETTINGS);
+  const [savedSettings, setSavedSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [updateNotice, setUpdateNotice] =
-    useState<ApplicationUpdateNotice | null>(() =>
-      applicationUpdater.canInstallUpdates
-        ? readApplicationUpdateNotice()
-        : null,
-    );
-  const [updateInstalling, setUpdateInstalling] = useState(
-    isApplicationUpdateInstalling,
+  const [updateNotice, setUpdateNotice] = useState<ApplicationUpdateNotice | null>(() =>
+    applicationUpdater.canInstallUpdates ? readApplicationUpdateNotice() : null,
   );
+  const [updateInstalling, setUpdateInstalling] = useState(isApplicationUpdateInstalling);
+  const [localDataLocked, setLocalDataLocked] = useState(false);
+  const [localDataError, setLocalDataError] = useState<string>();
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
     document.title = "设置";
@@ -160,26 +145,27 @@ function SettingsWindow() {
               terminalLogDirectory: await resolveDefaultTerminalLogDirectory(),
             };
           } catch (error) {
-            recordDiagnostic(
-              "warn",
-              "terminal.logging",
-              "默认终端日志目录解析失败",
-              { error: String(error) },
-            );
+            recordDiagnostic("warn", "terminal.logging", "默认终端日志目录解析失败", {
+              error: String(error),
+            });
           }
         }
         if (disposed) return;
         setSettings(resolvedSettings);
         setSavedSettings(resolvedSettings);
         setAppearanceMode(resolvedSettings.appearanceMode);
+        setLocalDataLocked(false);
       })
       .catch((error) => {
-        if (!disposed) {
-          recordDiagnostic("error", "configuration", "设置窗口读取配置失败", {
-            error: String(error),
-          });
-          Message.error(String(error));
+        if (disposed) return;
+        if (error instanceof LocalDataLockedError) {
+          setLocalDataLocked(true);
+          return;
         }
+        recordDiagnostic("error", "configuration", "设置窗口读取配置失败", {
+          error: String(error),
+        });
+        Message.error(String(error));
       })
       .finally(() => {
         if (!disposed) setLoading(false);
@@ -187,7 +173,7 @@ function SettingsWindow() {
     return () => {
       disposed = true;
     };
-  }, []);
+  }, [loadAttempt]);
 
   useEffect(
     () =>
@@ -221,18 +207,15 @@ function SettingsWindow() {
   }, []);
 
   useEffect(() => {
-    void configureDiagnosticLogging(savedSettings.diagnosticLogLevel).catch(
-      () => undefined,
-    );
+    void configureDiagnosticLogging(savedSettings.diagnosticLogLevel).catch(() => undefined);
   }, [savedSettings.diagnosticLogLevel]);
 
   useEffect(() => {
     if (loading) return;
     setAppearanceMode(settings.appearanceMode);
     if (isTauri()) {
-      const preview = settings.appearanceMode === savedSettings.appearanceMode
-        ? null
-        : settings.appearanceMode;
+      const preview =
+        settings.appearanceMode === savedSettings.appearanceMode ? null : settings.appearanceMode;
       void emitProtocolEventTo("main", "appearance:preview", preview).catch(() => undefined);
     }
   }, [loading, savedSettings.appearanceMode, settings.appearanceMode]);
@@ -243,9 +226,11 @@ function SettingsWindow() {
     let unlisten: (() => void) | undefined;
     void listenProtocolEvent("appearance:preview", ({ payload }) => {
       if (payload === null) {
-        setSettings((current) => current.appearanceMode === savedSettings.appearanceMode
-          ? current
-          : { ...current, appearanceMode: savedSettings.appearanceMode });
+        setSettings((current) =>
+          current.appearanceMode === savedSettings.appearanceMode
+            ? current
+            : { ...current, appearanceMode: savedSettings.appearanceMode },
+        );
       }
     }).then((stop) => {
       if (disposed) stop();
@@ -257,18 +242,12 @@ function SettingsWindow() {
     };
   }, [savedSettings.appearanceMode]);
 
-  const updateSetting = <Key extends keyof AppSettings>(
-    key: Key,
-    value: AppSettings[Key],
-  ) => {
+  const updateSetting = <Key extends keyof AppSettings>(key: Key, value: AppSettings[Key]) => {
     setSettings((current) => ({ ...current, [key]: value }));
   };
 
   const saveSettings = async () => {
-    if (
-      settings.terminalLoggingEnabled &&
-      !settings.terminalLogDirectory.trim()
-    ) {
+    if (settings.terminalLoggingEnabled && !settings.terminalLogDirectory.trim()) {
       Message.warning("请先选择终端日志目录");
       setActiveSection("terminal");
       return;
@@ -282,11 +261,7 @@ function SettingsWindow() {
         persist: true,
       });
       if (isTauri()) {
-        await emitProtocolEventTo(
-          "main",
-          "settings:changed",
-          configuration.settings,
-        );
+        await emitProtocolEventTo("main", "settings:changed", configuration.settings);
       }
       Message.success("设置已保存");
     } catch (error) {
@@ -359,10 +334,7 @@ function SettingsWindow() {
                 <Radio.Group
                   aria-label="应用外观"
                   onChange={(value) =>
-                    updateSetting(
-                      "appearanceMode",
-                      value as AppSettings["appearanceMode"],
-                    )
+                    updateSetting("appearanceMode", value as AppSettings["appearanceMode"])
                   }
                   options={[
                     { label: "浅色", value: "light" },
@@ -426,7 +398,12 @@ function SettingsWindow() {
                       { label: "粗体", value: "700" },
                     ]}
                     value={settings.terminalFontWeight}
-                    onChange={(value) => updateSetting("terminalFontWeight", value as AppSettings["terminalFontWeight"])}
+                    onChange={(value) =>
+                      updateSetting(
+                        "terminalFontWeight",
+                        value as AppSettings["terminalFontWeight"],
+                      )
+                    }
                   />
                 }
                 label="字体粗细"
@@ -438,9 +415,7 @@ function SettingsWindow() {
                     max={24}
                     min={10}
                     mode="button"
-                    onChange={(value) =>
-                      updateSetting("terminalFontSize", value)
-                    }
+                    onChange={(value) => updateSetting("terminalFontSize", value)}
                     suffix="px"
                     value={settings.terminalFontSize}
                   />
@@ -454,9 +429,7 @@ function SettingsWindow() {
                     max={2}
                     min={1}
                     mode="button"
-                    onChange={(value) =>
-                      updateSetting("terminalLineHeight", value)
-                    }
+                    onChange={(value) => updateSetting("terminalLineHeight", value)}
                     precision={1}
                     step={0.1}
                     value={settings.terminalLineHeight}
@@ -467,14 +440,22 @@ function SettingsWindow() {
             </div>
             <TerminalBackgroundSettings settings={settings} setSettings={setSettings} />
             <div className="settings-group">
-              {([
-                ["terminalCommandBarVisible", "显示命令输入框"],
-                ["terminalCommandBarHistory", "命令框历史"],
-                ["terminalCommandBarPaths", "命令框路径补全"],
-                ["terminalCommandBarNames", "命令框远程命令补全"],
-              ] as const).map(([key, label]) => (
+              {(
+                [
+                  ["terminalCommandBarVisible", "显示命令输入框"],
+                  ["terminalCommandBarHistory", "命令框历史"],
+                  ["terminalCommandBarPaths", "命令框路径补全"],
+                  ["terminalCommandBarNames", "命令框远程命令补全"],
+                ] as const
+              ).map(([key, label]) => (
                 <SettingRow
-                  control={<Switch aria-label={label} checked={settings[key]} onChange={(value) => updateSetting(key, value)} />}
+                  control={
+                    <Switch
+                      aria-label={label}
+                      checked={settings[key]}
+                      onChange={(value) => updateSetting(key, value)}
+                    />
+                  }
                   key={key}
                   label={label}
                 />
@@ -505,9 +486,7 @@ function SettingsWindow() {
                 control={
                   <Switch
                     checked={settings.terminalCursorBlink}
-                    onChange={(value) =>
-                      updateSetting("terminalCursorBlink", value)
-                    }
+                    onChange={(value) => updateSetting("terminalCursorBlink", value)}
                   />
                 }
                 label="光标闪烁"
@@ -516,9 +495,7 @@ function SettingsWindow() {
                 control={
                   <Select
                     aria-label="终端回滚行数"
-                    onChange={(value) =>
-                      updateSetting("terminalScrollback", value)
-                    }
+                    onChange={(value) => updateSetting("terminalScrollback", value)}
                     options={[
                       { label: "1,000 行", value: 1_000 },
                       { label: "2,000 行", value: 2_000 },
@@ -535,9 +512,7 @@ function SettingsWindow() {
                 control={
                   <Switch
                     checked={settings.terminalCopyOnSelect}
-                    onChange={(value) =>
-                      updateSetting("terminalCopyOnSelect", value)
-                    }
+                    onChange={(value) => updateSetting("terminalCopyOnSelect", value)}
                   />
                 }
                 label="选中后复制"
@@ -574,9 +549,7 @@ function SettingsWindow() {
                   <Switch
                     aria-label="自动记录终端日志"
                     checked={settings.terminalLoggingEnabled}
-                    onChange={(value) =>
-                      updateSetting("terminalLoggingEnabled", value)
-                    }
+                    onChange={(value) => updateSetting("terminalLoggingEnabled", value)}
                   />
                 }
                 label="自动记录"
@@ -611,10 +584,7 @@ function SettingsWindow() {
                     aria-label="终端日志格式"
                     disabled={!settings.terminalLoggingEnabled}
                     onChange={(value) =>
-                      updateSetting(
-                        "terminalLogFormat",
-                        value as AppSettings["terminalLogFormat"],
-                      )
+                      updateSetting("terminalLogFormat", value as AppSettings["terminalLogFormat"])
                     }
                     options={[
                       { label: "纯文本", value: "plain" },
@@ -630,9 +600,7 @@ function SettingsWindow() {
                   <Select
                     aria-label="终端日志单文件上限"
                     disabled={!settings.terminalLoggingEnabled}
-                    onChange={(value) =>
-                      updateSetting("terminalLogMaxFileSizeMb", value)
-                    }
+                    onChange={(value) => updateSetting("terminalLogMaxFileSizeMb", value)}
                     options={[
                       { label: "50 MB", value: 50 },
                       { label: "100 MB", value: 100 },
@@ -654,9 +622,7 @@ function SettingsWindow() {
                 control={
                   <Switch
                     checked={settings.showHiddenFiles}
-                    onChange={(value) =>
-                      updateSetting("showHiddenFiles", value)
-                    }
+                    onChange={(value) => updateSetting("showHiddenFiles", value)}
                   />
                 }
                 label="显示隐藏文件"
@@ -665,9 +631,7 @@ function SettingsWindow() {
                 control={
                   <Switch
                     checked={settings.confirmFileDelete}
-                    onChange={(value) =>
-                      updateSetting("confirmFileDelete", value)
-                    }
+                    onChange={(value) => updateSetting("confirmFileDelete", value)}
                   />
                 }
                 label="删除前确认"
@@ -679,9 +643,7 @@ function SettingsWindow() {
                     max={5}
                     min={0}
                     mode="button"
-                    onChange={(value) =>
-                      updateSetting("sftpUploadRetryAttempts", value)
-                    }
+                    onChange={(value) => updateSetting("sftpUploadRetryAttempts", value)}
                     suffix="次"
                     value={settings.sftpUploadRetryAttempts}
                   />
@@ -697,9 +659,7 @@ function SettingsWindow() {
                       readOnly
                       value={settings.externalEditorName}
                     />
-                    <Button onClick={() => void chooseExternalEditor()}>
-                      选择
-                    </Button>
+                    <Button onClick={() => void chooseExternalEditor()}>选择</Button>
                     {settings.externalEditorPath && (
                       <Button
                         aria-label="清除外部编辑器"
@@ -732,9 +692,7 @@ function SettingsWindow() {
                 control={
                   <Select
                     aria-label="监控刷新间隔"
-                    onChange={(value) =>
-                      updateSetting("monitorRefreshIntervalSeconds", value)
-                    }
+                    onChange={(value) => updateSetting("monitorRefreshIntervalSeconds", value)}
                     options={[
                       { label: "3 秒", value: 3 },
                       { label: "5 秒", value: 5 },
@@ -767,9 +725,7 @@ function SettingsWindow() {
                     max={120}
                     min={3}
                     mode="button"
-                    onChange={(value) =>
-                      updateSetting("defaultConnectTimeoutSeconds", value)
-                    }
+                    onChange={(value) => updateSetting("defaultConnectTimeoutSeconds", value)}
                     suffix="秒"
                     value={settings.defaultConnectTimeoutSeconds}
                   />
@@ -783,9 +739,7 @@ function SettingsWindow() {
                     max={300}
                     min={5}
                     mode="button"
-                    onChange={(value) =>
-                      updateSetting("defaultKeepAliveIntervalSeconds", value)
-                    }
+                    onChange={(value) => updateSetting("defaultKeepAliveIntervalSeconds", value)}
                     suffix="秒"
                     value={settings.defaultKeepAliveIntervalSeconds}
                   />
@@ -796,9 +750,7 @@ function SettingsWindow() {
                 control={
                   <Switch
                     checked={settings.defaultAutoReconnect}
-                    onChange={(value) =>
-                      updateSetting("defaultAutoReconnect", value)
-                    }
+                    onChange={(value) => updateSetting("defaultAutoReconnect", value)}
                   />
                 }
                 label="自动重连"
@@ -811,9 +763,7 @@ function SettingsWindow() {
                     max={10}
                     min={1}
                     mode="button"
-                    onChange={(value) =>
-                      updateSetting("defaultMaxReconnectAttempts", value)
-                    }
+                    onChange={(value) => updateSetting("defaultMaxReconnectAttempts", value)}
                     suffix="次"
                     value={settings.defaultMaxReconnectAttempts}
                   />
@@ -838,9 +788,7 @@ function SettingsWindow() {
           />
         );
       case "advanced":
-        return (
-          <AdvancedSettings settings={settings} updateSetting={updateSetting} />
-        );
+        return <AdvancedSettings settings={settings} updateSetting={updateSetting} />;
       case "backups":
         return (
           <ConfigurationMaintenance
@@ -888,6 +836,25 @@ function SettingsWindow() {
   ) : (
     content
   );
+
+  if (localDataLocked) {
+    return (
+      <LocalDataUnlock
+        error={localDataError}
+        onUnlock={async (passphrase) => {
+          setLocalDataError(undefined);
+          try {
+            await unlockLocalData(passphrase);
+            setLoading(true);
+            setLoadAttempt((attempt) => attempt + 1);
+          } catch (error) {
+            setLocalDataError(error instanceof Error ? error.message : String(error));
+          }
+        }}
+        state="locked"
+      />
+    );
+  }
 
   return (
     <main className="settings-window">

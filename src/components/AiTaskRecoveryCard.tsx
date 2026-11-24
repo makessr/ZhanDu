@@ -22,10 +22,7 @@ export default function AiTaskRecoveryCard({
   sessionAvailable,
 }: AiTaskRecoveryCardProps) {
   const busy = busyDecision !== undefined;
-  const confirmIfRunning = (
-    decision: AgentTaskRecoveryDecision,
-    button: ReactElement,
-  ) =>
+  const confirmIfRunning = (decision: AgentTaskRecoveryDecision, button: ReactElement) =>
     remoteCommandMayBeRunning ? (
       <Popconfirm
         content="中断的命令可能仍在服务器上运行。确认已检查过，再继续？"
@@ -62,11 +59,7 @@ export default function AiTaskRecoveryCard({
           <Button
             disabled={busy || !sessionAvailable}
             loading={busyDecision === "continue_analysis"}
-            onClick={
-              remoteCommandMayBeRunning
-                ? undefined
-                : () => onDecision("continue_analysis")
-            }
+            onClick={remoteCommandMayBeRunning ? undefined : () => onDecision("continue_analysis")}
             size="small"
             type="primary"
           >
@@ -78,9 +71,7 @@ export default function AiTaskRecoveryCard({
           <Button
             disabled={busy || !sessionAvailable}
             loading={busyDecision === "retry"}
-            onClick={
-              remoteCommandMayBeRunning ? undefined : () => onDecision("retry")
-            }
+            onClick={remoteCommandMayBeRunning ? undefined : () => onDecision("retry")}
             size="small"
           >
             重新尝试

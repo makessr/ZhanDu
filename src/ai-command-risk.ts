@@ -12,9 +12,7 @@ interface ReadOnlyCommandRule {
   maxArguments?: number;
 }
 
-const DESTRUCTIVE_PATTERNS = spec.destructivePatterns.map(
-  (pattern) => new RegExp(pattern, "i"),
-);
+const DESTRUCTIVE_PATTERNS = spec.destructivePatterns.map((pattern) => new RegExp(pattern, "i"));
 const UNSAFE_CHARACTERS = new Set(Array.from(spec.unsafeCharacters));
 const READ_ONLY_COMMANDS = new Map<string, ReadOnlyCommandRule>(
   Object.entries(spec.readOnlyCommands),
@@ -34,9 +32,7 @@ function segmentIsReadOnly(segment: string) {
   }
   if (
     args.some((argument) =>
-      (rule.forbiddenArguments ?? []).some((flag) =>
-        argumentMatches(argument, flag),
-      ),
+      (rule.forbiddenArguments ?? []).some((flag) => argumentMatches(argument, flag)),
     )
   ) {
     return false;

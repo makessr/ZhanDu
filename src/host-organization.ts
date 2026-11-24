@@ -50,9 +50,7 @@ export function collectHostGroupPaths(hosts: HostRecord[]) {
       paths.add(currentPath);
     }
   }
-  return [...paths].sort((left, right) =>
-    left.localeCompare(right, "zh-CN", { numeric: true }),
-  );
+  return [...paths].sort((left, right) => left.localeCompare(right, "zh-CN", { numeric: true }));
 }
 
 export function hostGroupKey(path: string) {
@@ -68,23 +66,16 @@ function hostTableRow(host: HostRecord): HostTableHostRow {
   };
 }
 
-function finalizeGroupRows(
-  groups: Iterable<MutableHostGroupRow>,
-): HostTableGroupRow[] {
+function finalizeGroupRows(groups: Iterable<MutableHostGroupRow>): HostTableGroupRow[] {
   return Array.from(groups)
-    .sort((left, right) =>
-      left.name.localeCompare(right.name, "zh-CN", { numeric: true }),
-    )
+    .sort((left, right) => left.name.localeCompare(right.name, "zh-CN", { numeric: true }))
     .map((group) => ({
       id: group.id,
       type: "group",
       name: group.name,
       path: group.path,
       count: group.count,
-      children: [
-        ...finalizeGroupRows(group.groups.values()),
-        ...group.hosts.map(hostTableRow),
-      ],
+      children: [...finalizeGroupRows(group.groups.values()), ...group.hosts.map(hostTableRow)],
     }));
 }
 
@@ -123,10 +114,7 @@ export function buildHostTableTree(hosts: HostRecord[]): HostTableRow[] {
     currentGroup?.hosts.push(host);
   }
 
-  return [
-    ...finalizeGroupRows(rootGroups.values()),
-    ...rootHosts.map(hostTableRow),
-  ];
+  return [...finalizeGroupRows(rootGroups.values()), ...rootHosts.map(hostTableRow)];
 }
 
 function compareHostNames(left: HostRecord, right: HostRecord) {

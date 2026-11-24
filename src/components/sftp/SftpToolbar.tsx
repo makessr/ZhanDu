@@ -29,9 +29,25 @@ import {
 import { remotePathBreadcrumbs } from "../../sftp-utils";
 import type { CreateEntryKind } from "./SftpDialogs";
 
+export interface SftpToolbarCommands {
+  clearHistory: () => void;
+  create: (kind: CreateEntryKind) => void;
+  inputPathChange: (value: string) => void;
+  navigate: (path: string) => void;
+  openTransfers: () => void;
+  paste: () => void;
+  refresh: () => void;
+  removeBookmark: (path: string) => void;
+  toggleBookmark: () => void;
+  toggleNameFilter: () => void;
+  upload: () => void;
+  up: () => void;
+}
+
 interface SftpToolbarProps {
   bookmarks: string[];
   clipboardEntryCount: number;
+  commands: SftpToolbarCommands;
   connected: boolean;
   currentPath: string;
   currentPathBookmarked: boolean;
@@ -44,23 +60,12 @@ interface SftpToolbarProps {
   pathSuggestions: string[];
   ready: boolean;
   transferActivityCount: number;
-  onClearHistory: () => void;
-  onCreate: (kind: CreateEntryKind) => void;
-  onInputPathChange: (value: string) => void;
-  onNavigate: (path: string) => void;
-  onOpenTransfers: () => void;
-  onPaste: () => void;
-  onRefresh: () => void;
-  onRemoveBookmark: (path: string) => void;
-  onToggleBookmark: () => void;
-  onToggleNameFilter: () => void;
-  onUpload: () => void;
-  onUp: () => void;
 }
 
 export default function SftpToolbar({
   bookmarks,
   clipboardEntryCount,
+  commands,
   connected,
   currentPath,
   currentPathBookmarked,
@@ -73,18 +78,6 @@ export default function SftpToolbar({
   pathSuggestions,
   ready,
   transferActivityCount,
-  onClearHistory,
-  onCreate,
-  onInputPathChange,
-  onNavigate,
-  onOpenTransfers,
-  onPaste,
-  onRefresh,
-  onRemoveBookmark,
-  onToggleBookmark,
-  onToggleNameFilter,
-  onUpload,
-  onUp,
 }: SftpToolbarProps) {
   const [editingPath, setEditingPath] = useState(false);
   const breadcrumbs = remotePathBreadcrumbs(currentPath);
@@ -95,19 +88,19 @@ export default function SftpToolbar({
 
   const beginPathEditing = () => {
     if (!ready) return;
-    onInputPathChange(currentPath);
+    commands.inputPathChange(currentPath);
     setEditingPath(true);
   };
 
   const cancelPathEditing = () => {
-    onInputPathChange(currentPath);
+    commands.inputPathChange(currentPath);
     setEditingPath(false);
   };
 
   const navigateFromEditor = (path: string) => {
     if (!path.trim()) return;
     setEditingPath(false);
-    onNavigate(path);
+    commands.navigate(path);
   };
 
   return (
@@ -118,7 +111,7 @@ export default function SftpToolbar({
             aria-label="返回上级目录"
             disabled={!ready || currentPath === "/"}
             icon={<IconArrowUp />}
-            onClick={onUp}
+            onClick={commands.up}
             size="mini"
           />
         </Tooltip>
@@ -128,7 +121,7 @@ export default function SftpToolbar({
             disabled={!ready}
             icon={<IconRefresh />}
             loading={loading}
-            onClick={onRefresh}
+            onClick={commands.refresh}
             size="mini"
           />
         </Tooltip>
@@ -148,7 +141,7 @@ export default function SftpToolbar({
               size: "mini",
             }}
             onBlur={cancelPathEditing}
-            onChange={onInputPathChange}
+            onChange={commands.inputPathChange}
             onPressEnter={(_, activeOption) => {
               if (!activeOption) navigateFromEditor(inputPath);
             }}
@@ -167,7 +160,7 @@ export default function SftpToolbar({
                   <Breadcrumb.Item
                     className="sftp-path-breadcrumb-item"
                     key={item.path}
-                    onClick={() => onNavigate(item.path)}
+                    onClick={() => commands.navigate(item.path)}
                   >
                     {item.label}
                   </Breadcrumb.Item>
@@ -183,17 +176,13 @@ export default function SftpToolbar({
             />
           </div>
         )}
-        <Tooltip
-          content={currentPathBookmarked ? "取消收藏当前目录" : "收藏当前目录"}
-        >
+        <Tooltip content={currentPathBookmarked ? "取消收藏当前目录" : "收藏当前目录"}>
           <Button
-            aria-label={
-              currentPathBookmarked ? "取消收藏当前目录" : "收藏当前目录"
-            }
+            aria-label={currentPathBookmarked ? "取消收藏当前目录" : "收藏当前目录"}
             className={currentPathBookmarked ? "is-active" : undefined}
             disabled={!ready}
             icon={currentPathBookmarked ? <IconStarFill /> : <IconStar />}
-            onClick={onToggleBookmark}
+            onClick={commands.toggleBookmark}
             size="mini"
           />
         </Tooltip>
@@ -204,10 +193,7 @@ export default function SftpToolbar({
               <Menu.ItemGroup title="快速目录">
                 {bookmarks.length ? (
                   bookmarks.map((path) => (
-                    <Menu.Item
-                      key={`bookmark:${path}`}
-                      onClick={() => onNavigate(path)}
-                    >
+                    <Menu.Item key={`bookmark:${path}`} onClick={() => commands.navigate(path)}>
                       <span className="sftp-location-menu-item">
                         <IconStarFill />
                         <span className="sftp-location-path">{path}</span>
@@ -216,7 +202,7 @@ export default function SftpToolbar({
                           icon={<IconClose />}
                           onClick={(event) => {
                             event.stopPropagation();
-                            onRemoveBookmark(path);
+                            commands.removeBookmark(path);
                           }}
                           size="mini"
                           type="text"
@@ -233,10 +219,7 @@ export default function SftpToolbar({
               <Menu.ItemGroup title="最近访问">
                 {history.length ? (
                   history.map((path) => (
-                    <Menu.Item
-                      key={`history:${path}`}
-                      onClick={() => onNavigate(path)}
-                    >
+                    <Menu.Item key={`history:${path}`} onClick={() => commands.navigate(path)}>
                       <span className="sftp-location-menu-item">
                         <IconHistory />
                         <span className="sftp-location-path">{path}</span>
@@ -250,7 +233,7 @@ export default function SftpToolbar({
                 )}
               </Menu.ItemGroup>
               {history.length > 0 && (
-                <Menu.Item key="clear-history" onClick={onClearHistory}>
+                <Menu.Item key="clear-history" onClick={commands.clearHistory}>
                   <span className="sftp-location-menu-item sftp-location-menu-action">
                     <IconDelete />
                     <span>清空最近访问</span>
@@ -274,8 +257,7 @@ export default function SftpToolbar({
       </div>
       {aiFileReadProgress && (
         <span className="sftp-ai-read-progress">
-          读取 AI 上下文 {aiFileReadProgress.completed}/
-          {aiFileReadProgress.total}
+          读取 AI 上下文 {aiFileReadProgress.completed}/{aiFileReadProgress.total}
         </span>
       )}
       <Space size="mini">
@@ -285,7 +267,7 @@ export default function SftpToolbar({
             aria-pressed={nameFilterOpen}
             disabled={!ready}
             icon={<IconSearch />}
-            onClick={onToggleNameFilter}
+            onClick={commands.toggleNameFilter}
             size="mini"
             type={nameFilterOpen ? "primary" : "default"}
           />
@@ -296,9 +278,7 @@ export default function SftpToolbar({
           droplist={
             <Menu
               className="sftp-create-menu"
-              onClickMenuItem={(key) =>
-                onCreate(key === "file" ? "file" : "directory")
-              }
+              onClickMenuItem={(key) => commands.create(key === "file" ? "file" : "directory")}
               selectable={false}
             >
               <Menu.Item key="file">
@@ -316,31 +296,27 @@ export default function SftpToolbar({
             </Menu>
           }
           icon={<IconDown />}
-          onClick={() => onCreate("directory")}
+          onClick={() => commands.create("directory")}
           size="mini"
           trigger="click"
         >
           新建
         </Dropdown.Button>
         <Tooltip
-          content={
-            clipboardEntryCount > 0
-              ? `粘贴 ${clipboardEntryCount} 个项目`
-              : "剪贴板为空"
-          }
+          content={clipboardEntryCount > 0 ? `粘贴 ${clipboardEntryCount} 个项目` : "剪贴板为空"}
         >
           <Button
             aria-label="粘贴远程项目"
             disabled={!ready || clipboardEntryCount === 0 || operationLoading}
             icon={<IconPaste />}
-            onClick={onPaste}
+            onClick={commands.paste}
             size="mini"
           />
         </Tooltip>
         <Button
           disabled={!ready}
           icon={<IconUpload />}
-          onClick={onUpload}
+          onClick={commands.upload}
           size="mini"
           type="primary"
         >
@@ -351,7 +327,7 @@ export default function SftpToolbar({
             <Button
               aria-label="打开传输记录"
               icon={<IconHistory />}
-              onClick={onOpenTransfers}
+              onClick={commands.openTransfers}
               size="mini"
             />
           </Badge>

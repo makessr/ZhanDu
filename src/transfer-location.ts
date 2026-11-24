@@ -37,10 +37,7 @@ export function abbreviateHomePath(path: string, homeDirectory?: string) {
 }
 
 /** Shortens a path by eliding its middle, which matters least for orientation. */
-export function middleTruncatePath(
-  path: string,
-  maxLength = TRANSFER_LOCATION_MAX_LENGTH,
-) {
+export function middleTruncatePath(path: string, maxLength = TRANSFER_LOCATION_MAX_LENGTH) {
   const characters = Array.from(path);
   if (characters.length <= maxLength) return path;
   const available = maxLength - 1;

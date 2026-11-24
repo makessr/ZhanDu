@@ -6,17 +6,12 @@ describe("ConnectionStatusOverlay", () => {
   test("uses a static warning icon and reconnects without a loading icon", () => {
     const onReconnect = mock(() => undefined);
     const { container } = render(
-      <ConnectionStatusOverlay
-        description="终端连接已断开"
-        onReconnect={onReconnect}
-      />,
+      <ConnectionStatusOverlay description="终端连接已断开" onReconnect={onReconnect} />,
     );
 
     expect(container.querySelector('[role="alert"]')).toBeTruthy();
     expect(screen.getByText("终端连接已断开")).toBeTruthy();
-    expect(
-      container.querySelector(".arco-icon-exclamation-circle-fill"),
-    ).toBeTruthy();
+    expect(container.querySelector(".arco-icon-exclamation-circle-fill")).toBeTruthy();
     expect(container.querySelector(".arco-icon-loading")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "重新连接" }));
@@ -33,13 +28,13 @@ describe("ConnectionStatusOverlay", () => {
     );
 
     expect(
-      (screen.getByRole("button", {
-        name: "正在重连",
-      }) as HTMLButtonElement).disabled,
+      (
+        screen.getByRole("button", {
+          name: "正在重连",
+        }) as HTMLButtonElement
+      ).disabled,
     ).toBe(true);
     expect(container.querySelector(".arco-icon-loading")).toBeTruthy();
-    expect(
-      container.querySelector(".arco-icon-exclamation-circle-fill"),
-    ).toBeNull();
+    expect(container.querySelector(".arco-icon-exclamation-circle-fill")).toBeNull();
   });
 });

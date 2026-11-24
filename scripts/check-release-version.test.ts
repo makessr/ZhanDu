@@ -17,12 +17,8 @@ describe("release version validation", () => {
   });
 
   test("rejects invalid tags and version mismatches", () => {
-    expect(() => validateReleaseVersion("release-1.2.3", versions)).toThrow(
-      "格式无效",
-    );
-    expect(() =>
-      validateReleaseVersion("v1.2.4", versions),
-    ).toThrow("与应用版本");
+    expect(() => validateReleaseVersion("release-1.2.3", versions)).toThrow("格式无效");
+    expect(() => validateReleaseVersion("v1.2.4", versions)).toThrow("与应用版本");
     expect(() =>
       validateReleaseVersion("v1.2.3", {
         ...versions,
@@ -46,19 +42,18 @@ library = { version = "9.9.9" }
 });
 
 describe("release update channel", () => {
-  const endpoints = [
-    "https://github.com/makessr/FineShell/releases/latest/download/latest.json",
-  ];
+  const endpoints = ["https://github.com/makessr/FineShell/releases/latest/download/latest.json"];
 
   test("allows the repository configured in the app", () => {
-    expect(() => validateReleaseRepository(endpoints, "makessr/fineshell"))
-      .not.toThrow();
+    expect(() => validateReleaseRepository(endpoints, "makessr/fineshell")).not.toThrow();
   });
 
   test("rejects publishing from the independent repo before the channel cutover", () => {
-    expect(() => validateReleaseRepository(endpoints, "makessr/ZhanDu"))
-      .toThrow("应用更新渠道与发布仓库不一致");
-    expect(() => validateReleaseRepository([], "makessr/ZhanDu"))
-      .toThrow("应用更新渠道与发布仓库不一致");
+    expect(() => validateReleaseRepository(endpoints, "makessr/ZhanDu")).toThrow(
+      "应用更新渠道与发布仓库不一致",
+    );
+    expect(() => validateReleaseRepository([], "makessr/ZhanDu")).toThrow(
+      "应用更新渠道与发布仓库不一致",
+    );
   });
 });

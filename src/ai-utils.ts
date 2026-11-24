@@ -77,9 +77,7 @@ export function aiRemoteFileContextError(size: number) {
   return null;
 }
 
-export function aiRemoteFileContextSource(
-  file: AiRemoteFileContext,
-): AiContextSource {
+export function aiRemoteFileContextSource(file: AiRemoteFileContext): AiContextSource {
   const trailingNewline = file.content.endsWith("\n");
   return {
     id: aiRemoteFileContextSourceId(file.path),
@@ -112,10 +110,7 @@ function escapeRegularExpression(value: string) {
 }
 
 function aiContextMentionPattern(source: AiContextSource) {
-  return new RegExp(
-    `(^|\\s)@${escapeRegularExpression(source.label)}(?=\\s|$)`,
-    "g",
-  );
+  return new RegExp(`(^|\\s)@${escapeRegularExpression(source.label)}(?=\\s|$)`, "g");
 }
 
 export function aiContextMentionIds(
@@ -124,9 +119,7 @@ export function aiContextMentionIds(
 ): AiContextSourceId[] {
   return sources
     .filter(
-      (source) =>
-        Boolean(source.content.trim()) &&
-        aiContextMentionPattern(source).test(value),
+      (source) => Boolean(source.content.trim()) && aiContextMentionPattern(source).test(value),
     )
     .map((source) => source.id);
 }
@@ -141,9 +134,7 @@ export function appendAiContextMentions(
   const mentions = sources
     .filter(
       (source) =>
-        selected.has(source.id) &&
-        Boolean(source.content.trim()) &&
-        !existing.has(source.id),
+        selected.has(source.id) && Boolean(source.content.trim()) && !existing.has(source.id),
     )
     .map((source) => `@${source.label}`);
   if (!mentions.length) return value;
@@ -151,10 +142,7 @@ export function appendAiContextMentions(
   return `${current}${current ? "\n\n" : ""}${mentions.join(" ")}`;
 }
 
-export function separateAiContextMentions(
-  value: string,
-  sources: AiContextSource[],
-) {
+export function separateAiContextMentions(value: string, sources: AiContextSource[]) {
   const labels = [...new Set(sources.map((source) => source.label))]
     .sort((left, right) => right.length - left.length)
     .map(escapeRegularExpression);
@@ -165,10 +153,7 @@ export function separateAiContextMentions(
   );
 }
 
-export function stripAiContextMentions(
-  value: string,
-  sources: AiContextSource[],
-) {
+export function stripAiContextMentions(value: string, sources: AiContextSource[]) {
   let result = value;
   for (const source of sources) {
     result = result.replace(aiContextMentionPattern(source), "$1");
@@ -228,8 +213,7 @@ const SECRET_ARGUMENT_PATTERN =
   /(^|[\s"'\\])(--?(?:password|passphrase|api[_-]?key|access[_-]?(?:key|token)|client[_-]?secret|secret|token|database[_-]?url|redis[_-]?url|mongodb?[_-]?(?:url|uri)|connection[_-]?string|dsn)\s+)["']?([^\s,"';&|}]+)/gi;
 const SENSITIVE_ENV_ASSIGNMENT_PATTERN =
   /(^|[\s;])((?:export\s+)?[A-Za-z_][A-Za-z0-9_]*(?:PASSWORD|PASSWD|PASSPHRASE|SECRET|TOKEN|API_KEY|ACCESS_KEY|PRIVATE_KEY|CLIENT_SECRET|DATABASE_URL|REDIS_URL|MONGODB_URL|MONGODB_URI|CONNECTION_STRING|DSN)[A-Za-z0-9_]*\s*=\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s#;&|\r\n]+)/gim;
-const CREDENTIAL_URL_PATTERN =
-  /\b([a-z][a-z0-9+.-]*:\/\/[^\s/:@]+:)([^\s/@]+)(@)/gi;
+const CREDENTIAL_URL_PATTERN = /\b([a-z][a-z0-9+.-]*:\/\/[^\s/:@]+:)([^\s/@]+)(@)/gi;
 const AI_REDACTION_MARKER_PATTERN = /\[已隐藏(?:私钥|密钥)?\]/;
 
 const SENSITIVE_REMOTE_FILE_PATTERNS: Array<{
@@ -270,8 +254,7 @@ export function aiRemoteFileSensitivityWarning(path: string, content: string) {
   const normalizedPath = path.replace(/\\/g, "/");
   const fileType = normalizedPath.toLowerCase().endsWith("/.kube/config")
     ? "Kubernetes 配置"
-    : SENSITIVE_REMOTE_FILE_PATTERNS.find(({ pattern }) => pattern.test(name))
-        ?.label;
+    : SENSITIVE_REMOTE_FILE_PATTERNS.find(({ pattern }) => pattern.test(name))?.label;
   const containsCredentials = redactAiContext(content) !== content;
   if (!fileType && !containsCredentials) return null;
   if (fileType && containsCredentials) {
@@ -293,9 +276,7 @@ export function buildAiContextPayloadResult(
   const entries = sources
     .filter((source) => selected.has(source.id) && source.content.trim())
     .map((source) => ({
-      content: redactAiContext(
-        source.preserveWhitespace ? source.content : source.content.trim(),
-      ),
+      content: redactAiContext(source.preserveWhitespace ? source.content : source.content.trim()),
       heading: `## ${source.label}\n`,
       truncateFrom: source.truncateFrom ?? "end",
     }));
@@ -306,9 +287,7 @@ export function buildAiContextPayloadResult(
   const overhead =
     entries.reduce((total, entry) => total + entry.heading.length, 0) +
     Math.max(0, entries.length - 1) * 2;
-  const sourceChars =
-    overhead +
-    entries.reduce((total, entry) => total + entry.content.length, 0);
+  const sourceChars = overhead + entries.reduce((total, entry) => total + entry.content.length, 0);
   if (overhead >= limit) {
     return { content: "", sourceChars, truncated: true, usedChars: 0 };
   }
@@ -318,13 +297,10 @@ export function buildAiContextPayloadResult(
   let pending = entries.map((_, index) => index);
   while (pending.length && remaining > 0) {
     const share = Math.floor(remaining / pending.length);
-    const completed = pending.filter(
-      (index) => entries[index]!.content.length <= share,
-    );
+    const completed = pending.filter((index) => entries[index]!.content.length <= share);
     if (!completed.length) {
       pending.forEach((index, offset) => {
-        allocations[index] =
-          share + (offset < remaining % pending.length ? 1 : 0);
+        allocations[index] = share + (offset < remaining % pending.length ? 1 : 0);
       });
       break;
     }
@@ -446,7 +422,7 @@ export function assessAiTerminalCommand(command: string): AiCommandAssessment {
     return {
       canInsert: true,
       label: "高风险",
-      reason: "命令可能删除数据、终止进程或影响系统可用性",
+      reason: "命令可能删除数据、终止进程、执行下载或动态生成的代码，或影响系统可用性",
       risk: "danger",
     };
   }

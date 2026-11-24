@@ -1,8 +1,4 @@
-import type {
-  HostRecord,
-  JumpHostConnection,
-  TerminalSessionStatus,
-} from "./models";
+import type { HostRecord, JumpHostConnection, TerminalSessionStatus } from "./models";
 
 const MAX_TRACKED_TERMINAL_INPUT_CHARS = 4_096;
 
@@ -90,9 +86,7 @@ export function trackInjectedTerminalInput(
     : { state: inserted, submissions: [] as string[] };
 }
 
-export function terminalInjectedInputData(
-  input: Pick<TerminalInjectedInput, "submit" | "value">,
-) {
+export function terminalInjectedInputData(input: Pick<TerminalInjectedInput, "submit" | "value">) {
   return `${input.value}${input.submit ? "\r" : ""}`;
 }
 
@@ -103,9 +97,7 @@ export function consumeTerminalCommandCandidate(
   const index = candidates.lastIndexOf(command);
   if (index < 0) return { candidates, matched: false };
   return {
-    candidates: candidates.filter(
-      (_, candidateIndex) => candidateIndex !== index,
-    ),
+    candidates: candidates.filter((_, candidateIndex) => candidateIndex !== index),
     matched: true,
   };
 }
@@ -172,34 +164,22 @@ export function isTerminalSessionOperational(status: TerminalSessionStatus) {
   return status === "connected" || status === "suspect";
 }
 
-export function terminalStatusNoticeKey(
-  status: TerminalSessionStatus,
-  error?: string,
-) {
-  return status === "failed" || status === "disconnected"
-    ? `${status}:${error ?? ""}`
-    : status;
+export function terminalStatusNoticeKey(status: TerminalSessionStatus, error?: string) {
+  return status === "failed" || status === "disconnected" ? `${status}:${error ?? ""}` : status;
 }
 
-export function sessionTabName(
-  sessions: SessionTabTarget[],
-  sessionId: string,
-) {
+export function sessionTabName(sessions: SessionTabTarget[], sessionId: string) {
   const index = sessions.findIndex((session) => session.id === sessionId);
   if (index < 0) return "";
   const session = sessions[index];
   const occurrence = sessions
     .slice(0, index + 1)
     .filter((item) => item.host.id === session.host.id).length;
-  return occurrence > 1
-    ? `${session.host.name} (${occurrence})`
-    : session.host.name;
+  return occurrence > 1 ? `${session.host.name} (${occurrence})` : session.host.name;
 }
 
 export function sshCredentialId(host: HostRecord) {
-  return host.authMethod === "privateKey" && host.sshKeyId
-    ? host.sshKeyId
-    : host.id;
+  return host.authMethod === "privateKey" && host.sshKeyId ? host.sshKeyId : host.id;
 }
 
 export function jumpHostRequest(connection?: JumpHostConnection) {

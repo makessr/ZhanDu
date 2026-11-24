@@ -13,13 +13,10 @@
       }
 
       try {
-        const savedAppearance = localStorage.getItem(
-          "fineshell.appearance-mode",
-        );
+        const savedAppearance = localStorage.getItem("fineshell.appearance-mode");
         const appearance =
           savedAppearance === "dark" ||
-          (savedAppearance === "system" &&
-            matchMedia("(prefers-color-scheme: dark)").matches)
+          (savedAppearance === "system" && matchMedia("(prefers-color-scheme: dark)").matches)
             ? "dark"
             : "light";
         document.documentElement.dataset.appearance = appearance;
@@ -33,12 +30,7 @@
   </head>
 
   <body>
-    <div
-      class="startup-loader"
-      id="startup-loader"
-      role="status"
-      aria-label="正在加载工作区"
-    >
+    <div class="startup-loader" id="startup-loader" role="status" aria-label="正在加载工作区">
       <div class="startup-loader-content">
         <div class="startup-loader-track" aria-hidden="true"></div>
         <div class="startup-loader-label">正在加载工作区</div>

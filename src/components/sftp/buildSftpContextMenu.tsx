@@ -41,10 +41,7 @@ interface SftpContextMenuOptions {
   onExtract: (entry: SftpEntry, intoDirectory: boolean) => void | Promise<void>;
   onFastDelete: (entries: SftpEntry[]) => void;
   onOpenDirectory: (entry: SftpEntry) => void;
-  onOpenExternal: (
-    entry: SftpEntry,
-    editorPath?: string,
-  ) => void | Promise<void>;
+  onOpenExternal: (entry: SftpEntry, editorPath?: string) => void | Promise<void>;
   onPaste: (targetDirectory: string) => void | Promise<void>;
   onPermissions: (entries: SftpEntry[]) => void;
   onRefresh: () => void | Promise<void>;
@@ -131,10 +128,7 @@ export default function buildSftpContextMenu({
         disabled: operationLoading,
         onClick: () => onChooseExternalEditor(singleEntry),
       });
-      if (
-        activeEdit?.status === "conflict" ||
-        activeEdit?.status === "failed"
-      ) {
+      if (activeEdit?.status === "conflict" || activeEdit?.status === "failed") {
         openItems.push({
           key: "resolve-external-edit",
           label: "处理同步问题",
@@ -159,9 +153,7 @@ export default function buildSftpContextMenu({
       onClick: () => onDownload(singleEntry),
     });
   } else if (entries.some((entry) => entry.kind !== "directory")) {
-    const fileCount = entries.filter(
-      (entry) => entry.kind !== "directory",
-    ).length;
+    const fileCount = entries.filter((entry) => entry.kind !== "directory").length;
     menuItems.push({
       key: "download-selected",
       label: `下载所选（${fileCount}）`,
@@ -185,9 +177,7 @@ export default function buildSftpContextMenu({
     menuItems.push({
       key: "send-file-list-to-ai",
       label:
-        entries.length === 1
-          ? "发送文件信息给 AI"
-          : `发送所选文件清单给 AI（${entries.length}）`,
+        entries.length === 1 ? "发送文件信息给 AI" : `发送所选文件清单给 AI（${entries.length}）`,
       icon: <IconRobot />,
       disabled: operationLoading,
       onClick: () => onSendSelectionToAi(entries),
@@ -196,9 +186,7 @@ export default function buildSftpContextMenu({
     menuItems.push({
       key: "send-selection-to-ai",
       label:
-        entries.length === 1
-          ? "发送项目信息给 AI"
-          : `发送所选项目清单给 AI（${entries.length}）`,
+        entries.length === 1 ? "发送项目信息给 AI" : `发送所选项目清单给 AI（${entries.length}）`,
       icon: <IconRobot />,
       disabled: operationLoading,
       onClick: () => onSendSelectionToAi(entries),
@@ -206,9 +194,7 @@ export default function buildSftpContextMenu({
   }
 
   const selectedArchiveFormat =
-    singleEntry?.kind === "file"
-      ? remoteArchiveFormatFromName(singleEntry.name)
-      : null;
+    singleEntry?.kind === "file" ? remoteArchiveFormatFromName(singleEntry.name) : null;
   if (singleEntry && selectedArchiveFormat) {
     menuItems.push({
       key: "extract",
@@ -236,24 +222,17 @@ export default function buildSftpContextMenu({
   if (entries.length > 0) {
     menuItems.push({
       key: "compress",
-      label:
-        entries.length === 1 ? "压缩..." : `压缩所选（${entries.length}）...`,
+      label: entries.length === 1 ? "压缩..." : `压缩所选（${entries.length}）...`,
       icon: <IconArchive />,
       dividerBefore: !selectedArchiveFormat,
       disabled: operationLoading,
       onClick: () => onArchive(entries, "compress"),
     });
   }
-  if (
-    entries.length > 1 ||
-    entries.some((entry) => entry.kind === "directory")
-  ) {
+  if (entries.length > 1 || entries.some((entry) => entry.kind === "directory")) {
     menuItems.push({
       key: "archive-download",
-      label:
-        entries.length === 1
-          ? "打包下载..."
-          : `打包下载所选（${entries.length}）...`,
+      label: entries.length === 1 ? "打包下载..." : `打包下载所选（${entries.length}）...`,
       icon: <IconDownload />,
       disabled: operationLoading,
       onClick: () => onArchive(entries, "download"),
@@ -320,8 +299,7 @@ export default function buildSftpContextMenu({
   if (entries.length > 0) {
     menuItems.push({
       key: "permissions",
-      label:
-        entries.length === 1 ? "文件权限" : `修改所选权限（${entries.length}）`,
+      label: entries.length === 1 ? "文件权限" : `修改所选权限（${entries.length}）`,
       icon: <IconLock />,
       disabled: operationLoading,
       onClick: () => onPermissions(entries),
@@ -338,10 +316,7 @@ export default function buildSftpContextMenu({
       },
       {
         key: "fast-delete",
-        label:
-          entries.length === 1
-            ? "删除(rm)"
-            : `删除所选(rm)（${entries.length}）`,
+        label: entries.length === 1 ? "删除(rm)" : `删除所选(rm)（${entries.length}）`,
         icon: <IconThunderbolt />,
         disabled: operationLoading,
         danger: true,

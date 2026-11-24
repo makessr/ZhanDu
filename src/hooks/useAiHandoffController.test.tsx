@@ -4,9 +4,7 @@ import { useState } from "react";
 import type { AiHandoffRequest } from "../ai-handoff";
 import type { AiContextSource, AiRemoteFileContext } from "../ai-utils";
 import type { HostRecord, TerminalSession } from "../models";
-import useAiHandoffController, {
-  aiHandoffTargetError,
-} from "./useAiHandoffController";
+import useAiHandoffController, { aiHandoffTargetError } from "./useAiHandoffController";
 
 const HOST: HostRecord = {
   id: "host-1",
@@ -35,19 +33,14 @@ function renderHandoffController(options?: {
 }) {
   const onNotice = mock(() => undefined);
   const openAssistant = mock(
-    options?.openAssistant ??
-      (async () => options?.openAssistantResult ?? true),
+    options?.openAssistant ?? (async () => options?.openAssistantResult ?? true),
   );
   const view = renderHook(() => {
-    const [businessContexts, setBusinessContexts] = useState<
-      Record<string, AiContextSource[]>
-    >({});
+    const [businessContexts, setBusinessContexts] = useState<Record<string, AiContextSource[]>>({});
     const [remoteFileContexts, setRemoteFileContexts] = useState<
       Record<string, AiRemoteFileContext[]>
     >({});
-    const [terminalSelections, setTerminalSelections] = useState<
-      Record<string, string>
-    >({});
+    const [terminalSelections, setTerminalSelections] = useState<Record<string, string>>({});
     const controller = useAiHandoffController({
       activeSession: options?.activeSession ?? SESSION,
       businessContexts,
@@ -75,9 +68,9 @@ describe("useAiHandoffController", () => {
     expect(aiHandoffTargetError(SESSION, "session-2")).toBe(
       "当前会话已切换，请重新选择要分析的内容",
     );
-    expect(
-      aiHandoffTargetError({ ...SESSION, status: "disconnected" }, SESSION.id),
-    ).toBe("当前会话不可用，请恢复连接后重试");
+    expect(aiHandoffTargetError({ ...SESSION, status: "disconnected" }, SESSION.id)).toBe(
+      "当前会话不可用，请恢复连接后重试",
+    );
   });
 
   test("redacts and replaces business context before opening AI", async () => {
@@ -92,17 +85,13 @@ describe("useAiHandoffController", () => {
     };
 
     await act(async () => {
-      expect(
-        await view.result.current.handoffContext(SESSION.id, request),
-      ).toBe(true);
+      expect(await view.result.current.handoffContext(SESSION.id, request)).toBe(true);
     });
 
-    expect(
-      view.result.current.businessContexts[SESSION.id]?.[0]?.content,
-    ).not.toContain("secret-value");
-    expect(view.openAssistant).toHaveBeenCalledWith(SESSION.id, "分析进程", [
-      "process-selection",
-    ]);
+    expect(view.result.current.businessContexts[SESSION.id]?.[0]?.content).not.toContain(
+      "secret-value",
+    );
+    expect(view.openAssistant).toHaveBeenCalledWith(SESSION.id, "分析进程", ["process-selection"]);
   });
 
   test("hands off a redacted terminal selection through the same boundary", async () => {
@@ -117,9 +106,7 @@ describe("useAiHandoffController", () => {
       ).toBe(true);
     });
 
-    expect(view.result.current.terminalSelections[SESSION.id]).not.toContain(
-      "secret",
-    );
+    expect(view.result.current.terminalSelections[SESSION.id]).not.toContain("secret");
     expect(view.openAssistant).toHaveBeenCalledWith(
       SESSION.id,
       "请解释这段终端输出，并给出排查建议。",
@@ -137,9 +124,7 @@ describe("useAiHandoffController", () => {
     };
 
     await act(async () => {
-      expect(
-        await view.result.current.handoffRemoteFiles(SESSION.id, [file]),
-      ).toBe(true);
+      expect(await view.result.current.handoffRemoteFiles(SESSION.id, [file])).toBe(true);
     });
     expect(view.result.current.remoteFileContexts[SESSION.id]).toEqual([file]);
     expect(view.openAssistant).toHaveBeenCalledWith(SESSION.id, "", [
@@ -147,9 +132,7 @@ describe("useAiHandoffController", () => {
     ]);
 
     await act(async () => {
-      expect(
-        await view.result.current.handoffRemoteFiles("session-2", [file]),
-      ).toBe(false);
+      expect(await view.result.current.handoffRemoteFiles("session-2", [file])).toBe(false);
     });
     expect(view.openAssistant).toHaveBeenCalledTimes(1);
     expect(view.onNotice).toHaveBeenLastCalledWith(
@@ -170,9 +153,7 @@ describe("useAiHandoffController", () => {
     };
 
     await act(async () => {
-      expect(
-        await view.result.current.handoffContext(SESSION.id, request),
-      ).toBe(false);
+      expect(await view.result.current.handoffContext(SESSION.id, request)).toBe(false);
     });
 
     expect(view.onNotice).toHaveBeenLastCalledWith(
@@ -192,15 +173,10 @@ describe("useAiHandoffController", () => {
     };
 
     await act(async () => {
-      expect(
-        await view.result.current.handoffTerminalSelection(
-          SESSION.id,
-          "需要分析的输出",
-        ),
-      ).toBe(false);
-      expect(
-        await view.result.current.handoffRemoteFiles(SESSION.id, [file]),
-      ).toBe(false);
+      expect(await view.result.current.handoffTerminalSelection(SESSION.id, "需要分析的输出")).toBe(
+        false,
+      );
+      expect(await view.result.current.handoffRemoteFiles(SESSION.id, [file])).toBe(false);
     });
 
     expect(view.result.current.terminalSelections[SESSION.id]).toBeUndefined();
@@ -230,27 +206,17 @@ describe("useAiHandoffController", () => {
     let firstHandoff: Promise<boolean> | undefined;
 
     await act(async () => {
-      firstHandoff = view.result.current.handoffContext(
-        SESSION.id,
-        request("旧上下文"),
-      );
+      firstHandoff = view.result.current.handoffContext(SESSION.id, request("旧上下文"));
       await Promise.resolve();
     });
     await act(async () => {
-      expect(
-        await view.result.current.handoffContext(
-          SESSION.id,
-          request("新上下文"),
-        ),
-      ).toBe(true);
+      expect(await view.result.current.handoffContext(SESSION.id, request("新上下文"))).toBe(true);
     });
     await act(async () => {
       resolveFirst?.(false);
       expect(await firstHandoff).toBe(false);
     });
 
-    expect(view.result.current.businessContexts[SESSION.id]?.[0]?.content).toBe(
-      "新上下文",
-    );
+    expect(view.result.current.businessContexts[SESSION.id]?.[0]?.content).toBe("新上下文");
   });
 });

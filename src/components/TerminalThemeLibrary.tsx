@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { Button, Input } from "@arco-design/web-react";
 import { isTauri } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
 import type { AppSettings } from "../app-settings";
 import { useResolvedAppearance } from "../hooks/useResolvedAppearance";
+import { pickLocalPath } from "../local-path-picker";
 import TerminalAppearancePreview from "./TerminalAppearancePreview";
 import { commandErrorMessage, invokeProtocolCommand as invoke } from "../tauri-protocol";
 import {
@@ -58,7 +58,9 @@ export default function TerminalThemeLibrary({
       .catch((error) => {
         if (!disposed) setScanError(commandErrorMessage(error));
       });
-    return () => { disposed = true; };
+    return () => {
+      disposed = true;
+    };
   }, [desktop, refresh]);
 
   const custom = useMemo(() => {
@@ -71,23 +73,42 @@ export default function TerminalThemeLibrary({
   }, [diskThemes, settings.terminalCustomThemes]);
 
   const groups = [
-    ["栈渡", [
-      { id: "appearance", name: "跟随界面外观" },
-      ...Object.entries(TERMINAL_THEMES).map(([id, theme]) => ({ id, name: theme.label })),
-    ]],
+    [
+      "栈渡",
+      [
+        { id: "appearance", name: "跟随界面外观" },
+        ...Object.entries(TERMINAL_THEMES).map(([id, theme]) => ({ id, name: theme.label })),
+      ],
+    ],
     ["Ghostty 主题", [...custom].map(([id, theme]) => ({ id, name: theme.name }))],
-    ["Base24", [...BASE24_TERMINAL_THEMES].map(([id, theme]) => ({
-      id, name: theme.label, author: theme.author,
-    }))],
+    [
+      "Base24",
+      [...BASE24_TERMINAL_THEMES].map(([id, theme]) => ({
+        id,
+        name: theme.label,
+        author: theme.author,
+      })),
+    ],
   ] as const;
   const words = search.trim().toLowerCase().split(/\s+/);
-  const filteredGroups = groups.map(([title, entries]) => [
-    title,
-    entries.filter((entry) => words.every((word) =>
-      `${entry.name} ${entry.id} ${"author" in entry ? entry.author : ""}`.toLowerCase().includes(word),
-    )),
-  ] as const);
-  const preview = resolveTerminalTheme(settings.terminalColorScheme, appearance, settings.terminalCustomThemes);
+  const filteredGroups = groups.map(
+    ([title, entries]) =>
+      [
+        title,
+        entries.filter((entry) =>
+          words.every((word) =>
+            `${entry.name} ${entry.id} ${"author" in entry ? entry.author : ""}`
+              .toLowerCase()
+              .includes(word),
+          ),
+        ),
+      ] as const,
+  );
+  const preview = resolveTerminalTheme(
+    settings.terminalColorScheme,
+    appearance,
+    settings.terminalCustomThemes,
+  );
   const theme = preview.theme;
   const selectedCustom = settings.terminalCustomThemes.find(
     ({ name }) => customTerminalThemeId(name) === settings.terminalColorScheme,
@@ -95,8 +116,11 @@ export default function TerminalThemeLibrary({
 
   function selectTheme(id: TerminalColorScheme, imported?: StoredTerminalTheme) {
     const existing = settings.terminalCustomThemes;
-    if (imported && !existing.some(({ name }) => name === imported.name) &&
-      existing.length >= MAX_CUSTOM_TERMINAL_THEMES) {
+    if (
+      imported &&
+      !existing.some(({ name }) => name === imported.name) &&
+      existing.length >= MAX_CUSTOM_TERMINAL_THEMES
+    ) {
       setActionError("已达到自定义主题上限，请先移除一套主题");
       return;
     }
@@ -114,10 +138,10 @@ export default function TerminalThemeLibrary({
     setImporting(true);
     setActionError("");
     try {
-      const path = await open({ title: "导入 Ghostty 主题" });
-      if (typeof path !== "string") return;
-      const contents = await invoke<string>("read_config_file", { path });
-      const imported = parseGhosttyTheme(path.split(/[/\\]/).pop() ?? "", contents);
+      const picked = await pickLocalPath({ mode: "open", title: "导入 Ghostty 主题" });
+      if (!picked) return;
+      const contents = await invoke<string>("read_config_file", { token: picked.token });
+      const imported = parseGhosttyTheme(picked.path.split(/[/\\]/).pop() ?? "", contents);
       setSearch("");
       selectTheme(customTerminalThemeId(imported.name), imported);
     } catch (error) {
@@ -140,10 +164,18 @@ export default function TerminalThemeLibrary({
           </Button>
         </div>
       </div>
-      {(scanError || actionError) && <div role="status">{[scanError, actionError].filter(Boolean).join(" · ")}</div>}
+      {(scanError || actionError) && (
+        <div role="status">{[scanError, actionError].filter(Boolean).join(" · ")}</div>
+      )}
       <div className="terminal-theme-library-grid">
         <div className="terminal-theme-picker">
-          <Input allowClear aria-label="搜索终端主题" placeholder="搜索名称或作者" value={search} onChange={setSearch} />
+          <Input
+            allowClear
+            aria-label="搜索终端主题"
+            placeholder="搜索名称或作者"
+            value={search}
+            onChange={setSearch}
+          />
           <select
             aria-label="终端配色方案"
             size={7}
@@ -151,30 +183,48 @@ export default function TerminalThemeLibrary({
             disabled={importing}
             onChange={(event) => {
               const id = event.target.value as TerminalColorScheme;
-              const saved = settings.terminalCustomThemes.some(({ name }) => customTerminalThemeId(name) === id);
+              const saved = settings.terminalCustomThemes.some(
+                ({ name }) => customTerminalThemeId(name) === id,
+              );
               selectTheme(id, saved ? undefined : custom.get(id));
             }}
           >
-            {filteredGroups.filter(([, entries]) => entries.length).map(([title, entries]) => (
-              <optgroup label={title} key={title}>
-                {entries.map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
-              </optgroup>
-            ))}
+            {filteredGroups
+              .filter(([, entries]) => entries.length)
+              .map(([title, entries]) => (
+                <optgroup label={title} key={title}>
+                  {entries.map(({ id, name }) => (
+                    <option key={id} value={id}>
+                      {name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
           </select>
-          {filteredGroups.every(([, entries]) => !entries.length) && <span role="status">没有匹配的主题</span>}
+          {filteredGroups.every(([, entries]) => !entries.length) && (
+            <span role="status">没有匹配的主题</span>
+          )}
         </div>
         <div className="terminal-theme-preview-column">
           <div className="terminal-theme-preview-title">
-            <span>{settings.terminalColorScheme === "appearance" ? "跟随界面外观" : preview.label}</span>
+            <span>
+              {settings.terminalColorScheme === "appearance" ? "跟随界面外观" : preview.label}
+            </span>
             {selectedCustom && (
-              <Button size="mini" disabled={importing} onClick={() => {
-                setActionError("");
-                setSettings((current) => ({
-                  ...current,
-                  terminalColorScheme: "appearance",
-                  terminalCustomThemes: current.terminalCustomThemes.filter(({ name }) => name !== selectedCustom.name),
-                }));
-              }}>
+              <Button
+                size="mini"
+                disabled={importing}
+                onClick={() => {
+                  setActionError("");
+                  setSettings((current) => ({
+                    ...current,
+                    terminalColorScheme: "appearance",
+                    terminalCustomThemes: current.terminalCustomThemes.filter(
+                      ({ name }) => name !== selectedCustom.name,
+                    ),
+                  }));
+                }}
+              >
                 移除已保存主题
               </Button>
             )}
@@ -182,7 +232,11 @@ export default function TerminalThemeLibrary({
           <TerminalAppearancePreview settings={settings} theme={theme} />
           <div className="terminal-theme-ansi" aria-label="16 色 ANSI 色板">
             {ANSI_COLOR_KEYS.map((key, index) => (
-              <span key={key} title={`ANSI ${index} · ${theme[key]}`} style={{ backgroundColor: theme[key] }} />
+              <span
+                key={key}
+                title={`ANSI ${index} · ${theme[key]}`}
+                style={{ backgroundColor: theme[key] }}
+              />
             ))}
           </div>
         </div>

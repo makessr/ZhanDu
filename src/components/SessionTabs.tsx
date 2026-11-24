@@ -1,11 +1,24 @@
 import { useState, type ReactNode } from "react";
-import { Button, Dropdown, Input, Menu, Message, Modal, Popconfirm, Space, Tabs, Tooltip } from "@arco-design/web-react";
+import {
+  Button,
+  Dropdown,
+  Input,
+  Menu,
+  Message,
+  Modal,
+  Popconfirm,
+  Space,
+  Tabs,
+  Tooltip,
+} from "@arco-design/web-react";
 import WorkspaceIcon from "./WorkspaceIcon";
 import type { TerminalSession } from "../models";
 import { sessionTabName } from "../terminal-utils";
 import ContextMenu, { type ContextMenuItem } from "./ContextMenu";
 import {
-  readTerminalWorkspaces, writeTerminalWorkspaces, type TerminalWorkspace,
+  readTerminalWorkspaces,
+  writeTerminalWorkspaces,
+  type TerminalWorkspace,
 } from "../terminal-workspaces";
 
 const HOME_TAB_ID = "home";
@@ -35,9 +48,7 @@ function sessionStatusLabel(session: TerminalSession) {
     disconnected: "已断开",
     reconnecting: "重连中",
   };
-  return session.error
-    ? `${labels[session.status]}：${session.error}`
-    : labels[session.status];
+  return session.error ? `${labels[session.status]}：${session.error}` : labels[session.status];
 }
 
 function SessionTabs({
@@ -68,25 +79,35 @@ function SessionTabs({
   const [opening, setOpening] = useState(false);
   const sessionIds = sessions.map(({ id }) => id);
   const companion = sessionIds.find((id) => id !== activeSessionId);
-  const split = selectedPair ?? (preferredDirection && activeSessionId && companion
-    ? { first: activeSessionId, second: companion, direction: preferredDirection }
-    : undefined);
-  const visiblePair = split && activeSessionId && companion
-    ? [split.first, split.second].includes(activeSessionId)
-      && sessionIds.includes(split.first) && sessionIds.includes(split.second)
-      ? [split.first, split.second]
-      : [split.first !== activeSessionId && sessionIds.includes(split.first)
-        ? split.first : companion, activeSessionId]
-    : undefined;
+  const split =
+    selectedPair ??
+    (preferredDirection && activeSessionId && companion
+      ? { first: activeSessionId, second: companion, direction: preferredDirection }
+      : undefined);
+  const visiblePair =
+    split && activeSessionId && companion
+      ? [split.first, split.second].includes(activeSessionId) &&
+        sessionIds.includes(split.first) &&
+        sessionIds.includes(split.second)
+        ? [split.first, split.second]
+        : [
+            split.first !== activeSessionId && sessionIds.includes(split.first)
+              ? split.first
+              : companion,
+            activeSessionId,
+          ]
+      : undefined;
 
   function selectSession(id: string | null) {
     if (split && visiblePair && id) {
       const [first, second] = visiblePair;
-      setSplit(visiblePair.includes(id)
-        ? { ...split, first, second }
-        : activeSessionId === first
-          ? { ...split, first: id, second }
-          : { ...split, first, second: id });
+      setSplit(
+        visiblePair.includes(id)
+          ? { ...split, first, second }
+          : activeSessionId === first
+            ? { ...split, first: id, second }
+            : { ...split, first, second: id },
+      );
     }
     onActiveSessionChange(id);
   }
@@ -102,24 +123,29 @@ function SessionTabs({
     }
   }
 
-  const canSaveWorkspace = sessions.length > 0 && activeSessionId !== null &&
+  const canSaveWorkspace =
+    sessions.length > 0 &&
+    activeSessionId !== null &&
     sessions.every(({ host }) => !host.id.startsWith("quick-"));
 
   function saveWorkspace() {
     const name = workspaceName.trim();
     if (!name || !canSaveWorkspace || !activeSessionId) return;
     const existing = workspaces.find((item) => item.name === name);
-    if (saveWorkspaces([
-      {
-        id: existing?.id ?? crypto.randomUUID(),
-        name,
-        hostIds: sessions.map(({ host }) => host.id),
-        active: sessionIds.indexOf(activeSessionId),
-        layout: visiblePair && split ? split.direction : "single",
-        panes: visiblePair?.map((id) => sessionIds.indexOf(id)) ?? [],
-      },
-      ...workspaces.filter((item) => item.id !== existing?.id),
-    ])) setWorkspaceName("");
+    if (
+      saveWorkspaces([
+        {
+          id: existing?.id ?? crypto.randomUUID(),
+          name,
+          hostIds: sessions.map(({ host }) => host.id),
+          active: sessionIds.indexOf(activeSessionId),
+          layout: visiblePair && split ? split.direction : "single",
+          panes: visiblePair?.map((id) => sessionIds.indexOf(id)) ?? [],
+        },
+        ...workspaces.filter((item) => item.id !== existing?.id),
+      ])
+    )
+      setWorkspaceName("");
   }
 
   async function openWorkspace(workspace: TerminalWorkspace) {
@@ -179,9 +205,7 @@ function SessionTabs({
         className="terminal-tabs"
         editable
         onAddTab={() => selectSession(null)}
-        onChange={(tabId) =>
-          selectSession(tabId === HOME_TAB_ID ? null : tabId)
-        }
+        onChange={(tabId) => selectSession(tabId === HOME_TAB_ID ? null : tabId)}
         onDeleteTab={onCloseSession}
         showAddButton
         size="small"
@@ -207,9 +231,7 @@ function SessionTabs({
                   className="terminal-tab-context-target terminal-tab-label"
                   onContextMenu={() => selectSession(session.id)}
                 >
-                  <span
-                    className={`terminal-status-dot terminal-status-${session.status}`}
-                  />
+                  <span className={`terminal-status-dot terminal-status-${session.status}`} />
                   <Tooltip content={sessionStatusLabel(session)}>
                     <span className="terminal-tab-name">
                       {sessionTabName(sessions, session.id)}
@@ -230,9 +252,7 @@ function SessionTabs({
       >
         {sessions.map((session) => {
           const paneIndex = visiblePair?.indexOf(session.id);
-          const visible = paneIndex === undefined
-            ? session.id === activeSessionId
-            : paneIndex >= 0;
+          const visible = paneIndex === undefined ? session.id === activeSessionId : paneIndex >= 0;
           return (
             <div
               aria-label={session.host.name}
@@ -257,9 +277,14 @@ function SessionTabs({
       </div>
       {onOpenWorkspace && (
         <div className="terminal-workspaces-action">
-          <Button aria-label="SSH 工作区" title="SSH 工作区" type="text"
+          <Button
+            aria-label="SSH 工作区"
+            title="SSH 工作区"
+            type="text"
             className="terminal-ai-action-button"
-            icon={<WorkspaceIcon name="layout-dashboard" />} onClick={() => setWorkspaceOpen(true)} />
+            icon={<WorkspaceIcon name="layout-dashboard" />}
+            onClick={() => setWorkspaceOpen(true)}
+          />
         </div>
       )}
       <div className="terminal-split-action">
@@ -289,9 +314,7 @@ function SessionTabs({
             <Button
               aria-label={aiAssistantVisible ? "关闭 AI 助手" : "打开 AI 助手"}
               aria-pressed={aiAssistantVisible}
-              className={`terminal-ai-action-button${
-                aiAssistantVisible ? " is-active" : ""
-              }`}
+              className={`terminal-ai-action-button${aiAssistantVisible ? " is-active" : ""}`}
               disabled={!hasActiveSession}
               icon={<WorkspaceIcon name="bot" />}
               onClick={onToggleAiAssistant}
@@ -300,24 +323,44 @@ function SessionTabs({
           </span>
         </Tooltip>
       </div>
-      <Modal title="SSH 工作区" visible={workspaceOpen} footer={null}
-        onCancel={() => setWorkspaceOpen(false)}>
+      <Modal
+        title="SSH 工作区"
+        visible={workspaceOpen}
+        footer={null}
+        onCancel={() => setWorkspaceOpen(false)}
+      >
         <Space direction="vertical" style={{ width: "100%" }}>
           <Space>
-            <Input aria-label="工作区名称" placeholder="工作区名称" value={workspaceName}
-              maxLength={60} onChange={setWorkspaceName} onPressEnter={saveWorkspace} />
-            <Button onClick={saveWorkspace}
-              disabled={opening || !canSaveWorkspace || !workspaceName.trim()}>
+            <Input
+              aria-label="工作区名称"
+              placeholder="工作区名称"
+              value={workspaceName}
+              maxLength={60}
+              onChange={setWorkspaceName}
+              onPressEnter={saveWorkspace}
+            />
+            <Button
+              onClick={saveWorkspace}
+              disabled={opening || !canSaveWorkspace || !workspaceName.trim()}
+            >
               保存当前会话
             </Button>
           </Space>
           {!canSaveWorkspace && <span>请先打开已保存的主机会话。</span>}
           {workspaces.map((workspace) => (
             <Space key={workspace.id} wrap>
-              <span>{workspace.name}（{workspace.hostIds.length} 条会话）</span>
-              <Button disabled={opening} onClick={() => void openWorkspace(workspace)}>打开</Button>
-              <Popconfirm content="删除这个工作区？"
-                onOk={() => { saveWorkspaces(workspaces.filter((item) => item.id !== workspace.id)); }}>
+              <span>
+                {workspace.name}（{workspace.hostIds.length} 条会话）
+              </span>
+              <Button disabled={opening} onClick={() => void openWorkspace(workspace)}>
+                打开
+              </Button>
+              <Popconfirm
+                content="删除这个工作区？"
+                onOk={() => {
+                  saveWorkspaces(workspaces.filter((item) => item.id !== workspace.id));
+                }}
+              >
                 <Button disabled={opening}>删除</Button>
               </Popconfirm>
             </Space>

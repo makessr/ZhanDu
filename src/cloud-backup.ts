@@ -71,9 +71,7 @@ function record(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
-export function sanitizeCloudBackupSettings(
-  value: unknown,
-): CloudBackupSettings {
+export function sanitizeCloudBackupSettings(value: unknown): CloudBackupSettings {
   const source = record(value);
   const storage = record(source?.storage);
   const protectionMode = source?.protectionMode;
@@ -83,31 +81,20 @@ export function sanitizeCloudBackupSettings(
         typeof storage?.profileId === "string" && storage.profileId.trim()
           ? storage.profileId.trim().slice(0, 160)
           : "default",
-      endpoint:
-        typeof storage?.endpoint === "string"
-          ? storage.endpoint.trim().slice(0, 2048)
-          : "",
+      endpoint: typeof storage?.endpoint === "string" ? storage.endpoint.trim().slice(0, 2048) : "",
       region:
         typeof storage?.region === "string" && storage.region.trim()
           ? storage.region.trim().slice(0, 120)
           : "us-east-1",
-      bucket:
-        typeof storage?.bucket === "string"
-          ? storage.bucket.trim().slice(0, 255)
-          : "",
+      bucket: typeof storage?.bucket === "string" ? storage.bucket.trim().slice(0, 255) : "",
       prefix:
-        typeof storage?.prefix === "string"
-          ? storage.prefix.trim().slice(0, 512)
-          : "FineShell",
+        typeof storage?.prefix === "string" ? storage.prefix.trim().slice(0, 512) : "FineShell",
     },
     protectionMode:
-      protectionMode === "recoveryKey" || protectionMode === "none"
-        ? protectionMode
-        : "password",
+      protectionMode === "recoveryKey" || protectionMode === "none" ? protectionMode : "password",
     includeCredentials: source?.includeCredentials === true,
     retentionCount:
-      typeof source?.retentionCount === "number" &&
-      Number.isFinite(source.retentionCount)
+      typeof source?.retentionCount === "number" && Number.isFinite(source.retentionCount)
         ? Math.min(100, Math.max(1, Math.round(source.retentionCount)))
         : 10,
   };
@@ -115,9 +102,7 @@ export function sanitizeCloudBackupSettings(
 
 export function loadCloudBackupSettings() {
   try {
-    return sanitizeCloudBackupSettings(
-      JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null"),
-    );
+    return sanitizeCloudBackupSettings(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null"));
   } catch {
     return { ...DEFAULT_CLOUD_BACKUP_SETTINGS };
   }
@@ -169,16 +154,14 @@ export async function initializeCloudBackupRepository(
   password?: string,
 ) {
   requireDesktop();
-  return invoke<CloudBackupInitializeResult>(
-    "cloud_backup_initialize_repository",
-    { storage, protectionMode, password },
-  );
+  return invoke<CloudBackupInitializeResult>("cloud_backup_initialize_repository", {
+    storage,
+    protectionMode,
+    password,
+  });
 }
 
-export async function unlockCloudBackupRepository(
-  storage: CloudStorageConfig,
-  secret: string,
-) {
+export async function unlockCloudBackupRepository(storage: CloudStorageConfig, secret: string) {
   requireDesktop();
   await invoke("cloud_backup_unlock_repository", { storage, secret });
 }
@@ -205,10 +188,7 @@ export async function createCloudBackupSnapshot(request: {
   });
 }
 
-export async function downloadCloudBackupSnapshot(
-  storage: CloudStorageConfig,
-  key: string,
-) {
+export async function downloadCloudBackupSnapshot(storage: CloudStorageConfig, key: string) {
   requireDesktop();
   return invoke<CloudBackupDownloadResult>("cloud_backup_download_snapshot", {
     storage,
@@ -226,10 +206,7 @@ export async function discardCloudBackupRestore(restoreToken: string) {
   await invoke("cloud_backup_discard_restore", { restoreToken });
 }
 
-export async function deleteCloudBackupSnapshot(
-  storage: CloudStorageConfig,
-  key: string,
-) {
+export async function deleteCloudBackupSnapshot(storage: CloudStorageConfig, key: string) {
   requireDesktop();
   await invoke("cloud_backup_delete_snapshot", { storage, key });
 }

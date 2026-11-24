@@ -19,7 +19,11 @@ pub(super) fn run_session(
             Err(RecvTimeoutError::Disconnected) => break,
         };
         match command {
-            SftpCommand::List { path, preview, reply } => {
+            SftpCommand::List {
+                path,
+                preview,
+                reply,
+            } => {
                 let _ = reply.send(list_directory(
                     &session,
                     &sftp,

@@ -7,10 +7,16 @@ import TerminalCommandBar from "./TerminalCommandBar";
 
 test("completes remote names and paths, then sends only on explicit submission", async () => {
   let finishSend!: () => void;
-  const submit = mock((_command: string) => new Promise<void>((resolve) => { finishSend = resolve; }));
+  const submit = mock(
+    (_command: string) =>
+      new Promise<void>((resolve) => {
+        finishSend = resolve;
+      }),
+  );
   mockIPC((command) => {
     if (command === "ssh_command_names") return ["/home/test", ["docker"]];
-    if (command === "sftp_list") return { path: "/home/test", entries: [{ name: "test dir", kind: "directory" }] };
+    if (command === "sftp_list")
+      return { path: "/home/test", entries: [{ name: "test dir", kind: "directory" }] };
     throw new Error(command);
   });
   const view = render(

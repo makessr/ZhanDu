@@ -70,11 +70,7 @@ describe("AI read-only tools", () => {
       status: "running" as const,
     };
     expect(running.detail).toBe("1.1.1.1");
-    const completed = finishAiToolRun(
-      running,
-      { summary: "状态：可达" },
-      1_250,
-    );
+    const completed = finishAiToolRun(running, { summary: "状态：可达" }, 1_250);
     expect(completed).toMatchObject({
       durationMs: 250,
       status: "success",

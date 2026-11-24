@@ -17,7 +17,11 @@ export default function TerminalBackgroundSettings({
   const inputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const { theme } = resolveTerminalTheme(settings.terminalColorScheme, appearance, settings.terminalCustomThemes);
+  const { theme } = resolveTerminalTheme(
+    settings.terminalColorScheme,
+    appearance,
+    settings.terminalCustomThemes,
+  );
   return (
     <div className="settings-group terminal-background-settings">
       <div className="terminal-theme-library-header">
@@ -44,11 +48,19 @@ export default function TerminalBackgroundSettings({
               }
             }}
           />
-          <Button size="small" loading={loading} onClick={() => inputRef.current?.click()}>选择图片</Button>
-          <Button size="small" disabled={loading || !settings.terminalBackgroundImage} onClick={() => {
-            setError("");
-            setSettings((current) => ({ ...current, terminalBackgroundImage: "" }));
-          }}>移除图片</Button>
+          <Button size="small" loading={loading} onClick={() => inputRef.current?.click()}>
+            选择图片
+          </Button>
+          <Button
+            size="small"
+            disabled={loading || !settings.terminalBackgroundImage}
+            onClick={() => {
+              setError("");
+              setSettings((current) => ({ ...current, terminalBackgroundImage: "" }));
+            }}
+          >
+            移除图片
+          </Button>
         </div>
       </div>
       {error && <div role="alert">{error}</div>}
@@ -56,12 +68,18 @@ export default function TerminalBackgroundSettings({
         <>
           <Radio.Group
             aria-label="背景填充方式"
-            options={[{ label: "铺满", value: "cover" }, { label: "完整显示", value: "contain" }, { label: "平铺", value: "tile" }]}
+            options={[
+              { label: "铺满", value: "cover" },
+              { label: "完整显示", value: "contain" },
+              { label: "平铺", value: "tile" },
+            ]}
             value={settings.terminalBackgroundMode}
-            onChange={(value) => setSettings((current) => ({
-              ...current,
-              terminalBackgroundMode: value as TerminalBackgroundMode,
-            }))}
+            onChange={(value) =>
+              setSettings((current) => ({
+                ...current,
+                terminalBackgroundMode: value as TerminalBackgroundMode,
+              }))
+            }
           />
           <div className="terminal-background-opacity">
             <span>图片不透明度</span>

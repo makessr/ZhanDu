@@ -66,8 +66,7 @@ export default function HostConnectionHistoryModal({
     username: "root",
   });
   const [quickPassword, setQuickPassword] = useState("");
-  const [quickAuthMethod, setQuickAuthMethod] =
-    useState<HostAuthMethod>("password");
+  const [quickAuthMethod, setQuickAuthMethod] = useState<HostAuthMethod>("password");
   const [quickSshKeyId, setQuickSshKeyId] = useState<string>();
   const [quickProxyId, setQuickProxyId] = useState<string>();
 
@@ -77,9 +76,7 @@ export default function HostConnectionHistoryModal({
       : quickAuthMethod === "privateKey"
         ? Boolean(quickSshKeyId)
         : true;
-  const historyColumns = useMemo<
-    TableColumnProps<ConnectionHistoryRecord>[]
-  >(
+  const historyColumns = useMemo<TableColumnProps<ConnectionHistoryRecord>[]>(
     () => [
       {
         title: "连接目标",
@@ -131,16 +128,12 @@ export default function HostConnectionHistoryModal({
           <Typography.Text bold>快速连接</Typography.Text>
           <div className="quick-connect-fields">
             <Input
-              onChange={(address) =>
-                setQuickTarget((current) => ({ ...current, address }))
-              }
+              onChange={(address) => setQuickTarget((current) => ({ ...current, address }))}
               placeholder="主机地址"
               value={quickTarget.address}
             />
             <Input
-              onChange={(username) =>
-                setQuickTarget((current) => ({ ...current, username }))
-              }
+              onChange={(username) => setQuickTarget((current) => ({ ...current, username }))}
               placeholder="用户名"
               value={quickTarget.username}
             />
@@ -173,9 +166,7 @@ export default function HostConnectionHistoryModal({
             <InputNumber
               max={65535}
               min={1}
-              onChange={(port) =>
-                setQuickTarget((current) => ({ ...current, port }))
-              }
+              onChange={(port) => setQuickTarget((current) => ({ ...current, port }))}
               placeholder="端口"
               value={quickTarget.port}
             />
@@ -190,12 +181,7 @@ export default function HostConnectionHistoryModal({
               value={quickProxyId}
             />
             <Button
-              disabled={
-                loading ||
-                actionPending ||
-                !quickTarget.address.trim() ||
-                !credentialReady
-              }
+              disabled={loading || actionPending || !quickTarget.address.trim() || !credentialReady}
               icon={<IconLink />}
               onClick={() => {
                 void onQuickConnect({

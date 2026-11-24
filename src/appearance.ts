@@ -71,10 +71,7 @@ export function persistAppearanceMode(mode: AppearanceMode) {
   }
 }
 
-export function setAppearanceMode(
-  mode: AppearanceMode,
-  options: { persist?: boolean } = {},
-) {
+export function setAppearanceMode(mode: AppearanceMode, options: { persist?: boolean } = {}) {
   const resolved = applyAppearanceMode(mode);
   if (options.persist) persistAppearanceMode(mode);
   return resolved;
@@ -91,10 +88,7 @@ export function initializeAppearance() {
     if (currentMode === "system") applyAppearanceMode(currentMode);
   });
   window.addEventListener("storage", (event) => {
-    if (
-      event.key !== APPEARANCE_STORAGE_KEY ||
-      !isAppearanceMode(event.newValue)
-    ) {
+    if (event.key !== APPEARANCE_STORAGE_KEY || !isAppearanceMode(event.newValue)) {
       return;
     }
     applyAppearanceMode(event.newValue);

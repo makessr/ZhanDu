@@ -15,22 +15,14 @@ import {
   Typography,
 } from "@arco-design/web-react";
 import type { TableColumnProps } from "@arco-design/web-react";
-import {
-  IconDelete,
-  IconEdit,
-  IconFolder,
-  IconPlus,
-} from "@arco-design/web-react/icon";
+import { IconDelete, IconEdit, IconFolder, IconPlus } from "@arco-design/web-react/icon";
 import { isTauri } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { APP_DISPLAY_NAME } from "../application-brand";
 import { confirmHostFingerprint } from "../app-window-actions";
 import { diagnosticInvoke as invoke } from "../diagnostics";
-import {
-  loadConfiguration,
-  updateConfiguration,
-} from "../config-database";
+import { loadConfiguration, updateConfiguration } from "../config-database";
 import {
   deleteSshKey,
   removeCredentialReference,
@@ -38,21 +30,12 @@ import {
   upsertSshKey,
 } from "../configuration-mutations";
 import { createCredentialReference } from "../credential-registry";
-import type {
-  HostRecord,
-  SshKeyFormValues,
-  SshKeyRecord,
-  SshKeySource,
-} from "../models";
+import type { HostRecord, SshKeyFormValues, SshKeyRecord, SshKeySource } from "../models";
 import { getSshKeySource } from "../ssh-keys";
 import { sshKeyInstallCommand } from "../ssh-key-install";
 import { jumpHostRequest } from "../terminal-utils";
 import { resolveWorkspaceConnection } from "../terminal-workspaces";
-import {
-  emitProtocolEventTo,
-  listenProtocolEvent,
-  type SshConnectResult,
-} from "../tauri-protocol";
+import { emitProtocolEventTo, listenProtocolEvent, type SshConnectResult } from "../tauri-protocol";
 
 function keyChange(
   configuration: Awaited<ReturnType<typeof loadConfiguration>>,
@@ -61,18 +44,49 @@ function keyChange(
 ) {
   const host = configuration.hosts.find(({ id }) => id === hostId);
   if (!host) throw new Error("所选主机已被删除");
-  const oldReference = host.authMethod === "privateKey"
-    ? host.sshKeyId
-      ? configuration.sshKeys.find(({ id }) => id === host.sshKeyId)?.privateKeyPath
-      : host.privateKeyPath
-    : undefined;
-  const replacement = { ...host, authMethod: "privateKey" as const, sshKeyId: keyId, privateKeyPath: undefined };
+  const oldReference =
+    host.authMethod === "privateKey"
+      ? host.sshKeyId
+        ? configuration.sshKeys.find(({ id }) => id === host.sshKeyId)?.privateKeyPath
+        : host.privateKeyPath
+      : undefined;
+  const replacement = {
+    ...host,
+    authMethod: "privateKey" as const,
+    sshKeyId: keyId,
+    privateKeyPath: undefined,
+  };
   const [candidate, proxy, jump] = resolveWorkspaceConnection(replacement, configuration);
-  const { address, port, username, authMethod, privateKeyPath, connectTimeoutSeconds, keepAliveIntervalSeconds } = candidate;
-  const request = { hostId: keyId, address, port, username, authMethod, privateKeyPath, connectTimeoutSeconds,
-    keepAliveIntervalSeconds, expectedFingerprint: host.hostFingerprint, proxy, jumpHost: jumpHostRequest(jump) };
+  const {
+    address,
+    port,
+    username,
+    authMethod,
+    privateKeyPath,
+    connectTimeoutSeconds,
+    keepAliveIntervalSeconds,
+  } = candidate;
+  const request = {
+    hostId: keyId,
+    address,
+    port,
+    username,
+    authMethod,
+    privateKeyPath,
+    connectTimeoutSeconds,
+    keepAliveIntervalSeconds,
+    expectedFingerprint: host.hostFingerprint,
+    proxy,
+    jumpHost: jumpHostRequest(jump),
+  };
   const original = [host.authMethod, host.sshKeyId, oldReference];
-  return { host, replacement, request, oldReference, snapshot: JSON.stringify([request, original]) };
+  return {
+    host,
+    replacement,
+    request,
+    oldReference,
+    snapshot: JSON.stringify([request, original]),
+  };
 }
 
 interface SshPrivateKeyIdentity {
@@ -81,7 +95,9 @@ interface SshPrivateKeyIdentity {
 }
 
 function readKeyIdentity(reference: string) {
-  return invoke<SshPrivateKeyIdentity>("ssh_private_key_identity", { reference }).catch(() => undefined);
+  return invoke<SshPrivateKeyIdentity>("ssh_private_key_identity", { reference }).catch(
+    () => undefined,
+  );
 }
 
 function createSshKeyId() {
@@ -145,12 +161,7 @@ interface SshKeyEditorModalProps {
   onSubmit: (values: SshKeyFormValues) => void;
 }
 
-function SshKeyEditorModal({
-  sshKey,
-  visible,
-  onCancel,
-  onSubmit,
-}: SshKeyEditorModalProps) {
+function SshKeyEditorModal({ sshKey, visible, onCancel, onSubmit }: SshKeyEditorModalProps) {
   const [form] = Form.useForm<SshKeyFormValues>();
   const initialSource = sshKey ? getSshKeySource(sshKey) : "file";
   const [source, setSource] = useState<SshKeySource>(initialSource);
@@ -236,9 +247,7 @@ function SshKeyEditorModal({
           </Form.Item>
         )}
         <Form.Item field="passphrase" label="私钥口令">
-          <Input.Password
-            placeholder={sshKey ? "留空则保留原口令" : "没有口令可留空"}
-          />
+          <Input.Password placeholder={sshKey ? "留空则保留原口令" : "没有口令可留空"} />
         </Form.Item>
         <div className="modal-actions">
           <Space>
@@ -332,9 +341,7 @@ function SshKeySettings() {
 
   const notifyMainWindow = async () => {
     if (!isTauri()) return;
-    await emitProtocolEventTo("main", "configuration:changed").catch(
-      () => undefined,
-    );
+    await emitProtocolEventTo("main", "configuration:changed").catch(() => undefined);
   };
 
   const showKeyInstall = useCallback(async (key: SshKeyRecord) => {
@@ -392,18 +399,24 @@ function SshKeySettings() {
     try {
       const change = keyChange(await loadConfiguration(), hostId, keyId);
       const verify = (expectedFingerprint = change.request.expectedFingerprint) =>
-        invoke<SshConnectResult>("ssh_verify_private_key", { request: { ...change.request, expectedFingerprint } });
+        invoke<SshConnectResult>("ssh_verify_private_key", {
+          request: { ...change.request, expectedFingerprint },
+        });
       let result = await verify();
       if (result.status === "hostKeyVerificationRequired") {
-        if (!await confirmHostFingerprint(change.host, result)) return;
+        if (!(await confirmHostFingerprint(change.host, result))) return;
         result = await verify(result.fingerprint);
         if (result.status !== "connected") throw new Error("验证期间主机指纹已变化，请重试");
       }
       const replacingKey = change.host.authMethod !== "password" && change.host.sshKeyId !== keyId;
-      const [oldKey, newKey] = replacingKey ? await Promise.all([
-        change.oldReference ? readKeyIdentity(change.oldReference) : undefined,
-        change.request.privateKeyPath ? readKeyIdentity(change.request.privateKeyPath) : undefined,
-      ]) : [];
+      const [oldKey, newKey] = replacingKey
+        ? await Promise.all([
+            change.oldReference ? readKeyIdentity(change.oldReference) : undefined,
+            change.request.privateKeyPath
+              ? readKeyIdentity(change.request.privateKeyPath)
+              : undefined,
+          ])
+        : [];
       await updateConfiguration((current) => {
         const latest = keyChange(current, hostId, keyId);
         if (latest.snapshot !== change.snapshot) {
@@ -431,18 +444,27 @@ function SshKeySettings() {
       }
       Modal.info({
         title: "新密钥已验证并启用",
-        content: oldKey && newKey ? (
-          <Space direction="vertical">
-            <Typography.Text>
-              确认没有其他设备需要旧公钥后，在服务器的 authorized_keys 中按下方指纹核对条目，再手动移除。
-            </Typography.Text>
-            <Typography.Text copyable>{oldKey.fingerprint}</Typography.Text>
-            <Button onClick={() => void writeText(oldKey.publicKey)
-              .then(() => Message.success("旧公钥已复制")).catch((error) => Message.error(String(error)))}>
-              复制旧公钥
-            </Button>
-          </Space>
-        ) : "当前无法识别旧公钥。请先在服务器核对旧条目的指纹，再手动撤销。",
+        content:
+          oldKey && newKey ? (
+            <Space direction="vertical">
+              <Typography.Text>
+                确认没有其他设备需要旧公钥后，在服务器的 authorized_keys
+                中按下方指纹核对条目，再手动移除。
+              </Typography.Text>
+              <Typography.Text copyable>{oldKey.fingerprint}</Typography.Text>
+              <Button
+                onClick={() =>
+                  void writeText(oldKey.publicKey)
+                    .then(() => Message.success("旧公钥已复制"))
+                    .catch((error) => Message.error(String(error)))
+                }
+              >
+                复制旧公钥
+              </Button>
+            </Space>
+          ) : (
+            "当前无法识别旧公钥。请先在服务器核对旧条目的指纹，再手动撤销。"
+          ),
       });
     } catch (error) {
       Message.error(String(error));
@@ -457,15 +479,10 @@ function SshKeySettings() {
     let passphraseStored = false;
     let managedKeyImported = false;
     try {
-      const existingSource = editingSshKey
-        ? getSshKeySource(editingSshKey)
-        : values.source;
+      const existingSource = editingSshKey ? getSshKeySource(editingSshKey) : values.source;
       let privateKeyPath = values.privateKeyPath?.trim() ?? "";
       if (!editingSshKey && existingSource === "managed") {
-        const result = await importManagedSshKey(
-          sshKeyId,
-          values.privateKeyContent?.trim() ?? "",
-        );
+        const result = await importManagedSshKey(sshKeyId, values.privateKeyContent?.trim() ?? "");
         privateKeyPath = result.reference;
         managedKeyImported = true;
       } else if (editingSshKey && existingSource === "managed") {
@@ -486,11 +503,7 @@ function SshKeySettings() {
       setSshKeys(configuration.sshKeys);
       if (values.passphrase) {
         await upsertCredentialReference(
-          createCredentialReference(
-            "privateKeyPassphrase",
-            sshKeyId,
-            `密钥：${sshKey.name}`,
-          ),
+          createCredentialReference("privateKeyPassphrase", sshKeyId, `密钥：${sshKey.name}`),
         ).catch(() => {
           Message.warning("密钥已保存，但凭据索引更新失败，可重新扫描");
         });
@@ -568,11 +581,7 @@ function SshKeySettings() {
           return (
             <Space size="mini">
               {isTauri() && getSshKeySource(sshKey) === "managed" && (
-                <Button
-                  disabled={acting}
-                  onClick={() => void showKeyInstall(sshKey)}
-                  size="mini"
-                >
+                <Button disabled={acting} onClick={() => void showKeyInstall(sshKey)} size="mini">
                   安装公钥
                 </Button>
               )}
@@ -657,16 +666,23 @@ function SshKeySettings() {
           confirmLoading={acting}
           footer={null}
           maskClosable={false}
-          onCancel={() => { if (!acting) setGeneratorOpen(false); }}
+          onCancel={() => {
+            if (!acting) setGeneratorOpen(false);
+          }}
           title="生成 Ed25519 密钥"
           visible
         >
-          <Form<{ name: string }> layout="vertical" onSubmit={(values) => void generateSshKey(values)}>
+          <Form<{ name: string }>
+            layout="vertical"
+            onSubmit={(values) => void generateSshKey(values)}
+          >
             <Form.Item field="name" label="密钥名称" rules={[{ required: true }]}>
               <Input autoFocus maxLength={80} placeholder="例如：我的工作服务器" />
             </Form.Item>
             <div className="modal-actions">
-              <Button htmlType="submit" loading={acting} type="primary">生成密钥</Button>
+              <Button htmlType="submit" loading={acting} type="primary">
+                生成密钥
+              </Button>
             </div>
           </Form>
         </Modal>
@@ -675,7 +691,9 @@ function SshKeySettings() {
         <Modal
           footer={null}
           maskClosable={false}
-          onCancel={() => { if (!acting) setInstallKey(null); }}
+          onCancel={() => {
+            if (!acting) setInstallKey(null);
+          }}
           style={{ width: 620 }}
           title={`安装公钥 · ${installKey.name}`}
           visible
@@ -684,15 +702,31 @@ function SshKeySettings() {
             <Typography.Text>
               用要登录的账号打开服务器终端，粘贴并执行安装命令。栈渡验证新密钥后才会切换主机配置。
             </Typography.Text>
-            <Input.TextArea aria-label="OpenSSH 公钥" autoSize readOnly value={installKey.publicKey} />
+            <Input.TextArea
+              aria-label="OpenSSH 公钥"
+              autoSize
+              readOnly
+              value={installKey.publicKey}
+            />
             <Space wrap>
-              <Button onClick={() => void writeText(installKey.publicKey)
-                .then(() => Message.success("公钥已复制")).catch((error) => Message.error(String(error)))}>
+              <Button
+                onClick={() =>
+                  void writeText(installKey.publicKey)
+                    .then(() => Message.success("公钥已复制"))
+                    .catch((error) => Message.error(String(error)))
+                }
+              >
                 复制公钥
               </Button>
-              <Button type="primary" onClick={() => void Promise.resolve()
-                .then(() => writeText(sshKeyInstallCommand(installKey.publicKey)))
-                .then(() => Message.success("安装命令已复制")).catch((error) => Message.error(String(error)))}>
+              <Button
+                type="primary"
+                onClick={() =>
+                  void Promise.resolve()
+                    .then(() => writeText(sshKeyInstallCommand(installKey.publicKey)))
+                    .then(() => Message.success("安装命令已复制"))
+                    .catch((error) => Message.error(String(error)))
+                }
+              >
                 复制安装命令
               </Button>
             </Space>

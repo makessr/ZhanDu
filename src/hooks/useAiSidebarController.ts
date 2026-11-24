@@ -37,8 +37,7 @@ function createWindowAdapter(): AiSidebarWindowAdapter | null {
     isFullscreen: () => appWindow.isFullscreen(),
     isMaximized: () => appWindow.isMaximized(),
     onResized: (callback) => appWindow.onResized(callback),
-    setInnerSize: (width, height) =>
-      appWindow.setSize(new LogicalSize(width, height)),
+    setInnerSize: (width, height) => appWindow.setSize(new LogicalSize(width, height)),
   };
 }
 
@@ -74,48 +73,36 @@ export function useAiSidebarController({
   const transitionQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   if (adapterRef.current === undefined) {
-    adapterRef.current =
-      windowAdapter === undefined ? createWindowAdapter() : windowAdapter;
+    adapterRef.current = windowAdapter === undefined ? createWindowAdapter() : windowAdapter;
   }
   sidebarWidthRef.current = sidebarWidth;
   getWorkspaceWidthRef.current = getWorkspaceWidth;
   onResizeFailureRef.current = onResizeFailure;
 
-  const updateState = useCallback(
-    (update: Partial<AiSidebarControllerState>) => {
-      const next = { ...stateRef.current, ...update };
-      stateRef.current = next;
-      setState(next);
-    },
-    [],
-  );
+  const updateState = useCallback((update: Partial<AiSidebarControllerState>) => {
+    const next = { ...stateRef.current, ...update };
+    stateRef.current = next;
+    setState(next);
+  }, []);
 
-  const reportResizeFailure = useCallback(
-    (error: unknown, operation: "expand" | "collapse") => {
-      if (resizeFailureReportedRef.current) return;
-      resizeFailureReportedRef.current = true;
-      onResizeFailureRef.current?.(error, operation);
-    },
-    [],
-  );
+  const reportResizeFailure = useCallback((error: unknown, operation: "expand" | "collapse") => {
+    if (resizeFailureReportedRef.current) return;
+    resizeFailureReportedRef.current = true;
+    onResizeFailureRef.current?.(error, operation);
+  }, []);
 
   const enqueue = useCallback((operation: () => Promise<void>) => {
-    transitionQueueRef.current = transitionQueueRef.current
-      .catch(() => undefined)
-      .then(operation);
+    transitionQueueRef.current = transitionQueueRef.current.catch(() => undefined).then(operation);
     return transitionQueueRef.current;
   }, []);
 
-  const windowCanResize = useCallback(
-    async (adapter: AiSidebarWindowAdapter) => {
-      const [maximized, fullscreen] = await Promise.all([
-        adapter.isMaximized(),
-        adapter.isFullscreen(),
-      ]);
-      return !maximized && !fullscreen;
-    },
-    [],
-  );
+  const windowCanResize = useCallback(async (adapter: AiSidebarWindowAdapter) => {
+    const [maximized, fullscreen] = await Promise.all([
+      adapter.isMaximized(),
+      adapter.isFullscreen(),
+    ]);
+    return !maximized && !fullscreen;
+  }, []);
 
   const open = useCallback(() => {
     const currentPhase = stateRef.current.phase;
@@ -143,17 +130,10 @@ export function useAiSidebarController({
       if (stateRef.current.phase !== "opening") return;
 
       try {
-        if (
-          appliedExpansionRef.current === 0 &&
-          (await windowCanResize(adapter))
-        ) {
+        if (appliedExpansionRef.current === 0 && (await windowCanResize(adapter))) {
           if (stateRef.current.phase !== "opening") return;
           const before = await adapter.getInnerSize();
-          const targetWidth = aiWindowTargetWidth(
-            before.width,
-            true,
-            sidebarWidthRef.current,
-          );
+          const targetWidth = aiWindowTargetWidth(before.width, true, sidebarWidthRef.current);
           await adapter.setInnerSize(targetWidth, before.height);
           appliedExpansionRef.current = Math.max(0, targetWidth - before.width);
           const after = await adapter.getInnerSize();
@@ -233,11 +213,7 @@ export function useAiSidebarController({
     let timer: number | undefined;
     void adapter
       .onResized(() => {
-        if (
-          disposed ||
-          stateRef.current.phase !== "closed" ||
-          appliedExpansionRef.current <= 0
-        ) {
+        if (disposed || stateRef.current.phase !== "closed" || appliedExpansionRef.current <= 0) {
           return;
         }
         window.clearTimeout(timer);

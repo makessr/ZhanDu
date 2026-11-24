@@ -67,12 +67,7 @@ export function updateStoredHostFingerprint(
         ? { ...item, hostFingerprint: normalizedFingerprint }
         : item,
     ),
-    knownHosts: upsertKnownHostRecord(
-      current.knownHosts,
-      host,
-      normalizedFingerprint,
-      verifiedAt,
-    ),
+    knownHosts: upsertKnownHostRecord(current.knownHosts, host, normalizedFingerprint, verifiedAt),
   }));
 }
 
@@ -103,7 +98,8 @@ export function importConfiguration(
     | "sftpLocations"
     | "knownHosts"
     | "settings"
-  > & Partial<Pick<FineShellConfiguration, "quickCommandGroups">>,
+  > &
+    Partial<Pick<FineShellConfiguration, "quickCommandGroups">>,
 ) {
   return updateConfiguration((current) => ({
     ...current,
@@ -117,16 +113,14 @@ export function importConfiguration(
     sftpLocations: imported.sftpLocations,
     knownHosts: imported.knownHosts,
     settings: imported.settings,
-    backups: [
-      createBackup(current, "导入配置前自动备份"),
-      ...current.backups,
-    ].slice(0, MAX_CONFIGURATION_BACKUPS),
+    backups: [createBackup(current, "导入配置前自动备份"), ...current.backups].slice(
+      0,
+      MAX_CONFIGURATION_BACKUPS,
+    ),
   }));
 }
 
-export function restoreCredentialReferences(
-  references: CredentialReferenceRecord[],
-) {
+export function restoreCredentialReferences(references: CredentialReferenceRecord[]) {
   return updateConfiguration((current) => ({
     ...current,
     credentialReferences: [
@@ -156,21 +150,17 @@ export function restoreConfigurationBackup(backupId: string) {
       hostSort: backup.hostSort,
       sftpLocations: backup.sftpLocations,
       knownHosts:
-        backup.knownHosts ??
-        deriveKnownHostRecords(backup.hosts, backup.history, backup.createdAt),
+        backup.knownHosts ?? deriveKnownHostRecords(backup.hosts, backup.history, backup.createdAt),
       settings: backup.settings ?? current.settings,
-      backups: [
-        createBackup(current, "恢复配置前自动备份"),
-        ...current.backups,
-      ].slice(0, MAX_CONFIGURATION_BACKUPS),
+      backups: [createBackup(current, "恢复配置前自动备份"), ...current.backups].slice(
+        0,
+        MAX_CONFIGURATION_BACKUPS,
+      ),
     };
   });
 }
 
-export function createDeletedHostRecord(
-  host: HostRecord,
-  now = new Date(),
-): DeletedHostRecord {
+export function createDeletedHostRecord(host: HostRecord, now = new Date()): DeletedHostRecord {
   const deletedAt = now.toISOString();
   const expiresAt = new Date(
     now.getTime() + TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000,
@@ -199,20 +189,14 @@ export function moveHostToTrash(hostId: string) {
       ...current,
       hosts: current.hosts
         .filter((item) => item.id !== hostId)
-        .map((item) =>
-          item.jumpHostId === hostId
-            ? { ...item, jumpHostId: undefined }
-            : item,
-        ),
+        .map((item) => (item.jumpHostId === hostId ? { ...item, jumpHostId: undefined } : item)),
       history: current.history.map((record) =>
-        record.jumpHostId === hostId
-          ? { ...record, jumpHostId: undefined }
-          : record,
+        record.jumpHostId === hostId ? { ...record, jumpHostId: undefined } : record,
       ),
-      backups: [
-        createBackup(current, "删除主机前自动备份"),
-        ...current.backups,
-      ].slice(0, MAX_CONFIGURATION_BACKUPS),
+      backups: [createBackup(current, "删除主机前自动备份"), ...current.backups].slice(
+        0,
+        MAX_CONFIGURATION_BACKUPS,
+      ),
       trash: [
         createDeletedHostRecord(host),
         ...current.trash.filter((item) => item.host.id !== hostId),
@@ -239,17 +223,14 @@ export function restoreDeletedHost(deletedHostId: string) {
 
 export function permanentlyDeleteHost(deletedHostId: string) {
   return updateConfiguration((current) => {
-    const hostId = current.trash.find((item) => item.id === deletedHostId)?.host
-      .id;
+    const hostId = current.trash.find((item) => item.id === deletedHostId)?.host.id;
     return {
       ...current,
       sftpLocations: hostId
         ? current.sftpLocations.filter((item) => item.hostId !== hostId)
         : current.sftpLocations,
       terminalCommandHistory: hostId
-        ? current.terminalCommandHistory.filter(
-            (item) => item.hostId !== hostId,
-          )
+        ? current.terminalCommandHistory.filter((item) => item.hostId !== hostId)
         : current.terminalCommandHistory,
       trash: current.trash.filter((item) => item.id !== deletedHostId),
     };
@@ -268,9 +249,7 @@ export async function purgeExpiredDeletedHosts(now = new Date()) {
     });
     return {
       ...current,
-      sftpLocations: current.sftpLocations.filter(
-        (item) => !expiredHostIds.includes(item.hostId),
-      ),
+      sftpLocations: current.sftpLocations.filter((item) => !expiredHostIds.includes(item.hostId)),
       terminalCommandHistory: current.terminalCommandHistory.filter(
         (item) => !expiredHostIds.includes(item.hostId),
       ),
@@ -292,11 +271,12 @@ export function updateSftpLocation(
     const location = current.sftpLocations.find((entry) => entry.hostId === hostId);
     const next = sanitizeSftpLocation(update(location ?? { hostId, bookmarks: [], history: [] }));
     if (!next || next.hostId !== hostId) throw new Error("SFTP 位置记录无效");
-    const sftpLocations = next.bookmarks.length || next.history.length
-      ? location
-        ? current.sftpLocations.map((entry) => entry.hostId === hostId ? next : entry)
-        : [...current.sftpLocations, next]
-      : current.sftpLocations.filter((entry) => entry.hostId !== hostId);
+    const sftpLocations =
+      next.bookmarks.length || next.history.length
+        ? location
+          ? current.sftpLocations.map((entry) => (entry.hostId === hostId ? next : entry))
+          : [...current.sftpLocations, next]
+        : current.sftpLocations.filter((entry) => entry.hostId !== hostId);
     return { ...current, sftpLocations };
   });
 }
@@ -334,12 +314,8 @@ export function upsertSshKey(sshKey: SshKeyRecord) {
 
 export function deleteSshKey(sshKeyId: string) {
   return updateConfiguration((current) => {
-    const activeUsage = current.hosts.filter(
-      (host) => host.sshKeyId === sshKeyId,
-    );
-    const trashUsage = current.trash.filter(
-      (item) => item.host.sshKeyId === sshKeyId,
-    );
+    const activeUsage = current.hosts.filter((host) => host.sshKeyId === sshKeyId);
+    const trashUsage = current.trash.filter((item) => item.host.sshKeyId === sshKeyId);
     if (activeUsage.length || trashUsage.length) {
       throw new Error("该密钥仍被主机或回收站记录使用，无法删除");
     }
@@ -366,12 +342,8 @@ export function upsertQuickCommand(command: QuickCommandRecord) {
   }
   return updateConfiguration((current) => ({
     ...current,
-    quickCommands: current.quickCommands.some(
-      (item) => item.id === sanitized.id,
-    )
-      ? current.quickCommands.map((item) =>
-          item.id === sanitized.id ? sanitized : item,
-        )
+    quickCommands: current.quickCommands.some((item) => item.id === sanitized.id)
+      ? current.quickCommands.map((item) => (item.id === sanitized.id ? sanitized : item))
       : [...current.quickCommands, sanitized],
   }));
 }
@@ -379,9 +351,7 @@ export function upsertQuickCommand(command: QuickCommandRecord) {
 export function deleteQuickCommand(commandId: string) {
   return updateConfiguration((current) => ({
     ...current,
-    quickCommands: current.quickCommands.filter(
-      (item) => item.id !== commandId,
-    ),
+    quickCommands: current.quickCommands.filter((item) => item.id !== commandId),
   }));
 }
 
@@ -400,17 +370,14 @@ export function clearConnectionHistory() {
   return updateConfiguration((current) => ({ ...current, history: [] }));
 }
 
-export function recordTerminalCommandHistory(
-  hostId: string,
-  command: string,
-  cwd?: string,
-) {
+export function recordTerminalCommandHistory(hostId: string, command: string, cwd?: string) {
   return updateConfiguration((current) => ({
     ...current,
-    terminalCommandHistory: recordTerminalCommandInHistory(
-      current.terminalCommandHistory,
-      { hostId, command, cwd },
-    ),
+    terminalCommandHistory: recordTerminalCommandInHistory(current.terminalCommandHistory, {
+      hostId,
+      command,
+      cwd,
+    }),
   }));
 }
 
@@ -421,41 +388,28 @@ export function clearTerminalCommandHistory() {
   }));
 }
 
-export function upsertCredentialReference(
-  reference: CredentialReferenceRecord,
-) {
+export function upsertCredentialReference(reference: CredentialReferenceRecord) {
   const sanitized = sanitizeCredentialReference(reference);
   if (!sanitized) return Promise.reject(new Error("凭据索引无效"));
   return updateConfiguration((current) => ({
     ...current,
-    credentialReferences: current.credentialReferences.some(
-      (item) => item.id === sanitized.id,
-    )
-      ? current.credentialReferences.map((item) =>
-          item.id === sanitized.id ? sanitized : item,
-        )
+    credentialReferences: current.credentialReferences.some((item) => item.id === sanitized.id)
+      ? current.credentialReferences.map((item) => (item.id === sanitized.id ? sanitized : item))
       : [...current.credentialReferences, sanitized],
   }));
 }
 
-export function replaceCredentialReferences(
-  references: CredentialReferenceRecord[],
-) {
+export function replaceCredentialReferences(references: CredentialReferenceRecord[]) {
   return updateConfiguration((current) => ({
     ...current,
     credentialReferences: references,
   }));
 }
 
-export function removeCredentialReference(
-  kind: CredentialKind,
-  ownerId: string,
-) {
+export function removeCredentialReference(kind: CredentialKind, ownerId: string) {
   const id = `${kind}:${ownerId}`;
   return updateConfiguration((current) => ({
     ...current,
-    credentialReferences: current.credentialReferences.filter(
-      (item) => item.id !== id,
-    ),
+    credentialReferences: current.credentialReferences.filter((item) => item.id !== id),
   }));
 }

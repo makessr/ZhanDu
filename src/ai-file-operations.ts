@@ -102,8 +102,7 @@ export function aiFileOperationContentError(content: string) {
 function exactKeys(value: Record<string, unknown>, keys: string[]) {
   const actual = Object.keys(value).sort();
   const expected = [...keys].sort();
-  return actual.length === expected.length &&
-    actual.every((key, index) => key === expected[index]);
+  return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
 }
 
 export function createAiFileOperationProposal(
@@ -115,16 +114,11 @@ export function createAiFileOperationProposal(
   if (!isAiFileOperationToolCall(call)) {
     throw new Error("AI 返回了不支持的文件操作工具");
   }
-  const directory = operationDirectory
-    ? normalizeAiRemotePath(operationDirectory)
-    : null;
+  const directory = operationDirectory ? normalizeAiRemotePath(operationDirectory) : null;
   const args = parseArguments(call);
   const operation = args.operation;
   const rawPath = args.path;
-  if (
-    !matchesOperation(operation) ||
-    typeof rawPath !== "string"
-  ) {
+  if (!matchesOperation(operation) || typeof rawPath !== "string") {
     throw new Error("AI 返回了无效的文件操作参数");
   }
   const path = normalizeAiRemotePath(rawPath);
@@ -202,10 +196,7 @@ function matchesOperation(value: unknown): value is AiFileOperationKind {
   return value === "create" || value === "rename" || value === "delete";
 }
 
-export function aiFileOperationToolResult(
-  call: AiToolCall,
-  error?: string,
-): AiToolResult {
+export function aiFileOperationToolResult(call: AiToolCall, error?: string): AiToolResult {
   return {
     callId: call.id,
     name: call.name,
@@ -221,9 +212,7 @@ export function aiFileOperationToolResult(
   };
 }
 
-export function aiFileOperationLineSummary(
-  proposal: AiFileOperationProposal,
-) {
+export function aiFileOperationLineSummary(proposal: AiFileOperationProposal) {
   if (proposal.operation === "create") {
     return aiFileEditLineSummary("", proposal.content ?? "");
   }
@@ -238,12 +227,9 @@ export function markAiFileOperationApplied(
   result: AiFileOperationResult,
   appliedAt: string,
 ) {
-  const expectedPath =
-    proposal.operation === "rename" ? proposal.targetPath : proposal.path;
+  const expectedPath = proposal.operation === "rename" ? proposal.targetPath : proposal.path;
   const expectedContent =
-    proposal.operation === "create"
-      ? proposal.content
-      : proposal.originalFile?.content;
+    proposal.operation === "create" ? proposal.content : proposal.originalFile?.content;
   if (proposal.operation === "delete") {
     if (result.file) throw new Error("删除文件操作返回了无效结果");
   } else if (
@@ -264,9 +250,7 @@ export function markAiFileOperationApplied(
   };
 }
 
-export function aiFileOperationRollbackEligibilityError(
-  proposal: AiFileOperationProposal,
-) {
+export function aiFileOperationRollbackEligibilityError(proposal: AiFileOperationProposal) {
   if (proposal.status !== "applied") {
     return "当前文件操作没有可回滚的应用快照";
   }
@@ -361,10 +345,8 @@ export function aiFileOperationLabel(operation: AiFileOperationKind) {
   return "删除文件";
 }
 
-export function aiFileOperationDisplayName(
-  proposal: AiFileOperationProposal,
-) {
+export function aiFileOperationDisplayName(proposal: AiFileOperationProposal) {
   return aiRemoteFileName(
-    proposal.operation === "rename" ? proposal.targetPath ?? proposal.path : proposal.path,
+    proposal.operation === "rename" ? (proposal.targetPath ?? proposal.path) : proposal.path,
   );
 }

@@ -3,7 +3,8 @@ import { expandSshConfig, mergeSshConfig, parseSshConfig } from "./ssh-config-im
 
 describe("OpenSSH configuration import", () => {
   test("applies first matching values and preserves quoted Windows identity paths", () => {
-    const { hosts, skipped } = parseSshConfig(`
+    const { hosts, skipped } = parseSshConfig(
+      `
 Host bastion
   HostName jump.example
   User deploy
@@ -15,10 +16,13 @@ Host prod
 Host * !bastion
   User ops
   Port 2200
-`, "fallback");
+`,
+      "fallback",
+    );
     expect(skipped).toEqual([]);
-    expect(hosts.map(({name, username, port}) => [name, username, port])).toEqual([
-      ["bastion", "deploy", 22], ["prod", "ops", 2222],
+    expect(hosts.map(({ name, username, port }) => [name, username, port])).toEqual([
+      ["bastion", "deploy", 22],
+      ["prod", "ops", 2222],
     ]);
     expect(hosts[1].privateKeyPath).toBe("C:\\Users\\Admin\\.ssh\\production key");
     const ids = ["jump-id", "prod-id"];
@@ -26,14 +30,17 @@ Host * !bastion
   });
 
   test("does not silently bypass an unsupported proxy or overwrite a same-name host", () => {
-    const { hosts, skipped } = parseSshConfig(`
+    const { hosts, skipped } = parseSshConfig(
+      `
 Host direct
   HostName direct.example
 Host unsafe
   ProxyCommand ssh gateway -W %h:%p
 Host chain
   ProxyJump unsafe
-`, "test-user");
+`,
+      "test-user",
+    );
     expect(hosts.map(({ name }) => name)).toEqual(["direct"]);
     expect(skipped).toHaveLength(2);
     const existing = [{ ...hosts[0], id: "old", address: "keep.example" }];
@@ -49,22 +56,29 @@ Host chain
       layer: "Host jump\n  User gateway",
       second: "Host test\n  Port 2222",
     };
-    const resolve = async (pattern: string) => pattern === "conf/*.ssh" ? ["first", "second"] : ["layer"];
+    const resolve = async (pattern: string) =>
+      pattern === "conf/*.ssh" ? ["first", "second"] : ["layer"];
     const expanded = await expandSshConfig("config", async (path) => files[path], resolve);
     const { hosts } = parseSshConfig(expanded, "fallback");
     expect(hosts.map(({ name, username, port }) => [name, username, port])).toEqual([
-      ["jump", "gateway", 22], ["test", "common", 2200], ["root", "common", 22],
+      ["jump", "gateway", 22],
+      ["test", "common", 2200],
+      ["root", "common", 22],
     ]);
   });
 
   test("rejects include cycles and conditional imports", async () => {
     const resolve = async () => ["config"];
-    await expect(expandSshConfig("config", async () => "Include loop", resolve)).rejects.toThrow("循环");
-    await expect(expandSshConfig("config", async () => "Host scoped\n Include config.d/*", resolve)).rejects.toThrow("Host");
+    await expect(expandSshConfig("config", async () => "Include loop", resolve)).rejects.toThrow(
+      "循环",
+    );
+    await expect(
+      expandSshConfig("config", async () => "Host scoped\n Include config.d/*", resolve),
+    ).rejects.toThrow("Host");
   });
 
   test("the text parser rejects unresolved Include and Match directives", () => {
     expect(() => parseSshConfig("Include ~/.ssh/config.d/*", "test")).toThrow("Include");
-    expect(() => parseSshConfig("Match exec \"true\"", "test")).toThrow("Match");
+    expect(() => parseSshConfig('Match exec "true"', "test")).toThrow("Match");
   });
 });

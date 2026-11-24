@@ -44,9 +44,7 @@ function renderActions(options?: {
     sessionId: "session-1",
     submittedAt: "2026-08-05T05:00:00.000Z",
   };
-  const onPrepareCommand = mock(
-    options?.onPrepareCommand ?? (async () => execution),
-  );
+  const onPrepareCommand = mock(options?.onPrepareCommand ?? (async () => execution));
   const onNotice = mock(() => undefined);
   const setDraft = mock((_conversationId: string, _value: string) => undefined);
   let currentProposal = proposal();
@@ -104,11 +102,7 @@ describe("useAiCommandActions", () => {
     });
     await waitFor(() => expect(view.onPrepareCommand).toHaveBeenCalledTimes(1));
 
-    expect(view.onPrepareCommand).toHaveBeenCalledWith(
-      "assistant-1",
-      value,
-      true,
-    );
+    expect(view.onPrepareCommand).toHaveBeenCalledWith("assistant-1", value, true);
     expect(view.updateCommandProposal).toHaveBeenCalledWith(
       "assistant-1",
       value.id,
@@ -123,11 +117,7 @@ describe("useAiCommandActions", () => {
     await act(async () => {
       await view.result.current.approveCommandProposal("assistant-1", value);
     });
-    expect(view.onPrepareCommand).toHaveBeenCalledWith(
-      "assistant-1",
-      value,
-      true,
-    );
+    expect(view.onPrepareCommand).toHaveBeenCalledWith("assistant-1", value, true);
   });
 
   test("hands a failed automatic approval back to the user", async () => {
@@ -139,11 +129,7 @@ describe("useAiCommandActions", () => {
     let result: unknown;
 
     await act(async () => {
-      result = await view.result.current.approveCommandProposal(
-        "assistant-1",
-        proposal(),
-        false,
-      );
+      result = await view.result.current.approveCommandProposal("assistant-1", proposal(), false);
     });
 
     expect(result).toEqual({
@@ -163,10 +149,7 @@ describe("useAiCommandActions", () => {
     let result: unknown;
 
     await act(async () => {
-      result = await view.result.current.approveCommandProposal(
-        "assistant-1",
-        proposal(),
-      );
+      result = await view.result.current.approveCommandProposal("assistant-1", proposal());
     });
 
     expect(result).toEqual({ failed: true, reason: "当前终端会话不可用" });
@@ -179,18 +162,10 @@ describe("useAiCommandActions", () => {
     const value = proposal();
 
     await act(async () => {
-      await view.result.current.approveCommandProposal(
-        "assistant-1",
-        value,
-        false,
-      );
+      await view.result.current.approveCommandProposal("assistant-1", value, false);
     });
 
-    expect(view.onPrepareCommand).toHaveBeenCalledWith(
-      "assistant-1",
-      value,
-      false,
-    );
+    expect(view.onPrepareCommand).toHaveBeenCalledWith("assistant-1", value, false);
   });
 
   test("prepares and completes verification for the matching conversation", async () => {
@@ -243,9 +218,7 @@ describe("useAiCommandActions", () => {
       view.result.current.prepareCommandVerification("assistant-1", value);
     });
     await waitFor(() => expect(view.setDraft).toHaveBeenCalledTimes(1));
-    expect(view.setDraft.mock.calls[0]?.[1]).toContain(
-      "@命令结果:重启 Nginx-mand",
-    );
+    expect(view.setDraft.mock.calls[0]?.[1]).toContain("@命令结果:重启 Nginx-mand");
     expect(view.onNotice).toHaveBeenCalledWith(
       "info",
       "已加入该命令的执行结果，确认问题后发送即可分析",

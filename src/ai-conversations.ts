@@ -1,8 +1,5 @@
 import { sanitizePersistedAiToolRuns, type AiToolRun } from "./ai-tools";
-import {
-  sanitizePersistedAiDiagnosticPlans,
-  type AiDiagnosticPlan,
-} from "./ai-diagnostic-plans";
+import { sanitizePersistedAiDiagnosticPlans, type AiDiagnosticPlan } from "./ai-diagnostic-plans";
 import {
   aiFileEditLineSummary,
   MAX_AI_FILE_EDIT_CHARS,
@@ -10,12 +7,16 @@ import {
   type AiFileChangeRecord,
   type AiFileChangeOperation,
 } from "./ai-file-edits";
-import {
-  MAX_AI_COMMAND_PURPOSE_CHARS,
-  type AiCommandRecord,
-} from "./ai-command-proposals";
+import { MAX_AI_COMMAND_PURPOSE_CHARS, type AiCommandRecord } from "./ai-command-proposals";
 import { redactAiContext } from "./ai-utils";
 import type { AiRequestTelemetry, AiTokenUsage } from "./tauri-protocol";
+import {
+  assertLocalDataAccessible,
+  decryptLocalValue,
+  encryptLocalValue,
+  isEncryptedLocalRecord,
+  isLocalDataEncryptionEnabled,
+} from "./local-encryption";
 
 const DATABASE_NAME = "fineshell.ai";
 const DATABASE_VERSION = 1;
@@ -59,15 +60,23 @@ export interface AiConversationRecord {
 type UnknownRecord = Record<string, unknown>;
 
 let databasePromise: Promise<IDBDatabase> | undefined;
+let conversationWriteQueue: Promise<unknown> = Promise.resolve();
+
+function enqueueConversationWrite<T>(task: () => Promise<T>): Promise<T> {
+  const run = conversationWriteQueue.then(task, task);
+  conversationWriteQueue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function boundedText(value: unknown, maxLength: number) {
-  return typeof value === "string" && value.trim()
-    ? value.trim().slice(0, maxLength)
-    : undefined;
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, maxLength) : undefined;
 }
 
 function isoDate(value: unknown, fallback: string) {
@@ -87,14 +96,7 @@ function optionalIsoDate(value: unknown) {
 function fileChangeStatus(value: unknown): AiFileChangeStatus | undefined {
   if (typeof value !== "string") return undefined;
   if (value === "pending") return "not-applied";
-  return [
-    "not-applied",
-    "applied",
-    "rolled-back",
-    "rejected",
-    "conflict",
-    "failed",
-  ].includes(value)
+  return ["not-applied", "applied", "rolled-back", "rejected", "conflict", "failed"].includes(value)
     ? (value as AiFileChangeStatus)
     : undefined;
 }
@@ -106,35 +108,21 @@ function boundedLineCount(value: unknown) {
 }
 
 function boundedNonNegativeInteger(value: unknown, maximum: number) {
-  return typeof value === "number" &&
-    Number.isSafeInteger(value) &&
-    value >= 0
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
     ? Math.min(value, maximum)
     : undefined;
 }
 
 function sanitizeTokenUsage(value: unknown): AiTokenUsage | undefined {
   if (!isRecord(value)) return undefined;
-  const inputTokens = boundedNonNegativeInteger(
-    value.inputTokens,
-    Number.MAX_SAFE_INTEGER,
-  );
-  const outputTokens = boundedNonNegativeInteger(
-    value.outputTokens,
-    Number.MAX_SAFE_INTEGER,
-  );
-  const totalTokens = boundedNonNegativeInteger(
-    value.totalTokens,
-    Number.MAX_SAFE_INTEGER,
-  );
+  const inputTokens = boundedNonNegativeInteger(value.inputTokens, Number.MAX_SAFE_INTEGER);
+  const outputTokens = boundedNonNegativeInteger(value.outputTokens, Number.MAX_SAFE_INTEGER);
+  const totalTokens = boundedNonNegativeInteger(value.totalTokens, Number.MAX_SAFE_INTEGER);
   const cachedInputTokens = boundedNonNegativeInteger(
     value.cachedInputTokens,
     Number.MAX_SAFE_INTEGER,
   );
-  const reasoningTokens = boundedNonNegativeInteger(
-    value.reasoningTokens,
-    Number.MAX_SAFE_INTEGER,
-  );
+  const reasoningTokens = boundedNonNegativeInteger(value.reasoningTokens, Number.MAX_SAFE_INTEGER);
   if (
     inputTokens === undefined ||
     outputTokens === undefined ||
@@ -153,9 +141,7 @@ function sanitizeTokenUsage(value: unknown): AiTokenUsage | undefined {
   };
 }
 
-function sanitizeRequestTelemetry(
-  value: unknown,
-): AiRequestTelemetry | undefined {
+function sanitizeRequestTelemetry(value: unknown): AiRequestTelemetry | undefined {
   if (!isRecord(value)) return undefined;
   const durationMs = boundedNonNegativeInteger(value.durationMs, 86_400_000);
   const requestCount = boundedNonNegativeInteger(value.requestCount, 10_000);
@@ -168,9 +154,7 @@ function sanitizeRequestTelemetry(
 }
 
 function fileChangeOperation(value: unknown): AiFileChangeOperation {
-  return value === "create" || value === "rename" || value === "delete"
-    ? value
-    : "edit";
+  return value === "create" || value === "rename" || value === "delete" ? value : "edit";
 }
 
 function fileNameFromPath(value: unknown) {
@@ -184,9 +168,7 @@ function sanitizeFileChanges(value: unknown) {
   const changes = value
     .map((item): AiFileChangeRecord | undefined => {
       if (!isRecord(item)) return undefined;
-      const originalFile = isRecord(item.originalFile)
-        ? item.originalFile
-        : undefined;
+      const originalFile = isRecord(item.originalFile) ? item.originalFile : undefined;
       const operation = fileChangeOperation(item.operation);
       const id = boundedText(item.id, 160);
       const fileName =
@@ -195,8 +177,7 @@ function sanitizeFileChanges(value: unknown) {
         fileNameFromPath(item.path);
       const targetFileName =
         operation === "rename"
-          ? (boundedText(item.targetFileName, 160) ??
-            fileNameFromPath(item.targetPath))
+          ? (boundedText(item.targetFileName, 160) ?? fileNameFromPath(item.targetPath))
           : undefined;
       const status = fileChangeStatus(item.status);
       if (!id || !fileName || !status) return undefined;
@@ -211,10 +192,8 @@ function sanitizeFileChanges(value: unknown) {
         (operation === "create" || typeof originalFile?.content === "string") &&
         (operation === "delete" || typeof item.content === "string")
       ) {
-        const originalContent =
-          operation === "create" ? "" : String(originalFile?.content ?? "");
-        const nextContent =
-          operation === "delete" ? "" : String(item.content ?? "");
+        const originalContent = operation === "create" ? "" : String(originalFile?.content ?? "");
+        const nextContent = operation === "delete" ? "" : String(item.content ?? "");
         if (
           originalContent.length <= MAX_AI_FILE_EDIT_CHARS &&
           nextContent.length <= MAX_AI_FILE_EDIT_CHARS
@@ -259,21 +238,14 @@ function sanitizeCommandRecords(value: unknown) {
     .map((item): AiCommandRecord | undefined => {
       if (!isRecord(item)) return undefined;
       const id = boundedText(item.id, 160);
-      const purposeValue = boundedText(
-        item.purpose,
-        MAX_AI_COMMAND_PURPOSE_CHARS,
-      );
+      const purposeValue = boundedText(item.purpose, MAX_AI_COMMAND_PURPOSE_CHARS);
       const purpose = purposeValue
         ? redactAiContext(purposeValue).slice(0, MAX_AI_COMMAND_PURPOSE_CHARS)
         : undefined;
-      const assessment = isRecord(item.assessment)
-        ? item.assessment
-        : undefined;
+      const assessment = isRecord(item.assessment) ? item.assessment : undefined;
       const riskValue = item.risk ?? assessment?.risk;
       const risk =
-        riskValue === "safe" ||
-        riskValue === "caution" ||
-        riskValue === "danger"
+        riskValue === "safe" || riskValue === "caution" || riskValue === "danger"
           ? riskValue
           : undefined;
       const status =
@@ -291,7 +263,7 @@ function sanitizeCommandRecords(value: unknown) {
                 item.status === "not-executed" ||
                 item.status === "pending"
               ? "not-executed"
-            : undefined;
+              : undefined;
       if (!id || !purpose || !risk || !status) return undefined;
       return {
         id,
@@ -319,35 +291,20 @@ function sanitizeCommandRecords(value: unknown) {
   return records.length ? records : undefined;
 }
 
-function sanitizeMessage(
-  value: unknown,
-): AiConversationMessageRecord | undefined {
+function sanitizeMessage(value: unknown): AiConversationMessageRecord | undefined {
   if (!isRecord(value)) return undefined;
   const id = boundedText(value.id, 160);
-  const role =
-    value.role === "user" || value.role === "assistant"
-      ? value.role
-      : undefined;
-  const content =
-    boundedText(value.content, role === "user" ? 4_000 : 40_000) ?? "";
-  const toolRuns =
-    role === "assistant"
-      ? sanitizePersistedAiToolRuns(value.toolRuns)
-      : undefined;
+  const role = value.role === "user" || value.role === "assistant" ? value.role : undefined;
+  const content = boundedText(value.content, role === "user" ? 4_000 : 40_000) ?? "";
+  const toolRuns = role === "assistant" ? sanitizePersistedAiToolRuns(value.toolRuns) : undefined;
   const diagnosticPlans =
-    role === "assistant"
-      ? sanitizePersistedAiDiagnosticPlans(value.diagnosticPlans)
-      : undefined;
+    role === "assistant" ? sanitizePersistedAiDiagnosticPlans(value.diagnosticPlans) : undefined;
   const fileChanges =
     role === "assistant"
       ? sanitizeFileChanges(
           value.fileChanges ?? [
-            ...(Array.isArray(value.fileEditProposals)
-              ? value.fileEditProposals
-              : []),
-            ...(Array.isArray(value.fileOperationProposals)
-              ? value.fileOperationProposals
-              : []),
+            ...(Array.isArray(value.fileEditProposals) ? value.fileEditProposals : []),
+            ...(Array.isArray(value.fileOperationProposals) ? value.fileOperationProposals : []),
           ],
         )
       : undefined;
@@ -390,9 +347,7 @@ function sanitizeMessages(value: unknown) {
   if (!Array.isArray(value)) return [];
   const candidates = value
     .map(sanitizeMessage)
-    .filter((message): message is AiConversationMessageRecord =>
-      Boolean(message),
-    )
+    .filter((message): message is AiConversationMessageRecord => Boolean(message))
     .slice(-MAX_AI_CONVERSATION_MESSAGES);
   const messages: AiConversationMessageRecord[] = [];
   let remaining = MAX_AI_CONVERSATION_CHARS;
@@ -401,8 +356,7 @@ function sanitizeMessages(value: unknown) {
     if (!message) continue;
     const toolChars =
       message.toolRuns?.reduce(
-        (total, run) =>
-          total + (run.summary?.length ?? 0) + (run.error?.length ?? 0),
+        (total, run) => total + (run.summary?.length ?? 0) + (run.error?.length ?? 0),
         0,
       ) ?? 0;
     const planChars =
@@ -411,21 +365,11 @@ function sanitizeMessages(value: unknown) {
         0,
       ) ?? 0;
     const fileChangeChars =
-      message.fileChanges?.reduce(
-        (total, change) => total + change.fileName.length + 64,
-        0,
-      ) ?? 0;
+      message.fileChanges?.reduce((total, change) => total + change.fileName.length + 64, 0) ?? 0;
     const commandRecordChars =
-      message.commandRecords?.reduce(
-        (total, record) => total + record.purpose.length + 32,
-        0,
-      ) ?? 0;
+      message.commandRecords?.reduce((total, record) => total + record.purpose.length + 32, 0) ?? 0;
     const messageChars =
-      message.content.length +
-      toolChars +
-      planChars +
-      fileChangeChars +
-      commandRecordChars;
+      message.content.length + toolChars + planChars + fileChangeChars + commandRecordChars;
     if (messageChars > remaining) break;
     messages.unshift(message);
     remaining -= messageChars;
@@ -434,9 +378,7 @@ function sanitizeMessages(value: unknown) {
   return messages;
 }
 
-function sanitizeSummary(
-  value: unknown,
-): AiConversationSummaryRecord | undefined {
+function sanitizeSummary(value: unknown): AiConversationSummaryRecord | undefined {
   if (!isRecord(value)) return undefined;
   const content = boundedText(value.content, 4_000);
   const throughMessageId = boundedText(value.throughMessageId, 160);
@@ -448,9 +390,7 @@ function sanitizeSummary(
   };
 }
 
-export function sanitizeAiConversation(
-  value: unknown,
-): AiConversationRecord | undefined {
+export function sanitizeAiConversation(value: unknown): AiConversationRecord | undefined {
   if (!isRecord(value)) return undefined;
   const id = boundedText(value.id, 160);
   const hostId = boundedText(value.hostId, 160);
@@ -475,9 +415,7 @@ export function aiConversationTitleFromPrompt(prompt: string) {
   return title.length > 36 ? `${title.slice(0, 36)}…` : title;
 }
 
-export function aiConversationExportFilename(
-  conversation: AiConversationRecord,
-) {
+export function aiConversationExportFilename(conversation: AiConversationRecord) {
   const title =
     conversation.title
       .replace(/[\\/:*?"<>|\u0000-\u001f]/g, "-")
@@ -487,9 +425,7 @@ export function aiConversationExportFilename(
   return `${title}.md`;
 }
 
-export function serializeAiConversationMarkdown(
-  conversation: AiConversationRecord,
-) {
+export function serializeAiConversationMarkdown(conversation: AiConversationRecord) {
   const sanitized = sanitizeAiConversation(conversation);
   if (!sanitized) throw new Error("AI 对话内容无效");
   const lines = [
@@ -508,14 +444,8 @@ export function serializeAiConversationMarkdown(
       lines.push("> 诊断工具：");
       for (const run of message.toolRuns) {
         const status =
-          run.status === "success"
-            ? "已完成"
-            : run.status === "cancelled"
-              ? "已取消"
-              : "不可用";
-        lines.push(
-          `> - ${run.label}${run.detail ? `（${run.detail}）` : ""}：${status}`,
-        );
+          run.status === "success" ? "已完成" : run.status === "cancelled" ? "已取消" : "不可用";
+        lines.push(`> - ${run.label}${run.detail ? `（${run.detail}）` : ""}：${status}`);
         const detail = run.summary ?? run.error;
         if (detail) {
           lines.push(...detail.split("\n").map((line) => `>   ${line}`));
@@ -556,11 +486,7 @@ export function serializeAiConversationMarkdown(
                         ? "已拒绝"
                         : "未执行";
         const risk =
-          record.risk === "danger"
-            ? "高风险"
-            : record.risk === "caution"
-              ? "需确认"
-              : "低风险";
+          record.risk === "danger" ? "高风险" : record.risk === "caution" ? "需确认" : "低风险";
         lines.push(`> - ${record.purpose}：${risk}，${status}`);
       }
       lines.push("");
@@ -604,18 +530,15 @@ export function serializeAiConversationMarkdown(
 function requestResult<T>(request: IDBRequest<T>) {
   return new Promise<T>((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () =>
-      reject(request.error ?? new Error("数据库请求失败"));
+    request.onerror = () => reject(request.error ?? new Error("数据库请求失败"));
   });
 }
 
 function transactionDone(transaction: IDBTransaction) {
   return new Promise<void>((resolve, reject) => {
     transaction.oncomplete = () => resolve();
-    transaction.onabort = () =>
-      reject(transaction.error ?? new Error("数据库事务已取消"));
-    transaction.onerror = () =>
-      reject(transaction.error ?? new Error("数据库事务失败"));
+    transaction.onabort = () => reject(transaction.error ?? new Error("数据库事务已取消"));
+    transaction.onerror = () => reject(transaction.error ?? new Error("数据库事务失败"));
   });
 }
 
@@ -632,91 +555,133 @@ function openDatabase() {
       }
     };
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () =>
-      reject(request.error ?? new Error("无法打开 AI 对话数据库"));
+    request.onerror = () => reject(request.error ?? new Error("无法打开 AI 对话数据库"));
     request.onblocked = () => reject(new Error("AI 对话数据库升级被阻止"));
   });
   return databasePromise;
 }
 
+async function decodeStoredConversation(value: unknown) {
+  if (isEncryptedLocalRecord(value)) {
+    return sanitizeAiConversation(await decryptLocalValue<AiConversationRecord>(value));
+  }
+  return sanitizeAiConversation(value);
+}
+
+async function decodeStoredConversations(records: unknown[]) {
+  return (await Promise.all(records.map((record) => decodeStoredConversation(record)))).filter(
+    (record): record is AiConversationRecord => Boolean(record),
+  );
+}
+
+async function encodeStoredConversation(conversation: AiConversationRecord) {
+  if (!(await isLocalDataEncryptionEnabled())) return conversation;
+  return { id: conversation.id, ...(await encryptLocalValue(conversation)) };
+}
+
+async function readStoredRecords(store: IDBObjectStore) {
+  return requestResult(store.getAll());
+}
+
 export async function loadAiConversations(hostId: string) {
+  await assertLocalDataAccessible();
   const database = await openDatabase();
   const transaction = database.transaction(CONVERSATION_STORE, "readonly");
   const completed = transactionDone(transaction);
-  const records = await requestResult(
-    transaction.objectStore(CONVERSATION_STORE).index("hostId").getAll(hostId),
-  );
+  const records = await readStoredRecords(transaction.objectStore(CONVERSATION_STORE));
   await completed;
-  return records
-    .map(sanitizeAiConversation)
-    .filter((record): record is AiConversationRecord => Boolean(record))
+  return (await decodeStoredConversations(records))
     .filter((record) => record.hostId === hostId)
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
     .slice(0, MAX_AI_CONVERSATIONS_PER_HOST);
 }
 
 export async function loadAllAiConversations() {
+  await assertLocalDataAccessible();
   const database = await openDatabase();
   const transaction = database.transaction(CONVERSATION_STORE, "readonly");
   const completed = transactionDone(transaction);
-  const records = await requestResult(
-    transaction.objectStore(CONVERSATION_STORE).getAll(),
-  );
+  const records = await readStoredRecords(transaction.objectStore(CONVERSATION_STORE));
   await completed;
-  return records
-    .map(sanitizeAiConversation)
-    .filter((record): record is AiConversationRecord => Boolean(record))
+  return (await decodeStoredConversations(records))
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
     .slice(0, MAX_AI_CONVERSATIONS_TOTAL);
 }
 
-export async function saveAiConversation(value: AiConversationRecord) {
-  const conversation = sanitizeAiConversation(value);
-  if (!conversation) throw new Error("AI 对话内容无效");
-  if (!conversation.messages.length) {
-    await deleteAiConversation(conversation.id);
-    return conversation;
-  }
-
-  const database = await openDatabase();
-  const transaction = database.transaction(CONVERSATION_STORE, "readwrite");
-  const completed = transactionDone(transaction);
-  const store = transaction.objectStore(CONVERSATION_STORE);
-  const stored = await requestResult(store.getAll());
-  const records = stored
-    .map(sanitizeAiConversation)
-    .filter((record): record is AiConversationRecord => Boolean(record))
-    .filter((record) => record.id !== conversation.id);
-  records.push(conversation);
-
-  const keep = new Set<string>();
-  const perHostCounts = new Map<string, number>();
-  for (const record of records.sort((left, right) =>
-    right.updatedAt.localeCompare(left.updatedAt),
-  )) {
-    const hostCount = perHostCounts.get(record.hostId) ?? 0;
-    if (
-      keep.size >= MAX_AI_CONVERSATIONS_TOTAL ||
-      hostCount >= MAX_AI_CONVERSATIONS_PER_HOST
-    ) {
-      continue;
+export function saveAiConversation(value: AiConversationRecord) {
+  return enqueueConversationWrite(async () => {
+    await assertLocalDataAccessible();
+    const conversation = sanitizeAiConversation(value);
+    if (!conversation) throw new Error("AI 对话内容无效");
+    if (!conversation.messages.length) {
+      await deleteStoredConversation(conversation.id);
+      return conversation;
     }
-    keep.add(record.id);
-    perHostCounts.set(record.hostId, hostCount + 1);
-  }
 
-  store.put(conversation);
-  for (const record of records) {
-    if (!keep.has(record.id)) store.delete(record.id);
-  }
-  await completed;
-  return conversation;
+    const database = await openDatabase();
+    const readTransaction = database.transaction(CONVERSATION_STORE, "readonly");
+    const readCompleted = transactionDone(readTransaction);
+    const stored = await readStoredRecords(readTransaction.objectStore(CONVERSATION_STORE));
+    await readCompleted;
+    const records = (await decodeStoredConversations(stored)).filter(
+      (record) => record.id !== conversation.id,
+    );
+    records.push(conversation);
+
+    const keep = new Set<string>();
+    const perHostCounts = new Map<string, number>();
+    for (const record of records.sort((left, right) =>
+      right.updatedAt.localeCompare(left.updatedAt),
+    )) {
+      const hostCount = perHostCounts.get(record.hostId) ?? 0;
+      if (keep.size >= MAX_AI_CONVERSATIONS_TOTAL || hostCount >= MAX_AI_CONVERSATIONS_PER_HOST) {
+        continue;
+      }
+      keep.add(record.id);
+      perHostCounts.set(record.hostId, hostCount + 1);
+    }
+
+    const encoded = await encodeStoredConversation(conversation);
+    const writeTransaction = database.transaction(CONVERSATION_STORE, "readwrite");
+    const writeCompleted = transactionDone(writeTransaction);
+    const store = writeTransaction.objectStore(CONVERSATION_STORE);
+    store.put(encoded);
+    for (const record of records) {
+      if (!keep.has(record.id)) store.delete(record.id);
+    }
+    await writeCompleted;
+    return conversation;
+  });
 }
 
-export async function deleteAiConversation(conversationId: string) {
+async function deleteStoredConversation(conversationId: string) {
   const database = await openDatabase();
   const transaction = database.transaction(CONVERSATION_STORE, "readwrite");
   const completed = transactionDone(transaction);
   transaction.objectStore(CONVERSATION_STORE).delete(conversationId);
   await completed;
+}
+
+export function deleteAiConversation(conversationId: string) {
+  return enqueueConversationWrite(() => deleteStoredConversation(conversationId));
+}
+
+export function rewriteStoredAiConversations(options: { plaintext?: boolean } = {}) {
+  return enqueueConversationWrite(async () => {
+    const database = await openDatabase();
+    const readTransaction = database.transaction(CONVERSATION_STORE, "readonly");
+    const readCompleted = transactionDone(readTransaction);
+    const stored = await readStoredRecords(readTransaction.objectStore(CONVERSATION_STORE));
+    await readCompleted;
+    const records = await decodeStoredConversations(stored);
+    const encoded = options.plaintext
+      ? records
+      : await Promise.all(records.map((record) => encodeStoredConversation(record)));
+    const writeTransaction = database.transaction(CONVERSATION_STORE, "readwrite");
+    const writeCompleted = transactionDone(writeTransaction);
+    const store = writeTransaction.objectStore(CONVERSATION_STORE);
+    for (const record of encoded) store.put(record);
+    await writeCompleted;
+    return records.length;
+  });
 }

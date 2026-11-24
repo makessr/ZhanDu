@@ -47,10 +47,7 @@ export function parseShellIntegrationMessage(
     return null;
   }
   if (values.length !== 1) return null;
-  if (
-    kind === "ready" &&
-    (value === "bash" || value === "zsh" || value === "fish")
-  ) {
+  if (kind === "ready" && (value === "bash" || value === "zsh" || value === "fish")) {
     return { kind, shell: value };
   }
   if (kind === "disabled" && value === "tty") {

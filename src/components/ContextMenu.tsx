@@ -1,10 +1,5 @@
 import { cloneElement, useRef, useState } from "react";
-import type {
-  MouseEvent,
-  MouseEventHandler,
-  ReactElement,
-  ReactNode,
-} from "react";
+import type { MouseEvent, MouseEventHandler, ReactElement, ReactNode } from "react";
 import { Dropdown, Menu } from "@arco-design/web-react";
 
 export interface ContextMenuItem {
@@ -30,10 +25,7 @@ interface ContextMenuProps {
   resolveItems?: (event: MouseEvent<HTMLElement>) => ContextMenuItem[];
 }
 
-function findMenuItem(
-  items: ContextMenuItem[],
-  key: string,
-): ContextMenuItem | undefined {
+function findMenuItem(items: ContextMenuItem[], key: string): ContextMenuItem | undefined {
   for (const item of items) {
     if (item.key === key) return item;
     const child = item.children && findMenuItem(item.children, key);
@@ -114,9 +106,7 @@ function ContextMenu({
       disabled={disabled}
       droplist={
         <Menu
-          className={
-            ["app-context-menu", menuClassName].filter(Boolean).join(" ")
-          }
+          className={["app-context-menu", menuClassName].filter(Boolean).join(" ")}
           onClickMenuItem={(key) => {
             const item = findMenuItem(activeItems, key);
             if (!item?.onClick || item.disabled) return false;

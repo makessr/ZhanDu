@@ -9,15 +9,12 @@ import type { AppSettings, GithubMirrorRoute } from "./app-settings";
 import { loadConfiguration } from "./config-database";
 import { invokeProtocolCommand } from "./tauri-protocol";
 
-export const FINESHELL_REPOSITORY_URL =
-  "https://github.com/makessr/ZhanDu";
+export const FINESHELL_REPOSITORY_URL = "https://github.com/makessr/ZhanDu";
 export const FINESHELL_LICENSE_URL = `${FINESHELL_REPOSITORY_URL}/blob/main/LICENSE`;
 const APPLICATION_UPDATE_NOTICE_KEY = "fineshell:application-update";
 const APPLICATION_UPDATE_NOTICE_EVENT = "fineshell:application-update-changed";
-const APPLICATION_UPDATE_INSTALLING_EVENT =
-  "fineshell:application-update-installing-changed";
-const APPLICATION_UPDATE_RELAUNCH_FOCUS_KEY =
-  "fineshell:application-update-relaunch-focus";
+const APPLICATION_UPDATE_INSTALLING_EVENT = "fineshell:application-update-installing-changed";
+const APPLICATION_UPDATE_RELAUNCH_FOCUS_KEY = "fineshell:application-update-relaunch-focus";
 const APPLICATION_UPDATE_RELAUNCH_FOCUS_MAX_AGE_MS = 10 * 60 * 1000;
 const APPLICATION_UPDATE_FOCUS_RETRY_DELAYS_MS = [0, 120, 320] as const;
 const MOCK_UPDATE_SIZE = 6 * 1024 * 1024;
@@ -47,9 +44,7 @@ export interface ApplicationUpdate {
   close: () => Promise<void>;
   currentVersion: string;
   date?: string;
-  downloadAndInstall: (
-    onEvent?: (event: ApplicationUpdateDownloadEvent) => void,
-  ) => Promise<void>;
+  downloadAndInstall: (onEvent?: (event: ApplicationUpdateDownloadEvent) => void) => Promise<void>;
   route?: string;
   version: string;
 }
@@ -88,14 +83,10 @@ export interface ApplicationUpdateRouteTestResult {
 export interface ApplicationUpdaterService {
   canInstallUpdates: boolean;
   canTestRoutes: boolean;
-  checkForUpdate: (
-    options?: ApplicationUpdateOptions,
-  ) => Promise<ApplicationUpdate | null>;
+  checkForUpdate: (options?: ApplicationUpdateOptions) => Promise<ApplicationUpdate | null>;
   getApplicationInfo: () => Promise<ApplicationInfo>;
   relaunch: () => Promise<void>;
-  testRoute: (
-    options: ApplicationUpdateOptions,
-  ) => Promise<ApplicationUpdateRouteTestResult>;
+  testRoute: (options: ApplicationUpdateOptions) => Promise<ApplicationUpdateRouteTestResult>;
 }
 
 export interface ApplicationUpdateNotice {
@@ -107,9 +98,7 @@ export interface ApplicationUpdateNotice {
 
 interface ApplicationWindowFocusTarget {
   isFocused: () => Promise<boolean>;
-  requestUserAttention: (
-    requestType: UserAttentionType | null,
-  ) => Promise<void>;
+  requestUserAttention: (requestType: UserAttentionType | null) => Promise<void>;
   setFocus: () => Promise<void>;
   show: () => Promise<void>;
   unminimize: () => Promise<void>;
@@ -141,10 +130,7 @@ export function createMockApplicationUpdate(): ApplicationUpdate {
 }
 
 export function applicationUpdateOptionsFromSettings(
-  settings: Pick<
-    AppSettings,
-    "githubMirrorCustomUrl" | "githubMirrorRoute"
-  >,
+  settings: Pick<AppSettings, "githubMirrorCustomUrl" | "githubMirrorRoute">,
 ): ApplicationUpdateOptions {
   return {
     customUrl: settings.githubMirrorCustomUrl || undefined,
@@ -157,9 +143,7 @@ async function savedApplicationUpdateOptions() {
   return applicationUpdateOptionsFromSettings(configuration.settings);
 }
 
-function applicationUpdateFromMetadata(
-  metadata: ApplicationUpdateMetadata,
-): ApplicationUpdate {
+function applicationUpdateFromMetadata(metadata: ApplicationUpdateMetadata): ApplicationUpdate {
   return {
     body: metadata.body,
     close: () =>
@@ -189,17 +173,13 @@ async function getApplicationInfo(): Promise<ApplicationInfo> {
     };
   }
 
-  const [version, tauriVersion] = await Promise.all([
-    getVersion(),
-    getTauriVersion(),
-  ]);
+  const [version, tauriVersion] = await Promise.all([getVersion(), getTauriVersion()]);
   return { name: APP_DISPLAY_NAME, version, tauriVersion };
 }
 
 const mockApplicationUpdateEnabled =
   import.meta.env.DEV && import.meta.env.VITE_MOCK_UPDATE === "true";
-const canInstallUpdates =
-  mockApplicationUpdateEnabled || (isTauri() && !import.meta.env.DEV);
+const canInstallUpdates = mockApplicationUpdateEnabled || (isTauri() && !import.meta.env.DEV);
 const canTestRoutes = mockApplicationUpdateEnabled || isTauri();
 
 export const applicationUpdater: ApplicationUpdaterService = {
@@ -267,16 +247,10 @@ export function readApplicationUpdateNotice(): ApplicationUpdateNotice | null {
       return null;
     }
     return {
-      body:
-        "body" in value && typeof value.body === "string"
-          ? value.body
-          : undefined,
+      body: "body" in value && typeof value.body === "string" ? value.body : undefined,
       currentVersion: value.currentVersion,
       version: value.version,
-      date:
-        "date" in value && typeof value.date === "string"
-          ? value.date
-          : undefined,
+      date: "date" in value && typeof value.date === "string" ? value.date : undefined,
     };
   } catch {
     try {
@@ -289,10 +263,7 @@ export function readApplicationUpdateNotice(): ApplicationUpdateNotice | null {
 }
 
 export function setApplicationUpdateNotice(
-  update: Pick<
-    ApplicationUpdate,
-    "body" | "currentVersion" | "date" | "version"
-  > | null,
+  update: Pick<ApplicationUpdate, "body" | "currentVersion" | "date" | "version"> | null,
 ) {
   if (typeof window === "undefined") return;
   try {
@@ -345,9 +316,7 @@ export function markApplicationUpdateRelaunchFocus(
 function takeApplicationUpdateRelaunchFocusRequest(now = Date.now()) {
   if (typeof window === "undefined") return false;
   try {
-    const stored = window.localStorage.getItem(
-      APPLICATION_UPDATE_RELAUNCH_FOCUS_KEY,
-    );
+    const stored = window.localStorage.getItem(APPLICATION_UPDATE_RELAUNCH_FOCUS_KEY);
     if (!stored) return false;
     window.localStorage.removeItem(APPLICATION_UPDATE_RELAUNCH_FOCUS_KEY);
 
@@ -406,20 +375,12 @@ export async function restoreApplicationFocusAfterUpdateRelaunch(
   }
 }
 
-export function listenApplicationUpdateInstalling(
-  handler: (installing: boolean) => void,
-) {
+export function listenApplicationUpdateInstalling(handler: (installing: boolean) => void) {
   if (typeof window === "undefined") return () => undefined;
   const handleInstalling = () => handler(applicationUpdateInstalling);
-  window.addEventListener(
-    APPLICATION_UPDATE_INSTALLING_EVENT,
-    handleInstalling,
-  );
+  window.addEventListener(APPLICATION_UPDATE_INSTALLING_EVENT, handleInstalling);
   return () => {
-    window.removeEventListener(
-      APPLICATION_UPDATE_INSTALLING_EVENT,
-      handleInstalling,
-    );
+    window.removeEventListener(APPLICATION_UPDATE_INSTALLING_EVENT, handleInstalling);
   };
 }
 
@@ -450,10 +411,7 @@ export async function openApplicationUrl(url: string) {
 export function formatUpdateBytes(bytes: number) {
   if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
   const units = ["B", "KB", "MB", "GB"];
-  const index = Math.min(
-    Math.floor(Math.log(bytes) / Math.log(1024)),
-    units.length - 1,
-  );
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
   const value = bytes / 1024 ** index;
   return `${value >= 100 || index === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[index]}`;
 }

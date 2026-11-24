@@ -12,12 +12,7 @@ import {
   Typography,
 } from "@arco-design/web-react";
 import { IconFolder } from "@arco-design/web-react/icon";
-import type {
-  HostFormValues,
-  HostRecord,
-  ProxyRecord,
-  SshKeyRecord,
-} from "../models";
+import type { HostFormValues, HostRecord, ProxyRecord, SshKeyRecord } from "../models";
 import type { AppSettings } from "../app-settings";
 import { recordDiagnostic } from "../diagnostics";
 import { collectHostGroupPaths } from "../host-organization";
@@ -66,23 +61,14 @@ function HostEditorModal({
   onSubmit,
 }: HostEditorModalProps) {
   const [form] = Form.useForm<HostEditorValues>();
-  const [authMethod, setAuthMethod] = useState(
-    host?.authMethod ?? "password",
-  );
+  const [authMethod, setAuthMethod] = useState(host?.authMethod ?? "password");
   const [sshKeyId, setSshKeyId] = useState(host?.sshKeyId);
-  const [activeSection, setActiveSection] =
-    useState<HostEditorSection>("basic");
+  const [activeSection, setActiveSection] = useState<HostEditorSection>("basic");
   const [proxyId, setProxyId] = useState(host?.proxyId);
   const [jumpHostId, setJumpHostId] = useState(host?.jumpHostId);
-  const [localPortForwards, setLocalPortForwards] = useState(
-    host?.localPortForwards ?? [],
-  );
-  const [remotePortForwards, setRemotePortForwards] = useState(
-    host?.remotePortForwards ?? [],
-  );
-  const [dynamicPortForwards, setDynamicPortForwards] = useState(
-    host?.dynamicPortForwards ?? [],
-  );
+  const [localPortForwards, setLocalPortForwards] = useState(host?.localPortForwards ?? []);
+  const [remotePortForwards, setRemotePortForwards] = useState(host?.remotePortForwards ?? []);
+  const [dynamicPortForwards, setDynamicPortForwards] = useState(host?.dynamicPortForwards ?? []);
   const groupOptions = useMemo(
     () =>
       collectHostGroupPaths(hosts).map((group) => ({
@@ -143,16 +129,12 @@ function HostEditorModal({
     onSubmit({
       ...values,
       connectTimeoutSeconds:
-        host?.connectTimeoutSeconds ??
-        connectionDefaults.defaultConnectTimeoutSeconds,
+        host?.connectTimeoutSeconds ?? connectionDefaults.defaultConnectTimeoutSeconds,
       keepAliveIntervalSeconds:
-        host?.keepAliveIntervalSeconds ??
-        connectionDefaults.defaultKeepAliveIntervalSeconds,
-      autoReconnect:
-        host?.autoReconnect ?? connectionDefaults.defaultAutoReconnect,
+        host?.keepAliveIntervalSeconds ?? connectionDefaults.defaultKeepAliveIntervalSeconds,
+      autoReconnect: host?.autoReconnect ?? connectionDefaults.defaultAutoReconnect,
       maxReconnectAttempts:
-        host?.maxReconnectAttempts ??
-        connectionDefaults.defaultMaxReconnectAttempts,
+        host?.maxReconnectAttempts ?? connectionDefaults.defaultMaxReconnectAttempts,
       hostFingerprint: targetUnchanged ? host.hostFingerprint : undefined,
       localPortForwards,
       remotePortForwards,
@@ -177,23 +159,16 @@ function HostEditorModal({
         onSubmit={submitHost}
         onSubmitFailed={(errors) => {
           setActiveSection("basic");
-          recordDiagnostic(
-            "warn",
-            "host.configuration",
-            "主机表单校验失败",
-            {
-              fields: Object.keys(errors),
-              mode: host ? "update" : "create",
-            },
-          );
+          recordDiagnostic("warn", "host.configuration", "主机表单校验失败", {
+            fields: Object.keys(errors),
+            mode: host ? "update" : "create",
+          });
         }}
       >
         <div className="host-editor-layout">
           <Menu
             className="host-editor-menu"
-            onClickMenuItem={(key) =>
-              setActiveSection(key as HostEditorSection)
-            }
+            onClickMenuItem={(key) => setActiveSection(key as HostEditorSection)}
             selectedKeys={[activeSection]}
           >
             <Menu.Item key="basic">基础信息</Menu.Item>
@@ -201,10 +176,7 @@ function HostEditorModal({
             <Menu.Item key="forwards">端口转发</Menu.Item>
           </Menu>
           <div className="host-editor-content">
-            <section
-              className="host-editor-tab-pane"
-              hidden={activeSection !== "basic"}
-            >
+            <section className="host-editor-tab-pane" hidden={activeSection !== "basic"}>
               <div className="host-form-row">
                 <Form.Item
                   field="name"
@@ -218,9 +190,7 @@ function HostEditorModal({
                     allowClear
                     allowCreate={{
                       formatter: (inputValue, creating) => ({
-                        label: creating
-                          ? `新建分组“${inputValue}”`
-                          : inputValue,
+                        label: creating ? `新建分组“${inputValue}”` : inputValue,
                         value: inputValue,
                       }),
                     }}
@@ -273,9 +243,7 @@ function HostEditorModal({
                       : [{ required: true, message: "请输入登录密码" }]
                   }
                 >
-                  <Input.Password
-                    placeholder={host ? "留空则保留原密码" : "登录密码"}
-                  />
+                  <Input.Password placeholder={host ? "留空则保留原密码" : "登录密码"} />
                 </Form.Item>
               ) : authMethod === "privateKey" ? (
                 <>
@@ -320,10 +288,7 @@ function HostEditorModal({
                           }
                         />
                       </Form.Item>
-                      <Form.Item
-                        field="privateKeyPassphrase"
-                        label="私钥口令"
-                      >
+                      <Form.Item field="privateKeyPassphrase" label="私钥口令">
                         <Input.Password placeholder="留空则保留原口令" />
                       </Form.Item>
                     </>
@@ -335,10 +300,7 @@ function HostEditorModal({
                 </>
               ) : null}
             </section>
-            <section
-              className="host-editor-tab-pane"
-              hidden={activeSection !== "route"}
-            >
+            <section className="host-editor-tab-pane" hidden={activeSection !== "route"}>
               <Form.Item field="proxyId" label="代理">
                 <Select
                   allowClear
@@ -369,10 +331,7 @@ function HostEditorModal({
                     }
                   }}
                   options={hosts
-                    .filter(
-                      (candidate) =>
-                        candidate.id !== host?.id && !candidate.jumpHostId,
-                    )
+                    .filter((candidate) => candidate.id !== host?.id && !candidate.jumpHostId)
                     .map((candidate) => ({
                       label: `${candidate.name} · ${candidate.username}@${candidate.address}:${candidate.port}`,
                       value: candidate.id,
@@ -382,10 +341,7 @@ function HostEditorModal({
                 />
               </Form.Item>
             </section>
-            <section
-              className="host-editor-tab-pane"
-              hidden={activeSection !== "forwards"}
-            >
+            <section className="host-editor-tab-pane" hidden={activeSection !== "forwards"}>
               <PortForwardRulesEditor
                 dynamicRules={dynamicPortForwards}
                 localRules={localPortForwards}

@@ -1,15 +1,7 @@
 import { createPortal } from "react-dom";
 import { useResizableColumns } from "./ResizableTableColumns";
 import { WorkspaceToolSurface, type WorkspaceTool } from "./WorkspaceToolPanel";
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -86,10 +78,7 @@ interface ServerMonitorPanelProps {
   refreshIntervalSeconds: number;
   session: TerminalSession | null;
   onReconnect: () => void;
-  onSnapshotChange: (
-    sessionId: string | null,
-    snapshot: ServerMonitorSnapshot | null,
-  ) => void;
+  onSnapshotChange: (sessionId: string | null, snapshot: ServerMonitorSnapshot | null) => void;
   onPortForwardStatusChange: (status: PortForwardStatus) => void;
   onSendToAi: (sessionId: string, request: AiHandoffRequest) => void;
 }
@@ -138,11 +127,8 @@ function ServerMonitorPanel({
   onOpenSettings,
 }: ServerMonitorPanelProps) {
   const appearance = useResolvedAppearance();
-  const chartSecondaryTextColor =
-    appearance === "dark" ? "rgba(255, 255, 255, 0.45)" : "#86909c";
-  const [windowVisible, setWindowVisible] = useState(
-    () => !document.hidden && !isTauri(),
-  );
+  const chartSecondaryTextColor = appearance === "dark" ? "rgba(255, 255, 255, 0.45)" : "#86909c";
+  const [windowVisible, setWindowVisible] = useState(() => !document.hidden && !isTauri());
   const pendingSnapshotRef = useRef<{
     sessionId: string;
     request: Promise<ServerMonitorSnapshot>;
@@ -150,36 +136,32 @@ function ServerMonitorPanel({
   const [snapshot, setSnapshot] = useState<ServerMonitorSnapshot | null>(null);
   const [history, setHistory] = useState<ServerMonitorHistoryPoint[]>([]);
   const [error, setError] = useState<string>();
-  const [processPreview, setProcessPreview] = useState<{ sessionId: string; rows: ServerProcess[] }>();
+  const [processPreview, setProcessPreview] = useState<{
+    sessionId: string;
+    rows: ServerProcess[];
+  }>();
   const [ipRegions, setIpRegions] = useState<Record<string, string>>({});
   const [networkQuery, setNetworkQuery] = useState("");
   const [diagnosticsVisible, setDiagnosticsVisible] = useState(false);
   const [processDrawerVisible, setProcessDrawerVisible] = useState(false);
-  const [portForwardDrawerVisible, setPortForwardDrawerVisible] =
-    useState(false);
+  const [portForwardDrawerVisible, setPortForwardDrawerVisible] = useState(false);
   const [pingTarget, setPingTarget] = useState("1.1.1.1");
   const [pingResult, setPingResult] = useState<NetworkPingResult | null>(null);
   const [networkInterface, setNetworkInterface] = useState("");
   const [pingLoading, setPingLoading] = useState(false);
   const [pingError, setPingError] = useState<string>();
-  const [connectionsResult, setConnectionsResult] =
-    useState<NetworkConnectionsResult | null>(null);
+  const [connectionsResult, setConnectionsResult] = useState<NetworkConnectionsResult | null>(null);
   const [connectionsLoading, setConnectionsLoading] = useState(false);
   const [connectionsError, setConnectionsError] = useState<string>();
-  const [connectionFilter, setConnectionFilter] =
-    useState<ConnectionFilter>("all");
-  const [traceResult, setTraceResult] = useState<NetworkTraceResult | null>(
-    null,
-  );
+  const [connectionFilter, setConnectionFilter] = useState<ConnectionFilter>("all");
+  const [traceResult, setTraceResult] = useState<NetworkTraceResult | null>(null);
   const [traceLoading, setTraceLoading] = useState(false);
   const [traceError, setTraceError] = useState<string>();
   const diagnosticsGenerationRef = useRef(0);
   const pingRequestRef = useRef(0);
   const connectionsRequestRef = useRef(0);
   const traceRequestRef = useRef(0);
-  const connected = Boolean(
-    session && isTerminalSessionOperational(session.status),
-  );
+  const connected = Boolean(session && isTerminalSessionOperational(session.status));
   const showMonitorCharts = visible && windowVisible && connected;
   const monitorSnapshot = connected ? snapshot : null;
   const monitorHistory = connected ? history : [];
@@ -264,12 +246,7 @@ function ServerMonitorPanel({
 
   useEffect(() => {
     const sessionId = session?.id;
-    if (
-      !visible ||
-      !windowVisible ||
-      !sessionId ||
-      !isTerminalSessionOperational(session.status)
-    ) {
+    if (!visible || !windowVisible || !sessionId || !isTerminalSessionOperational(session.status)) {
       return;
     }
 
@@ -277,9 +254,10 @@ function ServerMonitorPanel({
     let timer: ReturnType<typeof setTimeout> | undefined;
     const collect = async () => {
       const pending = pendingSnapshotRef.current;
-      const request = pending?.sessionId === sessionId
-        ? pending.request
-        : invoke<ServerMonitorSnapshot>("ssh_monitor_snapshot", { sessionId });
+      const request =
+        pending?.sessionId === sessionId
+          ? pending.request
+          : invoke<ServerMonitorSnapshot>("ssh_monitor_snapshot", { sessionId });
       pendingSnapshotRef.current = { sessionId, request };
       try {
         const next = await request;
@@ -320,8 +298,7 @@ function ServerMonitorPanel({
     const generation = diagnosticsGenerationRef.current;
     const requestId = ++pingRequestRef.current;
     const isCurrentRequest = () =>
-      generation === diagnosticsGenerationRef.current &&
-      requestId === pingRequestRef.current;
+      generation === diagnosticsGenerationRef.current && requestId === pingRequestRef.current;
     setPingTarget(nextTarget);
     setPingLoading(true);
     setPingError(undefined);
@@ -351,10 +328,9 @@ function ServerMonitorPanel({
     setConnectionsLoading(true);
     setConnectionsError(undefined);
     try {
-      const result = await invoke<NetworkConnectionsResult>(
-        "ssh_network_connections",
-        { sessionId: session.id },
-      );
+      const result = await invoke<NetworkConnectionsResult>("ssh_network_connections", {
+        sessionId: session.id,
+      });
       if (!isCurrentRequest()) return;
       setConnectionsResult(result);
     } catch (connectionFailure) {
@@ -387,10 +363,14 @@ function ServerMonitorPanel({
     let generation = 0;
     const lookup = () => {
       const request = ++generation;
-      void invoke<Record<string, string>>("ip_region_lookup", { addresses, includeIpv6: ipRegionIpv6 })
+      void invoke<Record<string, string>>("ip_region_lookup", {
+        addresses,
+        includeIpv6: ipRegionIpv6,
+      })
         .then((regions) => {
           if (!disposed && request === generation) setIpRegions(regions);
-        }).catch(() => {
+        })
+        .catch(() => {
           if (!disposed && request === generation) setIpRegions({});
         });
     };
@@ -403,14 +383,24 @@ function ServerMonitorPanel({
   }, [tool, connected, connectionsResult, ipRegionEnabled, ipRegionIpv6]);
 
   useEffect(() => {
-    if (!onSelectTool || !visible || !windowVisible || !connected || !session || tool === "processes") return;
+    if (
+      !onSelectTool ||
+      !visible ||
+      !windowVisible ||
+      !connected ||
+      !session ||
+      tool === "processes"
+    )
+      return;
     let disposed = false;
     let pending = false;
     const collect = async () => {
       if (pending) return;
       pending = true;
       try {
-        const result = await invoke<ServerProcessListResult>("ssh_processes", { sessionId: session.id });
+        const result = await invoke<ServerProcessListResult>("ssh_processes", {
+          sessionId: session.id,
+        });
         if (!disposed) {
           const rows = [...result.processes]
             .sort((a, b) => b.residentMemoryBytes - a.residentMemoryBytes)
@@ -429,7 +419,15 @@ function ServerMonitorPanel({
       disposed = true;
       window.clearInterval(timer);
     };
-  }, [connected, onSelectTool, refreshIntervalSeconds, session?.id, tool === "processes", visible, windowVisible]);
+  }, [
+    connected,
+    onSelectTool,
+    refreshIntervalSeconds,
+    session?.id,
+    tool === "processes",
+    visible,
+    windowVisible,
+  ]);
 
   const runTraceRoute = async () => {
     if (!session) return;
@@ -437,8 +435,7 @@ function ServerMonitorPanel({
     const generation = diagnosticsGenerationRef.current;
     const requestId = ++traceRequestRef.current;
     const isCurrentRequest = () =>
-      generation === diagnosticsGenerationRef.current &&
-      requestId === traceRequestRef.current;
+      generation === diagnosticsGenerationRef.current && requestId === traceRequestRef.current;
     setTraceLoading(true);
     setTraceError(undefined);
     try {
@@ -474,7 +471,10 @@ function ServerMonitorPanel({
     {
       label: "交换",
       usage: monitorSnapshot?.swap?.usagePercent,
-      bytes: monitorSnapshot?.swap && [monitorSnapshot.swap.usedBytes, monitorSnapshot.swap.totalBytes],
+      bytes: monitorSnapshot?.swap && [
+        monitorSnapshot.swap.usedBytes,
+        monitorSnapshot.swap.totalBytes,
+      ],
     },
   ];
   const latestHistoryPoint = monitorHistory[monitorHistory.length - 1];
@@ -484,7 +484,18 @@ function ServerMonitorPanel({
   const rates = monitorNetworkRates(latestHistoryPoint, interfaceName);
   const filteredConnections = useMemo(() => {
     const query = networkQuery.trim().toLowerCase();
-    const connections = (connectionsResult?.connections ?? []).filter((row) => !query || [row.process, row.localAddress, row.localPort, row.remoteAddress, row.remotePort, row.protocol].some((field) => field?.toLowerCase().includes(query)));
+    const connections = (connectionsResult?.connections ?? []).filter(
+      (row) =>
+        !query ||
+        [
+          row.process,
+          row.localAddress,
+          row.localPort,
+          row.remoteAddress,
+          row.remotePort,
+          row.protocol,
+        ].some((field) => field?.toLowerCase().includes(query)),
+    );
     if (connectionFilter === "listening") {
       return connections.filter(isListeningConnection);
     }
@@ -493,7 +504,8 @@ function ServerMonitorPanel({
     }
     return connections;
   }, [connectionFilter, connectionsResult, networkQuery]);
-  const connectionColumns = useMemo<TableColumnProps<NetworkConnection>[]>(() => [
+  const connectionColumns = useMemo<TableColumnProps<NetworkConnection>[]>(
+    () => [
       {
         key: "protocol",
         dataIndex: "protocol",
@@ -506,9 +518,7 @@ function ServerMonitorPanel({
         title: "状态",
         width: 96,
         render: (state: string) => (
-          <Tag color={connectionStateColor(state)}>
-            {CONNECTION_STATE_LABELS[state] ?? state}
-          </Tag>
+          <Tag color={connectionStateColor(state)}>{CONNECTION_STATE_LABELS[state] ?? state}</Tag>
         ),
       },
       {
@@ -517,10 +527,7 @@ function ServerMonitorPanel({
         width: 176,
         render: (_, connection) => (
           <span className="network-connection-value">
-            {formatNetworkEndpoint(
-              connection.localAddress,
-              connection.localPort,
-            )}
+            {formatNetworkEndpoint(connection.localAddress, connection.localPort)}
           </span>
         ),
       },
@@ -530,31 +537,36 @@ function ServerMonitorPanel({
         width: 176,
         render: (_, connection) => (
           <span className="network-connection-value">
-            {formatNetworkEndpoint(
-              connection.remoteAddress,
-              connection.remotePort,
-            )}
+            {formatNetworkEndpoint(connection.remoteAddress, connection.remotePort)}
           </span>
         ),
       },
-      ...(ipRegionEnabled ? [{
-        key: "region" as const,
-        title: "远端 IP 归属地",
-        width: 190,
-        render: (_: unknown, row: NetworkConnection) => <span className="network-connection-value">{ipRegions[row.remoteAddress] || "—"}</span>,
-      }] : []),
+      ...(ipRegionEnabled
+        ? [
+            {
+              key: "region" as const,
+              title: "远端 IP 归属地",
+              width: 190,
+              render: (_: unknown, row: NetworkConnection) => (
+                <span className="network-connection-value">
+                  {ipRegions[row.remoteAddress] || "—"}
+                </span>
+              ),
+            },
+          ]
+        : []),
       {
         key: "process",
         dataIndex: "process",
         title: "进程",
         width: 300,
         render: (process?: string) => (
-          <span className="network-connection-value">
-            {process || "-"}
-          </span>
+          <span className="network-connection-value">{process || "-"}</span>
         ),
       },
-    ], [ipRegionEnabled, ipRegions]);
+    ],
+    [ipRegionEnabled, ipRegions],
+  );
   const networkTable = useResizableColumns(connectionColumns);
 
   const reconnecting = session?.status === "reconnecting";
@@ -589,7 +601,8 @@ function ServerMonitorPanel({
     );
   };
 
-  const toolSurfaces = (<>
+  const toolSurfaces = (
+    <>
       <WorkspaceToolSurface
         embedded={Boolean(onSelectTool)}
         className="network-diagnostics-drawer"
@@ -633,7 +646,8 @@ function ServerMonitorPanel({
                 <span aria-live="polite" className="workspace-network-count">
                   {filteredConnections.length === connectionsResult.connections.length
                     ? filteredConnections.length
-                    : `${filteredConnections.length} / ${connectionsResult.connections.length}`} 条
+                    : `${filteredConnections.length} / ${connectionsResult.connections.length}`}{" "}
+                  条
                 </span>
               )}
             </div>
@@ -652,9 +666,16 @@ function ServerMonitorPanel({
               />
               {onSelectTool && (
                 <>
-                  <Button onClick={onOpenSettings} size="mini">IP 归属地设置</Button>
+                  <Button onClick={onOpenSettings} size="mini">
+                    IP 归属地设置
+                  </Button>
                   <Button
-                    disabled={pingLoading || traceLoading || connectionsLoading || (!connectionsResult && !pingResult && !traceResult)}
+                    disabled={
+                      pingLoading ||
+                      traceLoading ||
+                      connectionsLoading ||
+                      (!connectionsResult && !pingResult && !traceResult)
+                    }
                     onClick={sendNetworkToAi}
                     size="mini"
                   >
@@ -674,15 +695,9 @@ function ServerMonitorPanel({
               </Tooltip>
             </div>
           </div>
-          {connectionsError && (
-            <Alert content={connectionsError} showIcon type="error" />
-          )}
+          {connectionsError && <Alert content={connectionsError} showIcon type="error" />}
           {connectionsResult?.truncated && (
-            <Alert
-              content="连接数量较多，仅显示前 500 条"
-              showIcon
-              type="warning"
-            />
+            <Alert content="连接数量较多，仅显示前 500 条" showIcon type="warning" />
           )}
           <Table
             border={false}
@@ -698,122 +713,116 @@ function ServerMonitorPanel({
         </section>
         <details className="workspace-network-diagnostics" open={onSelectTool ? undefined : true}>
           <summary>Ping 与路由追踪</summary>
-        <section className="network-diagnostics-section">
-          <Typography.Text bold>Ping</Typography.Text>
-          <Input.Search
-            loading={pingLoading}
-            onChange={updateDiagnosticsTarget}
-            onSearch={(value) => void runPing(value)}
-            placeholder="域名或 IP 地址"
-            searchButton="测试"
-            value={pingTarget}
-          />
-          {pingError && <Alert content={pingError} showIcon type="error" />}
-          {pingLoading && !pingResult && (
-            <Skeleton animation text={{ rows: 2, width: ["100%", "80%"] }} />
-          )}
-          {pingResult && (
-            <Descriptions
-              border
-              column={2}
-              data={[
-                {
-                  label: "状态",
-                  value: (
-                    <Tag color={pingResult.reachable ? "green" : "red"}>
-                      {pingResult.reachable ? "可达" : "不可达"}
-                    </Tag>
-                  ),
-                },
-                {
-                  label: "平均延迟",
-                  value: formatLatency(pingResult.averageLatencyMs),
-                },
-                {
-                  label: "丢包率",
-                  value: formatMonitorPercent(pingResult.packetLossPercent),
-                },
-                {
-                  label: "收发",
-                  value: `${pingResult.received} / ${pingResult.transmitted}`,
-                },
-                {
-                  label: "最低延迟",
-                  value: formatLatency(pingResult.minimumLatencyMs),
-                },
-                {
-                  label: "最高延迟",
-                  value: formatLatency(pingResult.maximumLatencyMs),
-                },
-              ]}
-              size="small"
+          <section className="network-diagnostics-section">
+            <Typography.Text bold>Ping</Typography.Text>
+            <Input.Search
+              loading={pingLoading}
+              onChange={updateDiagnosticsTarget}
+              onSearch={(value) => void runPing(value)}
+              placeholder="域名或 IP 地址"
+              searchButton="测试"
+              value={pingTarget}
             />
-          )}
-        </section>
-        <section className="network-diagnostics-section">
-          <div className="network-diagnostics-section-heading">
-            <span>
-              <Typography.Text bold>路由追踪</Typography.Text>
-              {traceResult && (
-                <Typography.Text type="secondary">
-                  {traceResult.resolvedAddress ?? traceResult.target}
-                </Typography.Text>
-              )}
-            </span>
-            <Button
-              icon={<IconBranch />}
-              loading={traceLoading}
-              onClick={() => void runTraceRoute()}
-              size="small"
-            >
-              开始追踪
-            </Button>
-          </div>
-          {traceError && <Alert content={traceError} showIcon type="error" />}
-          {traceLoading && !traceResult && (
-            <Skeleton
-              animation
-              text={{ rows: 3, width: ["70%", "85%", "60%"] }}
-            />
-          )}
-          {traceResult && (
-            <>
-              <Tag color={traceResult.reached ? "green" : "orange"}>
-                {traceResult.reached ? "已到达目标" : "未在最大跳数内到达"}
-              </Tag>
-              <Timeline className="network-trace-timeline" mode="left">
-                {traceResult.hops.map((hop) => {
-                  const reachedTarget =
-                    hop.address ===
-                    (traceResult.resolvedAddress ?? traceResult.target);
-                  return (
-                    <Timeline.Item
-                      dotColor={
-                        reachedTarget
-                          ? "#00b42a"
-                          : hop.address
-                            ? "#165dff"
-                            : chartSecondaryTextColor
-                      }
-                      key={hop.hop}
-                      label={`第 ${hop.hop} 跳`}
-                      lineType={hop.address ? "solid" : "dashed"}
-                    >
-                      <div className="network-trace-hop">
-                        <Typography.Text>
-                          {hop.address ?? "请求超时"}
-                        </Typography.Text>
-                        <Typography.Text type="secondary">
-                          {formatLatency(hop.latencyMs)}
-                        </Typography.Text>
-                      </div>
-                    </Timeline.Item>
-                  );
-                })}
-              </Timeline>
-            </>
-          )}
-        </section>
+            {pingError && <Alert content={pingError} showIcon type="error" />}
+            {pingLoading && !pingResult && (
+              <Skeleton animation text={{ rows: 2, width: ["100%", "80%"] }} />
+            )}
+            {pingResult && (
+              <Descriptions
+                border
+                column={2}
+                data={[
+                  {
+                    label: "状态",
+                    value: (
+                      <Tag color={pingResult.reachable ? "green" : "red"}>
+                        {pingResult.reachable ? "可达" : "不可达"}
+                      </Tag>
+                    ),
+                  },
+                  {
+                    label: "平均延迟",
+                    value: formatLatency(pingResult.averageLatencyMs),
+                  },
+                  {
+                    label: "丢包率",
+                    value: formatMonitorPercent(pingResult.packetLossPercent),
+                  },
+                  {
+                    label: "收发",
+                    value: `${pingResult.received} / ${pingResult.transmitted}`,
+                  },
+                  {
+                    label: "最低延迟",
+                    value: formatLatency(pingResult.minimumLatencyMs),
+                  },
+                  {
+                    label: "最高延迟",
+                    value: formatLatency(pingResult.maximumLatencyMs),
+                  },
+                ]}
+                size="small"
+              />
+            )}
+          </section>
+          <section className="network-diagnostics-section">
+            <div className="network-diagnostics-section-heading">
+              <span>
+                <Typography.Text bold>路由追踪</Typography.Text>
+                {traceResult && (
+                  <Typography.Text type="secondary">
+                    {traceResult.resolvedAddress ?? traceResult.target}
+                  </Typography.Text>
+                )}
+              </span>
+              <Button
+                icon={<IconBranch />}
+                loading={traceLoading}
+                onClick={() => void runTraceRoute()}
+                size="small"
+              >
+                开始追踪
+              </Button>
+            </div>
+            {traceError && <Alert content={traceError} showIcon type="error" />}
+            {traceLoading && !traceResult && (
+              <Skeleton animation text={{ rows: 3, width: ["70%", "85%", "60%"] }} />
+            )}
+            {traceResult && (
+              <>
+                <Tag color={traceResult.reached ? "green" : "orange"}>
+                  {traceResult.reached ? "已到达目标" : "未在最大跳数内到达"}
+                </Tag>
+                <Timeline className="network-trace-timeline" mode="left">
+                  {traceResult.hops.map((hop) => {
+                    const reachedTarget =
+                      hop.address === (traceResult.resolvedAddress ?? traceResult.target);
+                    return (
+                      <Timeline.Item
+                        dotColor={
+                          reachedTarget
+                            ? "#00b42a"
+                            : hop.address
+                              ? "#165dff"
+                              : chartSecondaryTextColor
+                        }
+                        key={hop.hop}
+                        label={`第 ${hop.hop} 跳`}
+                        lineType={hop.address ? "solid" : "dashed"}
+                      >
+                        <div className="network-trace-hop">
+                          <Typography.Text>{hop.address ?? "请求超时"}</Typography.Text>
+                          <Typography.Text type="secondary">
+                            {formatLatency(hop.latencyMs)}
+                          </Typography.Text>
+                        </div>
+                      </Timeline.Item>
+                    );
+                  })}
+                </Timeline>
+              </>
+            )}
+          </section>
         </details>
       </WorkspaceToolSurface>
       {session && (
@@ -834,10 +843,13 @@ function ServerMonitorPanel({
           />
         </>
       )}
-  </>);
+    </>
+  );
 
   return (
-    <section className={`server-monitor${onSelectTool ? " monitor-compact" : ""}${connected ? "" : " is-unavailable"}`}>
+    <section
+      className={`server-monitor${onSelectTool ? " monitor-compact" : ""}${connected ? "" : " is-unavailable"}`}
+    >
       {!onSelectTool && (
         <div className="server-monitor-heading">
           <Typography.Text bold>服务器监控</Typography.Text>
@@ -878,7 +890,17 @@ function ServerMonitorPanel({
       {onSelectTool && session && (
         <div className="monitor-address">
           <span title={session.host.address}>IP {session.host.address}</span>
-          <Button onClick={() => void writeText(session.host.address).catch((error) => Message.error(commandErrorMessage(error)))} size="mini" type="text">复制</Button>
+          <Button
+            onClick={() =>
+              void writeText(session.host.address).catch((error) =>
+                Message.error(commandErrorMessage(error)),
+              )
+            }
+            size="mini"
+            type="text"
+          >
+            复制
+          </Button>
         </div>
       )}
       <dl aria-label="系统信息" className="monitor-system-facts">
@@ -904,9 +926,7 @@ function ServerMonitorPanel({
           <dt>负载</dt>
           <dd>
             {monitorSnapshot
-              ? monitorSnapshot.loadAverage
-                  .map((value) => value.toFixed(2))
-                  .join(" / ")
+              ? monitorSnapshot.loadAverage.map((value) => value.toFixed(2)).join(" / ")
               : "-"}
           </dd>
         </div>
@@ -915,10 +935,18 @@ function ServerMonitorPanel({
       <div className="monitor-chart-section">
         <div className="monitor-resource-meters">
           {resourceMeters.map(({ label, usage, bytes }) => {
-            const percent = typeof usage === "number" && Number.isFinite(usage)
-              ? Math.round(Math.min(100, Math.max(0, usage)))
-              : undefined;
-            const level = percent === undefined ? undefined : percent >= 80 ? "high" : percent >= 60 ? "medium" : "low";
+            const percent =
+              typeof usage === "number" && Number.isFinite(usage)
+                ? Math.round(Math.min(100, Math.max(0, usage)))
+                : undefined;
+            const level =
+              percent === undefined
+                ? undefined
+                : percent >= 80
+                  ? "high"
+                  : percent >= 60
+                    ? "medium"
+                    : "low";
             const value = percent === undefined ? "—" : formatMonitorPercent(percent);
             const amount = bytes?.map(formatMonitorBytes).join(" / ");
             const text = amount ? `${value}  ${amount}` : value;
@@ -934,7 +962,11 @@ function ServerMonitorPanel({
                   role={percent === undefined ? undefined : "meter"}
                   title={text}
                 >
-                  <span aria-hidden className="monitor-resource-fill" style={{ width: `${percent ?? 0}%` }} />
+                  <span
+                    aria-hidden
+                    className="monitor-resource-fill"
+                    style={{ width: `${percent ?? 0}%` }}
+                  />
                   <span className="monitor-resource-value">{text}</span>
                 </div>
               </div>
@@ -945,10 +977,28 @@ function ServerMonitorPanel({
 
       {onSelectTool && connected && (
         <table className="monitor-process-preview" aria-label="内存占用最高的进程">
-          <thead><tr><th scope="col">内存</th><th scope="col">CPU</th><th scope="col">命令</th></tr></thead>
-          <tbody>{processPreview?.sessionId === session?.id && processPreview?.rows.length ? processPreview.rows.map((row) => (
-            <tr key={row.id}><td>{formatMonitorBytes(row.residentMemoryBytes)}</td><td>{formatMonitorPercent(row.cpuUsagePercent)}</td><td title={row.command}>{row.name}</td></tr>
-          )) : <tr><td colSpan={3}>暂无进程摘要</td></tr>}</tbody>
+          <thead>
+            <tr>
+              <th scope="col">内存</th>
+              <th scope="col">CPU</th>
+              <th scope="col">命令</th>
+            </tr>
+          </thead>
+          <tbody>
+            {processPreview?.sessionId === session?.id && processPreview?.rows.length ? (
+              processPreview.rows.map((row) => (
+                <tr key={row.id}>
+                  <td>{formatMonitorBytes(row.residentMemoryBytes)}</td>
+                  <td>{formatMonitorPercent(row.cpuUsagePercent)}</td>
+                  <td title={row.command}>{row.name}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={3}>暂无进程摘要</td>
+              </tr>
+            )}
+          </tbody>
         </table>
       )}
       {showMonitorCharts && (
@@ -965,9 +1015,9 @@ function ServerMonitorPanel({
 
       <div className="monitor-chart-section">
         <Typography.Text className="monitor-network-total" type="secondary">
-            {monitorSnapshot
-              ? `累计 ↓ ${formatMonitorBytes(selectedInterface?.receiveBytes ?? monitorSnapshot.networkReceiveBytes)} / ↑ ${formatMonitorBytes(selectedInterface?.transmitBytes ?? monitorSnapshot.networkTransmitBytes)}`
-              : "累计 ↓ - / ↑ -"}
+          {monitorSnapshot
+            ? `累计 ↓ ${formatMonitorBytes(selectedInterface?.receiveBytes ?? monitorSnapshot.networkReceiveBytes)} / ↑ ${formatMonitorBytes(selectedInterface?.transmitBytes ?? monitorSnapshot.networkTransmitBytes)}`
+            : "累计 ↓ - / ↑ -"}
         </Typography.Text>
         <div className="monitor-network-summary">
           <span className="monitor-network-upload-rate" title="上传速率" aria-label="上传速率">
@@ -977,9 +1027,17 @@ function ServerMonitorPanel({
             ↓ {monitorSnapshot ? formatMonitorRate(rates.receive) : "—"}
           </span>
           {interfaces.length > 0 && (
-            <select aria-label="网络接口" value={interfaceName} onChange={(event) => setNetworkInterface(event.target.value)}>
+            <select
+              aria-label="网络接口"
+              value={interfaceName}
+              onChange={(event) => setNetworkInterface(event.target.value)}
+            >
               <option value="">全部</option>
-              {interfaces.map(({ name }) => <option key={name} value={name}>{name}</option>)}
+              {interfaces.map(({ name }) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
             </select>
           )}
         </div>
@@ -987,7 +1045,10 @@ function ServerMonitorPanel({
           <NetworkTrendChart monitorHistory={monitorHistory} interfaceName={interfaceName} />
         )}
       </div>
-      <div className="monitor-chart-section monitor-latency" title="从本机到服务器的 SSH 通道开启耗时，包含跳板机或代理路径">
+      <div
+        className="monitor-chart-section monitor-latency"
+        title="从本机到服务器的 SSH 通道开启耗时，包含跳板机或代理路径"
+      >
         <div className="monitor-latency-heading">
           <span aria-label="SSH 延迟">{formatLatency(monitorSnapshot?.sshLatencyMs)}</span>
           <Typography.Text type="secondary">服务器延迟</Typography.Text>
@@ -998,19 +1059,33 @@ function ServerMonitorPanel({
         <Typography.Text bold>磁盘</Typography.Text>
         <table className="monitor-disk-table" aria-label="磁盘挂载点">
           <thead>
-            <tr><th scope="col">路径</th><th scope="col">可用／大小</th></tr>
+            <tr>
+              <th scope="col">路径</th>
+              <th scope="col">可用／大小</th>
+            </tr>
           </thead>
           <tbody>
-            {monitorSnapshot?.diskMounts?.length ? monitorSnapshot.diskMounts.map((mount) => (
-              <tr key={mount.path}>
-                <td title={mount.path}>{mount.path}</td>
-                <td>{formatMonitorBytes(mount.availableBytes)} / {formatMonitorBytes(mount.totalBytes)}</td>
+            {monitorSnapshot?.diskMounts?.length ? (
+              monitorSnapshot.diskMounts.map((mount) => (
+                <tr key={mount.path}>
+                  <td title={mount.path}>{mount.path}</td>
+                  <td>
+                    {formatMonitorBytes(mount.availableBytes)} /{" "}
+                    {formatMonitorBytes(mount.totalBytes)}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={2} className="monitor-disk-empty">
+                  暂无挂载点数据
+                </td>
               </tr>
-            )) : <tr><td colSpan={2} className="monitor-disk-empty">暂无挂载点数据</td></tr>}
+            )}
           </tbody>
         </table>
       </div>
-      {onSelectTool ? (toolTarget && createPortal(toolSurfaces, toolTarget)) : toolSurfaces}
+      {onSelectTool ? toolTarget && createPortal(toolSurfaces, toolTarget) : toolSurfaces}
       {connectionUnavailable && (
         <ConnectionStatusOverlay
           description={connectionDescription}

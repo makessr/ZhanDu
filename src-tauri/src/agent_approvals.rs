@@ -11,6 +11,14 @@ pub(crate) struct ApprovalCredential {
 }
 
 impl ApprovalCredential {
+    pub(crate) fn from_token(token: String, call_id: String) -> Self {
+        Self { token, call_id }
+    }
+
+    pub(crate) fn token(&self) -> &str {
+        &self.token
+    }
+
     pub(crate) fn call_id(&self) -> &str {
         &self.call_id
     }

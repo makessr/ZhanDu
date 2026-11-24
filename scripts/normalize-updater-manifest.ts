@@ -46,10 +46,7 @@ function releaseAssetUrls(value: unknown) {
   release.assets.forEach((value) => {
     if (!isRecord(value)) return;
     const asset = value as GitHubReleaseAsset;
-    if (
-      typeof asset.url === "string" &&
-      typeof asset.browser_download_url === "string"
-    ) {
+    if (typeof asset.url === "string" && typeof asset.browser_download_url === "string") {
       urls.set(asset.url, asset.browser_download_url);
     }
   });
@@ -64,9 +61,7 @@ function stableReleaseDownloadUrl(value: string, releaseTag: string) {
     throw new Error("GitHub Release 公开下载地址无效");
   }
 
-  const match = url.pathname.match(
-    /^\/([^/]+)\/([^/]+)\/releases\/download\/[^/]+\/([^/]+)$/,
-  );
+  const match = url.pathname.match(/^\/([^/]+)\/([^/]+)\/releases\/download\/[^/]+\/([^/]+)$/);
   if (url.hostname !== "github.com" || !match) {
     throw new Error("GitHub Release 公开下载地址格式无效");
   }
@@ -135,16 +130,8 @@ if (import.meta.main) {
 
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
     const release = JSON.parse(readFileSync(releasePath, "utf8"));
-    const normalized = normalizeUpdaterManifestUrls(
-      manifest,
-      release,
-      releaseTag,
-    );
-    writeFileSync(
-      manifestPath,
-      `${JSON.stringify(normalized.manifest, null, 2)}\n`,
-      "utf8",
-    );
+    const normalized = normalizeUpdaterManifestUrls(manifest, release, releaseTag);
+    writeFileSync(manifestPath, `${JSON.stringify(normalized.manifest, null, 2)}\n`, "utf8");
     console.log(
       normalized.normalizedKeys.length > 0
         ? `已转换公开下载地址：${normalized.normalizedKeys.join(", ")}`

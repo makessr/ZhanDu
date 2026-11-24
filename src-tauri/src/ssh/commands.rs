@@ -39,8 +39,7 @@ pub(crate) async fn ssh_verify_private_key(
         return Err("验证新密钥时必须使用私钥认证".into());
     }
     tauri::async_runtime::spawn_blocking(move || {
-        let (session, fingerprint) =
-            connect_handshaken_session(&request, &AtomicBool::new(false))?;
+        let (session, fingerprint) = connect_handshaken_session(&request, &AtomicBool::new(false))?;
         let (status, expected_fingerprint) =
             match verify_fingerprint(request.expected_fingerprint.as_deref(), &fingerprint) {
                 FingerprintVerification::Trusted => {
@@ -50,9 +49,10 @@ pub(crate) async fn ssh_verify_private_key(
                 FingerprintVerification::Unknown => {
                     (SshConnectStatus::HostKeyVerificationRequired, None)
                 }
-                FingerprintVerification::Changed(expected) => {
-                    (SshConnectStatus::HostKeyVerificationRequired, Some(expected))
-                }
+                FingerprintVerification::Changed(expected) => (
+                    SshConnectStatus::HostKeyVerificationRequired,
+                    Some(expected),
+                ),
             };
         Ok(SshConnectResult {
             status,

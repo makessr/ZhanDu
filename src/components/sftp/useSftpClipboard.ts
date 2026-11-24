@@ -2,11 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Message } from "@arco-design/web-react";
 import { diagnosticInvoke as invoke } from "../../diagnostics";
 import type { SftpEntry, SftpListResult } from "../../models";
-import {
-  isRemotePathDescendant,
-  nextAvailableRemoteName,
-  remoteJoinPath,
-} from "../../sftp-utils";
+import { isRemotePathDescendant, nextAvailableRemoteName, remoteJoinPath } from "../../sftp-utils";
 import { commandErrorMessage } from "../../tauri-protocol";
 import type { PasteConflictPolicy } from "./SftpDialogs";
 
@@ -31,15 +27,11 @@ interface SftpClipboardOptions {
   sessionId?: string;
 }
 
-function invalidPasteDirectory(
-  clipboard: SftpClipboard,
-  targetDirectory: string,
-) {
+function invalidPasteDirectory(clipboard: SftpClipboard, targetDirectory: string) {
   return clipboard.entries.find(
     (entry) =>
       entry.kind === "directory" &&
-      (entry.path === targetDirectory ||
-        isRemotePathDescendant(entry.path, targetDirectory)),
+      (entry.path === targetDirectory || isRemotePathDescendant(entry.path, targetDirectory)),
   );
 }
 
@@ -50,19 +42,14 @@ export default function useSftpClipboard({
   onRefreshDirectory,
   sessionId,
 }: SftpClipboardOptions) {
-  const [clipboards, setClipboards] = useState<Record<string, SftpClipboard>>(
-    {},
-  );
+  const [clipboards, setClipboards] = useState<Record<string, SftpClipboard>>({});
   const [pendingPaste, setPendingPaste] = useState<PendingPaste | null>(null);
-  const [pasteConflictPolicy, setPasteConflictPolicy] =
-    useState<PasteConflictPolicy>("rename");
+  const [pasteConflictPolicy, setPasteConflictPolicy] = useState<PasteConflictPolicy>("rename");
   const currentClipboard = sessionId ? clipboards[sessionId] : undefined;
   const cutEntryPaths = useMemo(
     () =>
       new Set(
-        currentClipboard?.mode === "cut"
-          ? currentClipboard.entries.map((entry) => entry.path)
-          : [],
+        currentClipboard?.mode === "cut" ? currentClipboard.entries.map((entry) => entry.path) : [],
       ),
     [currentClipboard],
   );
@@ -85,9 +72,7 @@ export default function useSftpClipboard({
         entries: entries.map((entry) => ({ ...entry })),
       },
     }));
-    Message.success(
-      `${mode === "copy" ? "已复制" : "已剪切"} ${entries.length} 个项目`,
-    );
+    Message.success(`${mode === "copy" ? "已复制" : "已剪切"} ${entries.length} 个项目`);
   }
 
   async function pasteClipboard(
@@ -112,9 +97,7 @@ export default function useSftpClipboard({
         sessionId,
         path: targetDirectory,
       });
-      const unavailableNames = new Set(
-        targetListing.entries.map((entry) => entry.name),
-      );
+      const unavailableNames = new Set(targetListing.entries.map((entry) => entry.name));
 
       for (const entry of clipboard.entries) {
         let targetName = entry.name;
@@ -135,15 +118,12 @@ export default function useSftpClipboard({
         }
 
         try {
-          await invoke(
-            clipboard.mode === "copy" ? "sftp_copy" : "sftp_rename",
-            {
-              sessionId,
-              sourcePath: entry.path,
-              targetPath,
-              overwrite: conflicts && conflictPolicy === "overwrite",
-            },
-          );
+          await invoke(clipboard.mode === "copy" ? "sftp_copy" : "sftp_rename", {
+            sessionId,
+            sourcePath: entry.path,
+            targetPath,
+            overwrite: conflicts && conflictPolicy === "overwrite",
+          });
           unavailableNames.add(targetName);
           completedSourcePaths.add(entry.path);
           succeeded += 1;
@@ -156,9 +136,7 @@ export default function useSftpClipboard({
         setClipboards((current) => {
           const active = current[sessionId];
           if (!active || active.mode !== "cut") return current;
-          const remaining = active.entries.filter(
-            (entry) => !completedSourcePaths.has(entry.path),
-          );
+          const remaining = active.entries.filter((entry) => !completedSourcePaths.has(entry.path));
           if (remaining.length > 0) {
             return {
               ...current,
@@ -173,15 +151,12 @@ export default function useSftpClipboard({
       onClearSelection();
       await onRefreshDirectory();
       if (succeeded > 0) {
-        Message.success(
-          `${clipboard.mode === "copy" ? "已复制" : "已移动"} ${succeeded} 个项目`,
-        );
+        Message.success(`${clipboard.mode === "copy" ? "已复制" : "已移动"} ${succeeded} 个项目`);
       } else if (skipped > 0 && failures.length === 0) {
         Message.info("没有需要处理的项目");
       }
       if (failures.length > 0) {
-        const remaining =
-          failures.length > 1 ? `，另有 ${failures.length - 1} 项失败` : "";
+        const remaining = failures.length > 1 ? `，另有 ${failures.length - 1} 项失败` : "";
         Message.error(`${failures[0]}${remaining}`);
       }
     } catch (error) {
@@ -191,10 +166,7 @@ export default function useSftpClipboard({
     }
   }
 
-  async function requestPaste(
-    targetDirectory: string,
-    clipboard = currentClipboard,
-  ) {
+  async function requestPaste(targetDirectory: string, clipboard = currentClipboard) {
     if (!sessionId || !clipboard || clipboard.entries.length === 0) return;
     const invalidDirectory = invalidPasteDirectory(clipboard, targetDirectory);
     if (invalidDirectory) {
@@ -208,14 +180,11 @@ export default function useSftpClipboard({
         sessionId,
         path: targetDirectory,
       });
-      const targetNames = new Set(
-        targetListing.entries.map((entry) => entry.name),
-      );
+      const targetNames = new Set(targetListing.entries.map((entry) => entry.name));
       const conflictCount = clipboard.entries.filter((entry) => {
         const targetPath = remoteJoinPath(targetListing.path, entry.name);
         return (
-          !(clipboard.mode === "cut" && targetPath === entry.path) &&
-          targetNames.has(entry.name)
+          !(clipboard.mode === "cut" && targetPath === entry.path) && targetNames.has(entry.name)
         );
       }).length;
       if (conflictCount > 0) {

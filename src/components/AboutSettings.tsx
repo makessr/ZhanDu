@@ -11,12 +11,7 @@ import {
   Spin,
   Typography,
 } from "@arco-design/web-react";
-import {
-  IconDownload,
-  IconFile,
-  IconGithub,
-  IconRefresh,
-} from "@arco-design/web-react/icon";
+import { IconDownload, IconFile, IconGithub, IconRefresh } from "@arco-design/web-react/icon";
 import {
   FINESHELL_LICENSE_URL,
   FINESHELL_REPOSITORY_URL,
@@ -38,21 +33,12 @@ import { APP_DISPLAY_NAME } from "../application-brand";
 import ReleaseNotesMarkdown from "./ReleaseNotesMarkdown";
 
 type UpdateStatus =
-  | "idle"
-  | "checking"
-  | "latest"
-  | "available"
-  | "downloading"
-  | "restarting"
-  | "error";
+  "idle" | "checking" | "latest" | "available" | "downloading" | "restarting" | "error";
 
 interface AboutSettingsProps {
   knownUpdate?: ApplicationUpdateNotice | null;
   settings?: AppSettings;
-  updateSetting?: <Key extends keyof AppSettings>(
-    key: Key,
-    value: AppSettings[Key],
-  ) => void;
+  updateSetting?: <Key extends keyof AppSettings>(key: Key, value: AppSettings[Key]) => void;
   updater?: ApplicationUpdaterService;
 }
 
@@ -77,8 +63,7 @@ function AboutSettings({
 }: AboutSettingsProps) {
   const [applicationInfo, setApplicationInfo] = useState<ApplicationInfo>();
   const [applicationInfoError, setApplicationInfoError] = useState("");
-  const [availableUpdate, setAvailableUpdate] =
-    useState<ApplicationUpdate | null>(null);
+  const [availableUpdate, setAvailableUpdate] = useState<ApplicationUpdate | null>(null);
   const [status, setStatus] = useState<UpdateStatus>(() =>
     isApplicationUpdateInstalling() ? "downloading" : "idle",
   );
@@ -121,15 +106,12 @@ function AboutSettings({
     };
   }, []);
 
-  const replaceAvailableUpdate = useCallback(
-    (next: ApplicationUpdate | null) => {
-      const previous = updateRef.current;
-      updateRef.current = next;
-      if (mountedRef.current) setAvailableUpdate(next);
-      if (previous && previous !== next) void previous.close();
-    },
-    [],
-  );
+  const replaceAvailableUpdate = useCallback((next: ApplicationUpdate | null) => {
+    const previous = updateRef.current;
+    updateRef.current = next;
+    if (mountedRef.current) setAvailableUpdate(next);
+    if (previous && previous !== next) void previous.close();
+  }, []);
 
   const checkForUpdate = useCallback(async () => {
     const request = checkRequestRef.current + 1;
@@ -177,9 +159,7 @@ function AboutSettings({
     automaticallyCheckedVersionRef.current = knownUpdateVersion;
     void checkForUpdate();
     return () => {
-      if (
-        automaticallyCheckedVersionRef.current === knownUpdateVersion
-      ) {
+      if (automaticallyCheckedVersionRef.current === knownUpdateVersion) {
         automaticallyCheckedVersionRef.current = undefined;
       }
     };
@@ -244,8 +224,7 @@ function AboutSettings({
     const update = availableUpdate;
     Modal.confirm({
       cancelText: "稍后",
-      content:
-        "更新会关闭当前 SSH 会话并中断正在进行的文件传输。请确认重要任务已经完成。",
+      content: "更新会关闭当前 SSH 会话并中断正在进行的文件传输。请确认重要任务已经完成。",
       okText: "下载并安装",
       onOk: () => {
         void downloadAndInstall(update);
@@ -258,12 +237,8 @@ function AboutSettings({
     if (!settings || !updater.testRoute) return;
     setTestingRoute(true);
     try {
-      const result = await updater.testRoute(
-        applicationUpdateOptionsFromSettings(settings),
-      );
-      Message.success(
-        `线路可用：${result.route}（${result.latencyMs} ms）`,
-      );
+      const result = await updater.testRoute(applicationUpdateOptionsFromSettings(settings));
+      Message.success(`线路可用：${result.route}（${result.latencyMs} ms）`);
     } catch (error) {
       Message.error(errorMessage(error));
     } finally {
@@ -272,16 +247,11 @@ function AboutSettings({
   };
 
   const progressPercent =
-    totalBytes > 0
-      ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100))
-      : 0;
+    totalBytes > 0 ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)) : 0;
   const updateSummary = availableUpdate ?? knownUpdate;
   const showUpdateSummary =
     updateSummary !== null &&
-    (status === "idle" ||
-      status === "checking" ||
-      status === "available" ||
-      status === "error");
+    (status === "idle" || status === "checking" || status === "available" || status === "error");
 
   return (
     <div className="about-settings">
@@ -293,9 +263,7 @@ function AboutSettings({
           <Typography.Title heading={4}>
             {applicationInfo?.name ?? APP_DISPLAY_NAME}
           </Typography.Title>
-          <Typography.Text type="secondary">
-            跨平台 SSH 与 SFTP 客户端
-          </Typography.Text>
+          <Typography.Text type="secondary">跨平台 SSH 与 SFTP 客户端</Typography.Text>
         </div>
       </div>
 
@@ -372,9 +340,7 @@ function AboutSettings({
               <Input
                 aria-label="自定义镜像地址"
                 disabled={status === "downloading" || status === "restarting"}
-                onChange={(value) =>
-                  updateSetting("githubMirrorCustomUrl", value)
-                }
+                onChange={(value) => updateSetting("githubMirrorCustomUrl", value)}
                 placeholder="https://mirror.example.com/"
                 value={settings.githubMirrorCustomUrl}
               />
@@ -389,21 +355,14 @@ function AboutSettings({
           <div>
             <Typography.Title heading={6}>软件更新</Typography.Title>
           </div>
-          {availableUpdate &&
-          (status === "available" || status === "error") ? (
-            <Button
-              icon={<IconDownload />}
-              onClick={confirmInstallation}
-              type="primary"
-            >
+          {availableUpdate && (status === "available" || status === "error") ? (
+            <Button icon={<IconDownload />} onClick={confirmInstallation} type="primary">
               下载并安装
             </Button>
           ) : (
             <Button
               disabled={
-                !updater.canInstallUpdates ||
-                status === "downloading" ||
-                status === "restarting"
+                !updater.canInstallUpdates || status === "downloading" || status === "restarting"
               }
               icon={<IconRefresh />}
               loading={status === "checking"}
@@ -415,22 +374,15 @@ function AboutSettings({
         </div>
 
         {!updater.canInstallUpdates && (
-          <Alert
-            content="开发模式不支持安装更新，请使用正式安装包测试。"
-            type="info"
-          />
+          <Alert content="开发模式不支持安装更新，请使用正式安装包测试。" type="info" />
         )}
 
-        {status === "latest" && (
-          <Alert content="当前已是最新版本。" type="success" />
-        )}
+        {status === "latest" && <Alert content="当前已是最新版本。" type="success" />}
 
         {showUpdateSummary && updateSummary && (
           <div className="about-release">
             <div className="about-release-heading">
-              <Typography.Text bold>
-                发现新版本 v{updateSummary.version}
-              </Typography.Text>
+              <Typography.Text bold>发现新版本 v{updateSummary.version}</Typography.Text>
               {releaseDate(updateSummary.date) && (
                 <Typography.Text type="secondary">
                   {releaseDate(updateSummary.date)}
@@ -469,10 +421,7 @@ function AboutSettings({
         )}
 
         {status === "error" && (
-          <Alert
-            content={updateError || "更新失败，请稍后重试。"}
-            type="error"
-          />
+          <Alert content={updateError || "更新失败，请稍后重试。"} type="error" />
         )}
       </section>
     </div>

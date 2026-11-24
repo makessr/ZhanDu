@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import {
   Button,
@@ -21,19 +15,9 @@ import type { TableColumnProps } from "@arco-design/web-react";
 import { isTauri } from "@tauri-apps/api/core";
 import { writeText as writeClipboardText } from "@tauri-apps/plugin-clipboard-manager";
 import { open } from "@tauri-apps/plugin-dialog";
-import {
-  diagnosticInvoke as invoke,
-  recordDiagnostic,
-} from "../diagnostics";
-import {
-  commandErrorMessage,
-  emitProtocolEventTo,
-  listenProtocolEvent,
-} from "../tauri-protocol";
-import {
-  IconCopy,
-  IconSort,
-} from "@arco-design/web-react/icon";
+import { diagnosticInvoke as invoke, recordDiagnostic } from "../diagnostics";
+import { commandErrorMessage, emitProtocolEventTo, listenProtocolEvent } from "../tauri-protocol";
+import { IconCopy, IconSort } from "@arco-design/web-react/icon";
 import type {
   ConnectionHistoryRecord,
   HostFormValues,
@@ -60,10 +44,8 @@ import {
   sortHosts,
   type HostTableRow,
 } from "../host-organization";
-import {
-  loadConfiguration,
-  updateConfiguration,
-} from "../config-database";
+import { loadConfiguration, updateConfiguration } from "../config-database";
+import { pickLocalPath } from "../local-path-picker";
 import { expandSshConfig, mergeSshConfig, parseSshConfig } from "../ssh-config-import";
 import {
   moveHostToTrash,
@@ -75,16 +57,17 @@ import {
 } from "../configuration-mutations";
 import type { AppSettings } from "../app-settings";
 import { applyConnectionHistoryPolicy } from "../connection-history";
-import {
-  connectionTargetKey,
-  createCredentialReference,
-} from "../credential-registry";
+import { connectionTargetKey, createCredentialReference } from "../credential-registry";
 
 function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function OpenSshImportPreview({ contents, onImport, onClose }: {
+function OpenSshImportPreview({
+  contents,
+  onImport,
+  onClose,
+}: {
   contents: string;
   onImport: (hosts: ReturnType<typeof parseSshConfig>["hosts"]) => Promise<void>;
   onClose: () => void;
@@ -125,12 +108,19 @@ function OpenSshImportPreview({ contents, onImport, onClose }: {
         onChange={setUsername}
       />
       <Typography.Paragraph>
-        {preview.error ?? `可导入 ${preview.hosts.length} 条，跳过 ${preview.skipped.length} 条。同名主机保留原记录。`}
+        {preview.error ??
+          `可导入 ${preview.hosts.length} 条，跳过 ${preview.skipped.length} 条。同名主机保留原记录。`}
       </Typography.Paragraph>
       {(preview.hosts.length > 0 || preview.skipped.length > 0) && (
         <ul style={{ maxHeight: 220, overflow: "auto" }}>
-          {preview.hosts.map((host) => <li key={host.name}>{host.name} · {host.username}@{host.address}</li>)}
-          {preview.skipped.map((message) => <li key={message}>{message}</li>)}
+          {preview.hosts.map((host) => (
+            <li key={host.name}>
+              {host.name} · {host.username}@{host.address}
+            </li>
+          ))}
+          {preview.skipped.map((message) => (
+            <li key={message}>{message}</li>
+          ))}
         </ul>
       )}
     </Modal>
@@ -193,19 +183,13 @@ function isInteractiveRowTarget(target: EventTarget | null) {
   return (
     target instanceof Element &&
     Boolean(
-      target.closest(
-        "button, a, input, textarea, select, [role='button'], [role='menuitem']",
-      ),
+      target.closest("button, a, input, textarea, select, [role='button'], [role='menuitem']"),
     )
   );
 }
 
 interface HostManagerPanelProps {
-  onConnect: (
-    host: HostRecord,
-    proxy?: ProxyRecord,
-    jumpHost?: JumpHostConnection,
-  ) => void;
+  onConnect: (host: HostRecord, proxy?: ProxyRecord, jumpHost?: JumpHostConnection) => void;
   settings: AppSettings;
 }
 
@@ -266,10 +250,7 @@ function HostManagerPanel({ onConnect, settings }: HostManagerPanelProps) {
             removePrivateKeyPassphrase(hostId),
           ]),
         );
-        if (
-          !disposed &&
-          cleanup.some((result) => result.status === "rejected")
-        ) {
+        if (!disposed && cleanup.some((result) => result.status === "rejected")) {
           Message.warning("过期主机已清理，但部分系统凭据删除失败");
         }
       })
@@ -325,14 +306,8 @@ function HostManagerPanel({ onConnect, settings }: HostManagerPanelProps) {
         .some((value) => value?.toLowerCase().includes(normalized)),
     );
   }, [hosts, keyword]);
-  const visibleHosts = useMemo(
-    () => sortHosts(filteredHosts, hostSort),
-    [filteredHosts, hostSort],
-  );
-  const hostTableRows = useMemo(
-    () => buildHostTableTree(visibleHosts),
-    [visibleHosts],
-  );
+  const visibleHosts = useMemo(() => sortHosts(filteredHosts, hostSort), [filteredHosts, hostSort]);
+  const hostTableRows = useMemo(() => buildHostTableTree(visibleHosts), [visibleHosts]);
 
   function openHostEditor(host: HostRecord | null) {
     setEditingHost(host);
@@ -355,11 +330,7 @@ function HostManagerPanel({ onConnect, settings }: HostManagerPanelProps) {
   }
 
   async function saveHost(values: HostFormValues) {
-    const {
-      password,
-      privateKeyPassphrase,
-      host: normalized,
-    } = normalizeHostForm(values);
+    const { password, privateKeyPassphrase, host: normalized } = normalizeHostForm(values);
     const hostId = editingHost?.id ?? createId("host");
     const action = editingHost ? "update" : "create";
     const credentialTypes = [
@@ -374,34 +345,21 @@ function HostManagerPanel({ onConnect, settings }: HostManagerPanelProps) {
       usesJumpHost: Boolean(normalized.jumpHostId),
       usesProxy: Boolean(normalized.proxyId),
     };
-    recordDiagnostic(
-      "info",
-      "host.configuration",
-      "开始保存主机配置",
-      diagnosticContext,
-    );
+    recordDiagnostic("info", "host.configuration", "开始保存主机配置", diagnosticContext);
     if (normalized.proxyId && normalized.jumpHostId) {
-      recordDiagnostic(
-        "warn",
-        "host.configuration",
-        "主机配置路由校验失败",
-        { ...diagnosticContext, reason: "proxy_and_jump_host_conflict" },
-      );
+      recordDiagnostic("warn", "host.configuration", "主机配置路由校验失败", {
+        ...diagnosticContext,
+        reason: "proxy_and_jump_host_conflict",
+      });
       Message.error("代理和跳板机不能同时配置");
       return;
     }
-    const routeError = jumpHostSelectionError(
-      hostId,
-      normalized.jumpHostId,
-      hosts,
-    );
+    const routeError = jumpHostSelectionError(hostId, normalized.jumpHostId, hosts);
     if (routeError) {
-      recordDiagnostic(
-        "warn",
-        "host.configuration",
-        "主机配置跳板机校验失败",
-        { ...diagnosticContext, error: routeError },
-      );
+      recordDiagnostic("warn", "host.configuration", "主机配置跳板机校验失败", {
+        ...diagnosticContext,
+        error: routeError,
+      });
       Message.error(routeError);
       return;
     }
@@ -410,12 +368,7 @@ function HostManagerPanel({ onConnect, settings }: HostManagerPanelProps) {
     let passphraseStored = false;
     try {
       if (credentialTypes.length > 0) {
-        recordDiagnostic(
-          "info",
-          "host.configuration",
-          "开始写入系统凭据",
-          diagnosticContext,
-        );
+        recordDiagnostic("info", "host.configuration", "开始写入系统凭据", diagnosticContext);
       }
       if (password) {
         await storeHostPassword(hostId, password);
@@ -426,26 +379,17 @@ function HostManagerPanel({ onConnect, settings }: HostManagerPanelProps) {
         passphraseStored = true;
       }
       if (credentialTypes.length > 0) {
-        recordDiagnostic(
-          "info",
-          "host.configuration",
-          "系统凭据写入完成",
-          diagnosticContext,
-        );
+        recordDiagnostic("info", "host.configuration", "系统凭据写入完成", diagnosticContext);
       }
     } catch (error) {
-      recordDiagnostic(
-        "error",
-        "host.configuration",
-        "系统凭据写入失败",
-        { ...diagnosticContext, error: commandErrorMessage(error) },
-      );
+      recordDiagnostic("error", "host.configuration", "系统凭据写入失败", {
+        ...diagnosticContext,
+        error: commandErrorMessage(error),
+      });
       if (!editingHost) {
         await Promise.allSettled([
           ...(passwordStored ? [removeHostPassword(hostId)] : []),
-          ...(passphraseStored
-            ? [removePrivateKeyPassphrase(hostId)]
-            : []),
+          ...(passphraseStored ? [removePrivateKeyPassphrase(hostId)] : []),
         ]);
       }
       Message.error("认证凭据保存失败，请检查系统凭据库权限");
@@ -453,38 +397,22 @@ function HostManagerPanel({ onConnect, settings }: HostManagerPanelProps) {
     }
 
     const nextHosts = editingHost
-      ? hosts.map((host) =>
-          host.id === editingHost.id ? { ...host, ...normalized } : host,
-        )
+      ? hosts.map((host) => (host.id === editingHost.id ? { ...host, ...normalized } : host))
       : [...hosts, { id: hostId, ...normalized }];
     try {
-      recordDiagnostic(
-        "info",
-        "host.configuration",
-        "开始写入本地主机配置",
-        diagnosticContext,
-      );
+      recordDiagnostic("info", "host.configuration", "开始写入本地主机配置", diagnosticContext);
       await replaceConfigurationContent(nextHosts, history);
       setHosts(nextHosts);
-      recordDiagnostic(
-        "info",
-        "host.configuration",
-        "本地主机配置写入完成",
-        diagnosticContext,
-      );
+      recordDiagnostic("info", "host.configuration", "本地主机配置写入完成", diagnosticContext);
     } catch (error) {
-      recordDiagnostic(
-        "error",
-        "host.configuration",
-        "本地主机配置写入失败",
-        { ...diagnosticContext, error: commandErrorMessage(error) },
-      );
+      recordDiagnostic("error", "host.configuration", "本地主机配置写入失败", {
+        ...diagnosticContext,
+        error: commandErrorMessage(error),
+      });
       if (!editingHost) {
         await Promise.allSettled([
           ...(passwordStored ? [removeHostPassword(hostId)] : []),
-          ...(passphraseStored
-            ? [removePrivateKeyPassphrase(hostId)]
-            : []),
+          ...(passphraseStored ? [removePrivateKeyPassphrase(hostId)] : []),
         ]);
       }
       Message.error("主机配置保存失败");
@@ -494,49 +422,29 @@ function HostManagerPanel({ onConnect, settings }: HostManagerPanelProps) {
       ...(password
         ? [
             upsertCredentialReference(
-              createCredentialReference(
-                "hostPassword",
-                hostId,
-                `主机：${normalized.name}`,
-              ),
+              createCredentialReference("hostPassword", hostId, `主机：${normalized.name}`),
             ),
           ]
         : []),
       ...(privateKeyPassphrase
         ? [
             upsertCredentialReference(
-              createCredentialReference(
-                "privateKeyPassphrase",
-                hostId,
-                `主机：${normalized.name}`,
-              ),
+              createCredentialReference("privateKeyPassphrase", hostId, `主机：${normalized.name}`),
             ),
           ]
         : []),
     ]);
     if (indexed.some((result) => result.status === "rejected")) {
-      recordDiagnostic(
-        "warn",
-        "host.configuration",
-        "主机已保存但凭据索引更新失败",
-        {
-          ...diagnosticContext,
-          errors: indexed.flatMap((result) =>
-            result.status === "rejected"
-              ? [commandErrorMessage(result.reason)]
-              : [],
-          ),
-        },
-      );
+      recordDiagnostic("warn", "host.configuration", "主机已保存但凭据索引更新失败", {
+        ...diagnosticContext,
+        errors: indexed.flatMap((result) =>
+          result.status === "rejected" ? [commandErrorMessage(result.reason)] : [],
+        ),
+      });
       Message.warning("主机已保存，但凭据索引更新失败，可在隐私与清理中重新扫描");
     }
 
-    recordDiagnostic(
-      "info",
-      "host.configuration",
-      "主机配置保存完成",
-      diagnosticContext,
-    );
+    recordDiagnostic("info", "host.configuration", "主机配置保存完成", diagnosticContext);
     Message.success(editingHost ? "主机信息已更新" : "主机已添加");
 
     setEditorVisible(false);
@@ -549,9 +457,7 @@ function HostManagerPanel({ onConnect, settings }: HostManagerPanelProps) {
       const next = await moveHostToTrash(host.id);
       setHosts(next.hosts);
       if (isTauri()) {
-        await emitProtocolEventTo("settings", "configuration:changed").catch(
-          () => undefined,
-        );
+        await emitProtocolEventTo("settings", "configuration:changed").catch(() => undefined);
       }
       Message.success(`已将 ${host.name} 移至回收站`);
     } catch (error) {
@@ -577,11 +483,7 @@ function HostManagerPanel({ onConnect, settings }: HostManagerPanelProps) {
         credentialsCopied = true;
         if (result.passwordCopied) {
           await upsertCredentialReference(
-            createCredentialReference(
-              "hostPassword",
-              copiedHost.id,
-              `主机：${copiedHost.name}`,
-            ),
+            createCredentialReference("hostPassword", copiedHost.id, `主机：${copiedHost.name}`),
           );
         }
         if (result.passphraseCopied) {
@@ -623,25 +525,19 @@ function HostManagerPanel({ onConnect, settings }: HostManagerPanelProps) {
 
   async function sendConnection(host: HostRecord) {
     let connectionSshKeys = sshKeys;
-    const proxy = host.proxyId
-      ? proxies.find((item) => item.id === host.proxyId)
-      : undefined;
+    const proxy = host.proxyId ? proxies.find((item) => item.id === host.proxyId) : undefined;
     if (host.proxyId && !proxy) {
       Message.error("主机引用的代理不存在，请重新编辑主机");
       return;
     }
-    let jumpHost = host.jumpHostId
-      ? hosts.find((item) => item.id === host.jumpHostId)
-      : undefined;
+    let jumpHost = host.jumpHostId ? hosts.find((item) => item.id === host.jumpHostId) : undefined;
     if (host.jumpHostId && jumpHost && !jumpHost.hostFingerprint) {
       try {
         const configuration = await loadConfiguration();
         setHosts(configuration.hosts);
         setSshKeys(configuration.sshKeys);
         connectionSshKeys = configuration.sshKeys;
-        jumpHost = configuration.hosts.find(
-          (item) => item.id === host.jumpHostId,
-        );
+        jumpHost = configuration.hosts.find((item) => item.id === host.jumpHostId);
       } catch {
         // The existing in-memory validation below will provide the actionable error.
       }
@@ -703,14 +599,9 @@ function HostManagerPanel({ onConnect, settings }: HostManagerPanelProps) {
       connectedAt: now,
     };
 
-    const nextHosts = hosts.map((item) =>
-      item.id === host.id ? storedConnectedHost : item,
-    );
+    const nextHosts = hosts.map((item) => (item.id === host.id ? storedConnectedHost : item));
     const nextHistory = applyConnectionHistoryPolicy(
-      [
-        historyRecord,
-        ...history.filter((item) => connectionTargetKey(item) !== identity),
-      ],
+      [historyRecord, ...history.filter((item) => connectionTargetKey(item) !== identity)],
       settings,
       new Date(now),
     );
@@ -754,8 +645,7 @@ function HostManagerPanel({ onConnect, settings }: HostManagerPanelProps) {
       id: `quick-${connectionTargetKey({ ...normalized, proxyId: quickProxyId })}`,
       name: normalized.address,
       authMethod: quickAuthMethod,
-      sshKeyId:
-        quickAuthMethod === "privateKey" ? quickSshKeyId : undefined,
+      sshKeyId: quickAuthMethod === "privateKey" ? quickSshKeyId : undefined,
       connectTimeoutSeconds: settings.defaultConnectTimeoutSeconds,
       keepAliveIntervalSeconds: settings.defaultKeepAliveIntervalSeconds,
       autoReconnect: settings.defaultAutoReconnect,
@@ -805,11 +695,9 @@ function HostManagerPanel({ onConnect, settings }: HostManagerPanelProps) {
         hostFingerprint: record.hostFingerprint,
         connectTimeoutSeconds: settings.defaultConnectTimeoutSeconds,
         keepAliveIntervalSeconds:
-          record.keepAliveIntervalSeconds ??
-          settings.defaultKeepAliveIntervalSeconds,
+          record.keepAliveIntervalSeconds ?? settings.defaultKeepAliveIntervalSeconds,
         autoReconnect: record.autoReconnect ?? settings.defaultAutoReconnect,
-        maxReconnectAttempts:
-          record.maxReconnectAttempts ?? settings.defaultMaxReconnectAttempts,
+        maxReconnectAttempts: record.maxReconnectAttempts ?? settings.defaultMaxReconnectAttempts,
         proxyId: record.proxyId,
         jumpHostId: record.jumpHostId,
         localPortForwards: record.localPortForwards,
@@ -862,8 +750,7 @@ function HostManagerPanel({ onConnect, settings }: HostManagerPanelProps) {
     {
       title: "最近连接",
       width: 150,
-      render: (_, row) =>
-        row.type === "host" ? formatTime(row.host.lastConnectedAt) : null,
+      render: (_, row) => (row.type === "host" ? formatTime(row.host.lastConnectedAt) : null),
     },
     {
       title: "操作",
@@ -926,13 +813,30 @@ function HostManagerPanel({ onConnect, settings }: HostManagerPanelProps) {
                 icon={<WorkspaceIcon name="download" />}
                 onClick={async () => {
                   try {
-                    const path = await open({ multiple: false, directory: false, title: "选择 OpenSSH 配置文件" });
-                    if (typeof path === "string") {
-                      setSshImportContents(await expandSshConfig(
-                        path,
-                        (file) => invoke<string>("read_config_file", { path: file }),
-                        (pattern) => invoke<string[]>("ssh_config_include_files", { root: path, pattern }),
-                      ));
+                    const picked = await pickLocalPath({
+                      mode: "open",
+                      title: "选择 OpenSSH 配置文件",
+                    });
+                    if (picked) {
+                      const includeTokens = new Map<string, string>();
+                      const expanded = await expandSshConfig(
+                        picked.path,
+                        async (file) => {
+                          const token =
+                            file === picked.path ? picked.token : includeTokens.get(file);
+                          if (!token) throw new Error(`缺少配置文件访问令牌：${file}`);
+                          return invoke<string>("read_config_file", { token });
+                        },
+                        async (pattern) => {
+                          const files = await invoke<{ path: string; token: string }[]>(
+                            "ssh_config_include_files",
+                            { root: picked.path, pattern },
+                          );
+                          for (const file of files) includeTokens.set(file.path, file.token);
+                          return files.map((file) => file.path);
+                        },
+                      );
+                      setSshImportContents(expanded);
                     }
                   } catch (error) {
                     Message.error(commandErrorMessage(error));
@@ -1002,9 +906,7 @@ function HostManagerPanel({ onConnect, settings }: HostManagerPanelProps) {
             expandProps={{ expandRowByClick: true }}
             indentSize={20}
             loading={configurationLoading}
-            noDataElement={
-              <Empty description={keyword ? "没有匹配的主机" : "暂无主机"} />
-            }
+            noDataElement={<Empty description={keyword ? "没有匹配的主机" : "暂无主机"} />}
             onRow={(row) => ({
               onDoubleClick: (event) => {
                 if (
@@ -1022,9 +924,7 @@ function HostManagerPanel({ onConnect, settings }: HostManagerPanelProps) {
             })}
             pagination={false}
             rowClassName={(row) =>
-              row.type === "group"
-                ? "host-table-group-row"
-                : "host-table-host-row"
+              row.type === "group" ? "host-table-group-row" : "host-table-host-row"
             }
             rowKey="id"
             scroll={{ y: hostTableBodyHeight }}

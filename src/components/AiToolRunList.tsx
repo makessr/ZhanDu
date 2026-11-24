@@ -1,9 +1,4 @@
-import {
-  Button,
-  Spin,
-  Tooltip,
-  Typography,
-} from "@arco-design/web-react";
+import { Button, Spin, Tooltip, Typography } from "@arco-design/web-react";
 import {
   IconCheckCircle,
   IconCloseCircle,
@@ -25,9 +20,7 @@ interface AiToolRunListProps {
 
 export function aiToolRunDuration(durationMs?: number) {
   if (durationMs === undefined) return "";
-  return durationMs < 1_000
-    ? `${durationMs} ms`
-    : `${(durationMs / 1_000).toFixed(1)} 秒`;
+  return durationMs < 1_000 ? `${durationMs} ms` : `${(durationMs / 1_000).toFixed(1)} 秒`;
 }
 
 function runStatus(run: AiToolRun) {
@@ -73,15 +66,11 @@ function AiToolRunList({
           >
             <div className="ai-tool-run-heading">
               <span className="ai-tool-run-icon">{runStatusIcon(run)}</span>
-              <Typography.Text
-                title={run.detail ? `${run.label} · ${run.detail}` : run.label}
-              >
+              <Typography.Text title={run.detail ? `${run.label} · ${run.detail}` : run.label}>
                 {run.label}
                 {run.detail ? ` · ${run.detail}` : ""}
               </Typography.Text>
-              <Typography.Text type="secondary">
-                {runStatus(run)}
-              </Typography.Text>
+              <Typography.Text type="secondary">{runStatus(run)}</Typography.Text>
               <span className="ai-tool-run-actions">
                 {hasDetail && (
                   <Tooltip content={expanded ? "收起结果" : "展开结果"}>

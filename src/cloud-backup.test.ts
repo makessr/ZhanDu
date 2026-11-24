@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  DEFAULT_CLOUD_BACKUP_SETTINGS,
-  sanitizeCloudBackupSettings,
-} from "./cloud-backup";
+import { DEFAULT_CLOUD_BACKUP_SETTINGS, sanitizeCloudBackupSettings } from "./cloud-backup";
 
 describe("cloud backup settings", () => {
   test("keeps S3 connection metadata separate from application settings", () => {

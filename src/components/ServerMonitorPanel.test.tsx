@@ -34,25 +34,27 @@ function session(status: TerminalSession["status"]): TerminalSession {
 
 describe("ServerMonitorPanel", () => {
   test("shows charts automatically and pauses hidden monitoring", async () => {
-    const collect = mock(() => Promise.resolve({
-      collectedAt: Date.now(),
-      hostname: "test-host",
-      loadAverage: [0, 0, 0],
-      cpuUsagePercent: 5,
-      memoryUsagePercent: 60,
-      diskUsagePercent: 32,
-      memoryUsedBytes: 2 ** 30,
-      memoryTotalBytes: 2 ** 31,
-      swap: { usagePercent: 80, usedBytes: 1_048_576, totalBytes: 2 ** 32 },
-      sshLatencyMs: 16.72,
-      networkReceiveBytes: 800,
-      networkTransmitBytes: 400,
-      networkInterfaces: [{ name: "eth0", receiveBytes: 200, transmitBytes: 100 }],
-      diskMounts: [
-        { path: "/", availableBytes: 20 * 1024 ** 3, totalBytes: 40 * 1024 ** 3 },
-        { path: "/boot/efi", availableBytes: 477 * 1024 ** 2, totalBytes: 486 * 1024 ** 2 },
-      ],
-    }));
+    const collect = mock(() =>
+      Promise.resolve({
+        collectedAt: Date.now(),
+        hostname: "test-host",
+        loadAverage: [0, 0, 0],
+        cpuUsagePercent: 5,
+        memoryUsagePercent: 60,
+        diskUsagePercent: 32,
+        memoryUsedBytes: 2 ** 30,
+        memoryTotalBytes: 2 ** 31,
+        swap: { usagePercent: 80, usedBytes: 1_048_576, totalBytes: 2 ** 32 },
+        sshLatencyMs: 16.72,
+        networkReceiveBytes: 800,
+        networkTransmitBytes: 400,
+        networkInterfaces: [{ name: "eth0", receiveBytes: 200, transmitBytes: 100 }],
+        diskMounts: [
+          { path: "/", availableBytes: 20 * 1024 ** 3, totalBytes: 40 * 1024 ** 3 },
+          { path: "/boot/efi", availableBytes: 477 * 1024 ** 2, totalBytes: 486 * 1024 ** 2 },
+        ],
+      }),
+    );
     mockIPC((command) => {
       if (command === "ssh_monitor_snapshot") return collect();
     });
@@ -78,10 +80,18 @@ describe("ServerMonitorPanel", () => {
       expect(await screen.findByText("test-host")).not.toBeNull();
       expect(collect).toHaveBeenCalledTimes(1);
       expect(screen.getByRole("meter", { name: "CPU" }).getAttribute("aria-valuenow")).toBe("5");
-      expect(screen.getByRole("meter", { name: "内存" }).getAttribute("aria-valuetext")).toContain("1.0 GB / 2.0 GB");
-      expect(screen.getByRole("meter", { name: "CPU" }).getAttribute("data-usage-level")).toBe("low");
-      expect(screen.getByRole("meter", { name: "内存" }).getAttribute("data-usage-level")).toBe("medium");
-      expect(screen.getByRole("meter", { name: "交换" }).getAttribute("data-usage-level")).toBe("high");
+      expect(screen.getByRole("meter", { name: "内存" }).getAttribute("aria-valuetext")).toContain(
+        "1.0 GB / 2.0 GB",
+      );
+      expect(screen.getByRole("meter", { name: "CPU" }).getAttribute("data-usage-level")).toBe(
+        "low",
+      );
+      expect(screen.getByRole("meter", { name: "内存" }).getAttribute("data-usage-level")).toBe(
+        "medium",
+      );
+      expect(screen.getByRole("meter", { name: "交换" }).getAttribute("data-usage-level")).toBe(
+        "high",
+      );
       expect(screen.getByLabelText("SSH 延迟").textContent).toBe("16.7 ms");
       expect(screen.getByText("/boot/efi")).not.toBeNull();
       expect(screen.getByText("477 MB / 486 MB")).not.toBeNull();
@@ -121,10 +131,13 @@ describe("ServerMonitorPanel", () => {
       value: true,
     });
     mockWindows("main");
-    mockIPC((command) => {
-      if (command === "plugin:window|is_minimized") return checkMinimized();
-      if (command === "ssh_monitor_snapshot") return collect();
-    }, { shouldMockEvents: true });
+    mockIPC(
+      (command) => {
+        if (command === "plugin:window|is_minimized") return checkMinimized();
+        if (command === "ssh_monitor_snapshot") return collect();
+      },
+      { shouldMockEvents: true },
+    );
     const view = render(
       <ServerMonitorPanel
         visible
@@ -167,9 +180,7 @@ describe("ServerMonitorPanel", () => {
 
     const monitor = container.querySelector(".server-monitor");
     expect(monitor?.classList.contains("is-unavailable")).toBe(true);
-    expect(container.querySelector(".monitor-system-facts")?.textContent).toBe(
-      "系统-主机名-内核-",
-    );
+    expect(container.querySelector(".monitor-system-facts")?.textContent).toBe("系统-主机名-内核-");
     expect(onSnapshotChange).toHaveBeenCalledWith("session-1", null);
   });
 

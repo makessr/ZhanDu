@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Message } from "@arco-design/web-react";
 import { isTauri } from "@tauri-apps/api/core";
-import {
-  loadConfiguration,
-  MAX_SFTP_PATH_HISTORY,
-} from "../../config-database";
+import { loadConfiguration, MAX_SFTP_PATH_HISTORY } from "../../config-database";
 import { updateSftpLocation } from "../../configuration-mutations";
 import type { SftpLocationRecord } from "../../models";
 import { addRemotePathHistory } from "../../sftp-utils";
@@ -17,16 +14,11 @@ const EMPTY_SFTP_LOCATION: SftpLocationRecord = {
 };
 
 function samePaths(left: string[], right: string[]) {
-  return (
-    left.length === right.length &&
-    left.every((path, index) => path === right[index])
-  );
+  return left.length === right.length && left.every((path, index) => path === right[index]);
 }
 
 export default function useSftpLocations() {
-  const [locations, setLocations] = useState<
-    Record<string, SftpLocationRecord>
-  >({});
+  const [locations, setLocations] = useState<Record<string, SftpLocationRecord>>({});
   const locationsRef = useRef(locations);
   const persistenceErrorRef = useRef(false);
   const editVersion = useRef(0);
@@ -61,10 +53,7 @@ export default function useSftpLocations() {
   }, [applyLocations]);
 
   const commitLocation = useCallback(
-    (
-      hostId: string,
-      update: (current: SftpLocationRecord) => SftpLocationRecord,
-    ) => {
+    (hostId: string, update: (current: SftpLocationRecord) => SftpLocationRecord) => {
       const current = locationsRef.current[hostId] ?? {
         ...EMPTY_SFTP_LOCATION,
         hostId,
@@ -99,11 +88,7 @@ export default function useSftpLocations() {
     (hostId: string, path: string) => {
       commitLocation(hostId, (current) => ({
         ...current,
-        history: addRemotePathHistory(
-          current.history,
-          path,
-          MAX_SFTP_PATH_HISTORY,
-        ),
+        history: addRemotePathHistory(current.history, path, MAX_SFTP_PATH_HISTORY),
       }));
     },
     [commitLocation],
@@ -111,9 +96,7 @@ export default function useSftpLocations() {
 
   const locationForHost = useCallback(
     (hostId?: string) =>
-      hostId
-        ? (locations[hostId] ?? { ...EMPTY_SFTP_LOCATION, hostId })
-        : EMPTY_SFTP_LOCATION,
+      hostId ? (locations[hostId] ?? { ...EMPTY_SFTP_LOCATION, hostId }) : EMPTY_SFTP_LOCATION,
     [locations],
   );
 

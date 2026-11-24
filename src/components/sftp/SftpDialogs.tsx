@@ -89,9 +89,9 @@ export function TextEditorDialog({
       okButtonProps={{
         disabled: Boolean(
           state?.loading ||
-            !state?.document ||
-            state.content === state.document.content ||
-            byteLength > maxBytes,
+          !state?.document ||
+          state.content === state.document.content ||
+          byteLength > maxBytes,
         ),
       }}
       okText="保存"
@@ -116,10 +116,7 @@ export function TextEditorDialog({
             disabled={Boolean(state?.loading || state?.saving)}
             onChange={onChange}
             onKeyDown={(event) => {
-              if (
-                (event.metaKey || event.ctrlKey) &&
-                event.key.toLowerCase() === "s"
-              ) {
+              if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
                 event.preventDefault();
                 onSave();
               }
@@ -356,8 +353,7 @@ export function PermissionsDialog({
   parsedPermission,
   permission,
 }: PermissionsDialogProps) {
-  const selectedFlags =
-    parsedPermission === null ? [] : permissionFlagsFromValue(parsedPermission);
+  const selectedFlags = parsedPermission === null ? [] : permissionFlagsFromValue(parsedPermission);
   return (
     <Modal
       confirmLoading={loading}
@@ -384,9 +380,7 @@ export function PermissionsDialog({
             addBefore="用户组"
             maxLength={128}
             onChange={onGroupChange}
-            placeholder={
-              entries.length > 1 ? "留空保持不变" : "用户组名称或 GID"
-            }
+            placeholder={entries.length > 1 ? "留空保持不变" : "用户组名称或 GID"}
             value={group}
           />
         </div>
@@ -394,9 +388,7 @@ export function PermissionsDialog({
           addBefore="权限"
           autoFocus
           maxLength={4}
-          onChange={(value) =>
-            onPermissionChange(value.replace(/[^0-7]/g, "").slice(0, 4))
-          }
+          onChange={(value) => onPermissionChange(value.replace(/[^0-7]/g, "").slice(0, 4))}
           onPressEnter={onConfirm}
           placeholder={entries.length > 1 ? "留空保持不变" : "755"}
           status={permission && parsedPermission === null ? "error" : undefined}
@@ -406,10 +398,7 @@ export function PermissionsDialog({
           onChange={(values) => {
             onPermissionChange(
               formatPermissions(
-                permissionValueFromFlags(
-                  values as PermissionFlag[],
-                  parsedPermission ?? 0,
-                ),
+                permissionValueFromFlags(values as PermissionFlag[], parsedPermission ?? 0),
               ),
             );
           }}
@@ -425,19 +414,14 @@ export function PermissionsDialog({
             {PERMISSION_MATRIX_ROWS.map(({ label, scope }) => (
               <div className="sftp-permission-matrix-row" key={scope}>
                 <span>{label}</span>
-                {PERMISSION_MATRIX_COLUMNS.map(
-                  ({ capability, label: action }) => {
-                    const value = `${scope}-${capability}` as PermissionFlag;
-                    return (
-                      <span className="sftp-permission-checkbox" key={value}>
-                        <Checkbox
-                          aria-label={`${label}${action}权限`}
-                          value={value}
-                        />
-                      </span>
-                    );
-                  },
-                )}
+                {PERMISSION_MATRIX_COLUMNS.map(({ capability, label: action }) => {
+                  const value = `${scope}-${capability}` as PermissionFlag;
+                  return (
+                    <span className="sftp-permission-checkbox" key={value}>
+                      <Checkbox aria-label={`${label}${action}权限`} value={value} />
+                    </span>
+                  );
+                })}
               </div>
             ))}
           </div>

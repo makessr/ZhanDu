@@ -23,18 +23,11 @@ const HOST: HostRecord = {
 describe("known host fingerprints", () => {
   test("normalizes SHA256 fingerprints", () => {
     expect(normalizeHostFingerprint(" abc123 ")).toBe("SHA256:abc123");
-    expect(normalizeHostFingerprint("SHA256:abc123")).toBe(
-      "SHA256:abc123",
-    );
+    expect(normalizeHostFingerprint("SHA256:abc123")).toBe("SHA256:abc123");
   });
 
   test("keeps the first seen time while refreshing the same fingerprint", () => {
-    const first = upsertKnownHostRecord(
-      [],
-      HOST,
-      "SHA256:first",
-      "2026-07-20T00:00:00.000Z",
-    );
+    const first = upsertKnownHostRecord([], HOST, "SHA256:first", "2026-07-20T00:00:00.000Z");
     const refreshed = upsertKnownHostRecord(
       first,
       HOST,
@@ -47,18 +40,8 @@ describe("known host fingerprints", () => {
   });
 
   test("starts a new trust period when the fingerprint changes", () => {
-    const first = upsertKnownHostRecord(
-      [],
-      HOST,
-      "SHA256:first",
-      "2026-07-20T00:00:00.000Z",
-    );
-    const changed = upsertKnownHostRecord(
-      first,
-      HOST,
-      "SHA256:second",
-      "2026-07-22T00:00:00.000Z",
-    );
+    const first = upsertKnownHostRecord([], HOST, "SHA256:first", "2026-07-20T00:00:00.000Z");
+    const changed = upsertKnownHostRecord(first, HOST, "SHA256:second", "2026-07-22T00:00:00.000Z");
 
     expect(changed[0].fingerprint).toBe("SHA256:second");
     expect(changed[0].firstSeenAt).toBe("2026-07-22T00:00:00.000Z");
@@ -93,12 +76,7 @@ describe("known host fingerprints", () => {
   });
 
   test("clears trust from every account using the removed endpoint", () => {
-    const records = upsertKnownHostRecord(
-      [],
-      HOST,
-      "SHA256:first",
-      "2026-07-20T00:00:00.000Z",
-    );
+    const records = upsertKnownHostRecord([], HOST, "SHA256:first", "2026-07-20T00:00:00.000Z");
     const result = removeKnownHostTrust(
       records,
       [

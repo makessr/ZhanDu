@@ -6,10 +6,7 @@ import {
   aiConversationTitleFromPrompt,
   type AiConversationSummaryRecord,
 } from "../ai-conversations";
-import {
-  buildAiConversationRequestMessages,
-} from "../ai-summaries";
-import { AiStreamBuffer } from "../ai-stream-buffer";
+import { buildAiConversationRequestMessages } from "../ai-summaries";
 import { finishAiToolRun } from "../ai-tools";
 import type { AiRemoteFileContext } from "../ai-utils";
 import { diagnosticInvoke } from "../diagnostics";
@@ -19,25 +16,15 @@ import {
   listenProtocolEvent,
   type AgentApprovalMode,
   type AgentTask,
-  type AgentTaskEventPayload,
   type AgentTaskRecoveryContext,
   type AgentTaskRecoveryDecision,
-  type AgentTaskSync,
   type AiChatResult,
   type AiRequestTelemetry,
-  type AiStreamPayload,
   type AiToolRound,
   type TauriCommand,
 } from "../tauri-protocol";
 import type { AiConversation, AiMessage } from "./useAiConversations";
-import {
-  agentTaskIsTerminal,
-  mergeAgentPlanIntoMessage,
-} from "./ai-agent-plan-presentation";
-import {
-  applyAgentTaskEvent,
-  reconcileAgentTaskSync,
-} from "./agent-task-event-state";
+import { mergeAgentPlanIntoMessage } from "./ai-agent-plan-presentation";
 import {
   aiProposalRoundHasPendingApprovals,
   prepareAiProposalRound,
@@ -46,19 +33,18 @@ import {
 import { createAiRequestId } from "./ai-request-id";
 import { useAiConversationSummaryQueue } from "./useAiConversationSummaryQueue";
 import { useAiProposalApprovals } from "./useAiProposalApprovals";
+import { useAiStreamBridge } from "./useAiStreamBridge";
+import type { AiStreamListener } from "./useAiStreamBridge";
+import { useAiTaskRecovery } from "./useAiTaskRecovery";
+import type { ActiveAiRequest, AiTaskListener } from "./useAiTaskRecovery";
+
+export type { AiStreamListener } from "./useAiStreamBridge";
+export type { AiTaskListener } from "./useAiTaskRecovery";
 
 export type AiRequestInvoke = <T>(
   command: TauriCommand,
   args?: Record<string, unknown>,
 ) => Promise<T>;
-
-export type AiStreamListener = (
-  callback: (payload: AiStreamPayload) => void,
-) => Promise<() => void>;
-
-export type AiTaskListener = (
-  callback: (payload: AgentTaskEventPayload) => void,
-) => Promise<() => void>;
 
 interface SendAiMessageOptions {
   approvalModeOverride?: AgentApprovalMode;
@@ -112,21 +98,13 @@ interface UseAiRequestOrchestratorOptions {
   ) => AiConversation | undefined;
 }
 
-interface ActiveAiRequest {
-  assistantId: string;
-  conversationId: string;
-  hostId: string;
-  requestId: string;
-}
-
 interface ActiveDiagnosticPlanLocation {
   conversationId: string;
   hostId: string;
   messageId: string;
 }
 
-const defaultInvoke: AiRequestInvoke = (command, args) =>
-  diagnosticInvoke(command, args);
+const defaultInvoke: AiRequestInvoke = (command, args) => diagnosticInvoke(command, args);
 
 const defaultStreamListener: AiStreamListener = (callback) =>
   listenProtocolEvent("ai-stream", ({ payload }) => callback(payload));
@@ -194,34 +172,9 @@ export function useAiRequestOrchestrator({
   updateMessages,
 }: UseAiRequestOrchestratorOptions) {
   const [sending, setSending] = useState(false);
-  const [activeTask, setActiveTask] = useState<AgentTask>();
-  const activeTaskRef = useRef<AgentTask>();
   const activeRequestRef = useRef<ActiveAiRequest>();
-  const streamBufferRef = useRef<AiStreamBuffer>();
-  streamBufferRef.current ??= new AiStreamBuffer((target, chunk) =>
-    callbacksRef.current.updateMessages(
-      target.hostId,
-      target.conversationId,
-      (current) =>
-        current.map((message) =>
-          message.id === target.assistantId
-            ? {
-                ...message,
-                content: message.content + chunk.content,
-                ...(chunk.reasoning
-                  ? { reasoning: `${message.reasoning ?? ""}${chunk.reasoning}` }
-                  : {}),
-              }
-            : message,
-        ),
-    ),
-  );
-  const streamBuffer = streamBufferRef.current;
-  const trackedTaskIdRef = useRef<string>();
   const cancelledRequestsRef = useRef(new Set<string>());
-  const activeDiagnosticPlansRef = useRef(
-    new Map<string, ActiveDiagnosticPlanLocation>(),
-  );
+  const activeDiagnosticPlansRef = useRef(new Map<string, ActiveDiagnosticPlanLocation>());
   const backendDiagnosticPlanTasksRef = useRef(new Map<string, string>());
   const stoppedDiagnosticPlansRef = useRef(new Set<string>());
   const callbacksRef = useRef({
@@ -238,14 +191,14 @@ export function useAiRequestOrchestrator({
     onSummaryError,
     updateMessages,
   };
-  const { queueConversationSummary, summarizingConversationIds } =
-    useAiConversationSummaryQueue({
-      invoke,
-      onSummaryError,
-      persistConversation,
-      settings,
-      updateConversation,
-    });
+  const { streamBuffer } = useAiStreamBridge({ listenToStream, updateMessages });
+  const { queueConversationSummary, summarizingConversationIds } = useAiConversationSummaryQueue({
+    invoke,
+    onSummaryError,
+    persistConversation,
+    settings,
+    updateConversation,
+  });
   const {
     decideCommandProposal,
     decideFileProposal,
@@ -254,11 +207,6 @@ export function useAiRequestOrchestrator({
     waitForCommandApproval,
     waitForFileApproval,
   } = useAiProposalApprovals();
-
-  const commitActiveTask = useCallback((task: AgentTask | undefined) => {
-    activeTaskRef.current = task;
-    setActiveTask(task);
-  }, []);
 
   const projectTaskPlan = useCallback(
     (task: AgentTask, activeRequest: ActiveAiRequest | undefined) => {
@@ -343,8 +291,7 @@ export function useAiRequestOrchestrator({
   );
 
   const reviseDiagnosticPlan = useCallback(
-    (planId: string, feedback: string) =>
-      decideDiagnosticPlan(planId, "reject", [], feedback),
+    (planId: string, feedback: string) => decideDiagnosticPlan(planId, "reject", [], feedback),
     [decideDiagnosticPlan],
   );
 
@@ -364,139 +311,52 @@ export function useAiRequestOrchestrator({
       }
       const location = activeDiagnosticPlansRef.current.get(planId);
       if (!location) return;
-      updateMessages(
-        location.hostId,
-        location.conversationId,
-        (messages) =>
-          messages.map((message) =>
-            message.id === location.messageId
-              ? {
-                  ...message,
-                  diagnosticPlans: message.diagnosticPlans?.map((plan) =>
-                    plan.id === planId
-                      ? { ...plan, stopRequested: true }
-                      : plan,
-                  ),
-                }
-              : message,
-          ),
+      updateMessages(location.hostId, location.conversationId, (messages) =>
+        messages.map((message) =>
+          message.id === location.messageId
+            ? {
+                ...message,
+                diagnosticPlans: message.diagnosticPlans?.map((plan) =>
+                  plan.id === planId ? { ...plan, stopRequested: true } : plan,
+                ),
+              }
+            : message,
+        ),
       );
     },
     [invoke, updateMessages],
   );
 
+  const resetTaskRef = useRef<() => void>(() => undefined);
+
   useEffect(() => {
     const activeRequest = activeRequestRef.current;
     if (activeRequest) {
       cancelledRequestsRef.current.add(activeRequest.requestId);
-      rejectPendingCommandApprovals(
-        activeRequest.requestId,
-        "终端会话已切换，AI 审批已取消",
-      );
-      rejectPendingFileApprovals(
-        activeRequest.requestId,
-        "终端会话已切换，AI 审批已取消",
-      );
+      rejectPendingCommandApprovals(activeRequest.requestId, "终端会话已切换，AI 审批已取消");
+      rejectPendingFileApprovals(activeRequest.requestId, "终端会话已切换，AI 审批已取消");
       void invoke("ai_chat_cancel", {
         requestId: activeRequest.requestId,
       }).catch(() => undefined);
       callbacksRef.current.onSessionSwitchInterrupt?.();
     }
     activeRequestRef.current = undefined;
-    trackedTaskIdRef.current = undefined;
     activeDiagnosticPlansRef.current.clear();
     backendDiagnosticPlanTasksRef.current.clear();
     stoppedDiagnosticPlansRef.current.clear();
-    commitActiveTask(undefined);
+    resetTaskRef.current();
     setSending(false);
-  }, [
+  }, [invoke, rejectPendingCommandApprovals, rejectPendingFileApprovals, sessionId]);
+
+  const { activeTask, commitActiveTask, resetTask, trackTaskId } = useAiTaskRecovery({
     invoke,
-    rejectPendingCommandApprovals,
-    rejectPendingFileApprovals,
-    commitActiveTask,
-    sessionId,
-  ]);
-
-  useEffect(() => {
-    let disposed = false;
-    let stopStream: (() => void) | undefined;
-    void listenToStream((payload) => {
-      streamBuffer.push(
-        payload.requestId,
-        payload.kind === "reasoning" ? "reasoning" : "content",
-        payload.delta,
-      );
-    }).then((unlisten) => {
-      if (disposed) unlisten();
-      else stopStream = unlisten;
-    });
-    return () => {
-      disposed = true;
-      stopStream?.();
-    };
-  }, [listenToStream]);
-
-  useEffect(() => {
-    let disposed = false;
-    let stopTaskEvents: (() => void) | undefined;
-    void listenToTaskEvents((payload) => {
-      const activeRequest = activeRequestRef.current;
-      const trackedTaskId = activeRequest?.requestId ?? trackedTaskIdRef.current;
-      const next = applyAgentTaskEvent(
-        activeTaskRef.current,
-        trackedTaskId,
-        payload,
-      );
-      if (!next || next === activeTaskRef.current) return;
-      commitActiveTask(next);
-      projectTaskPlan(next, activeRequest);
-      if (agentTaskIsTerminal(next)) setSending(false);
-    })
-      .then((unlisten) => {
-        if (disposed) unlisten();
-        else stopTaskEvents = unlisten;
-      })
-      .catch(() => undefined);
-    return () => {
-      disposed = true;
-      stopTaskEvents?.();
-    };
-  }, [commitActiveTask, listenToTaskEvents, projectTaskPlan]);
-
-  useEffect(() => {
-    if (!restoreTaskId) {
-      if (!activeRequestRef.current) {
-        trackedTaskIdRef.current = undefined;
-        commitActiveTask(undefined);
-      }
-      return;
-    }
-    trackedTaskIdRef.current = restoreTaskId;
-    let disposed = false;
-    const currentSequence =
-      activeTaskRef.current?.id === restoreTaskId
-        ? activeTaskRef.current.lastEventSequence
-        : 0;
-    void invoke<AgentTaskSync>("ai_task_sync", {
-      taskId: restoreTaskId,
-      afterSequence: currentSequence,
-    })
-      .then((sync) => {
-        if (disposed || trackedTaskIdRef.current !== restoreTaskId) return;
-        const next = reconcileAgentTaskSync(
-          activeTaskRef.current,
-          restoreTaskId,
-          sync,
-        );
-        if (!next || next === activeTaskRef.current) return;
-        commitActiveTask(next);
-        projectTaskPlan(next, activeRequestRef.current);
-      })
-      .catch(() => undefined);
-    return () => {
-      disposed = true;
-    };
-  }, [commitActiveTask, invoke, projectTaskPlan, restoreTaskId]);
+    listenToTaskEvents,
+    restoreTaskId,
+    getActiveRequest: () => activeRequestRef.current,
+    onTaskChange: projectTaskPlan,
+    onTerminal: () => setSending(false),
+  });
+  resetTaskRef.current = resetTask;
 
   const sendMessage = useCallback(
     async ({
@@ -543,7 +403,7 @@ export function useAiRequestOrchestrator({
         hostId: targetHostId,
         requestId,
       };
-      trackedTaskIdRef.current = requestId;
+      trackTaskId(requestId);
       updateConversation(targetHostId, targetConversationId, (current) => ({
         ...current,
         title:
@@ -621,10 +481,7 @@ export function useAiRequestOrchestrator({
             // Deltas that arrive after the turn's result are dropped.
             streamBuffer.end();
           }
-          requestTelemetry = mergeAiRequestTelemetry(
-            requestTelemetry,
-            result.telemetry,
-          );
+          requestTelemetry = mergeAiRequestTelemetry(requestTelemetry, result.telemetry);
           for (const plan of result.diagnosticPlans ?? []) {
             backendDiagnosticPlanTasksRef.current.set(plan.id, requestId);
             updateMessages(targetHostId, targetConversationId, (current) =>
@@ -636,29 +493,23 @@ export function useAiRequestOrchestrator({
             );
           }
           toolRounds.push(...(result.diagnosticToolRounds ?? []));
-          validateAiActionIntents(
-            result.toolCalls,
-            result.actionIntents ?? [],
-          );
+          validateAiActionIntents(result.toolCalls, result.actionIntents ?? []);
           if (!result.toolCalls.length) {
             if (result.content.trim()) {
               responseParts.push(result.content.trim());
             }
-            completed = updateMessages(
-              targetHostId,
-              targetConversationId,
-              (current) =>
-                current.map((message) =>
-                  message.id === assistantMessage.id
-                    ? {
-                        ...message,
-                        content: responseParts.join("\n\n"),
-                        error: undefined,
-                        failed: false,
-                        telemetry: requestTelemetry,
-                      }
-                    : message,
-                ),
+            completed = updateMessages(targetHostId, targetConversationId, (current) =>
+              current.map((message) =>
+                message.id === assistantMessage.id
+                  ? {
+                      ...message,
+                      content: responseParts.join("\n\n"),
+                      error: undefined,
+                      failed: false,
+                      telemetry: requestTelemetry,
+                    }
+                  : message,
+              ),
             );
             break;
           }
@@ -704,21 +555,16 @@ export function useAiRequestOrchestrator({
           if (aiProposalRoundHasPendingApprovals(proposalRound)) {
             await persistConversation(proposalConversation);
           }
-          const decisions = await resolveAiProposalRound(
-            result.toolCalls,
-            proposalRound,
-            () => cancelledRequestsRef.current.has(requestId),
+          const decisions = await resolveAiProposalRound(result.toolCalls, proposalRound, () =>
+            cancelledRequestsRef.current.has(requestId),
           );
-          const toolResults = await invoke<AiToolRound["results"]>(
-            "ai_task_action_results",
-            {
-              request: {
-                taskId: requestId,
-                calls: result.toolCalls,
-                decisions,
-              },
+          const toolResults = await invoke<AiToolRound["results"]>("ai_task_action_results", {
+            request: {
+              taskId: requestId,
+              calls: result.toolCalls,
+              decisions,
             },
-          );
+          });
           toolRounds.push({
             calls: result.toolCalls,
             content: result.content.trim() || undefined,
@@ -733,64 +579,52 @@ export function useAiRequestOrchestrator({
         const cancelled =
           cancelledRequestsRef.current.has(requestId) ||
           (error instanceof FineShellCommandError && error.code === "cancelled");
-        const failedConversation = updateMessages(
-          targetHostId,
-          targetConversationId,
-          (current) =>
-            current.map((message) =>
-              message.id === assistantMessage.id
-                ? (() => {
-                    const toolRuns = message.toolRuns?.map((run) =>
-                      run.status === "running" || run.status === "pending"
-                        ? finishAiToolRun(
-                            run.status === "pending"
-                              ? { ...run, startedAt: Date.now() }
-                              : run,
-                            {
-                              error: cancelled ? "已停止" : "调用未完成",
-                              status: cancelled ? "cancelled" : "failed",
-                              summary: cancelled
-                                ? "用户已停止生成"
-                                : "调用未完成",
-                            },
-                          )
-                        : run,
-                    );
-                    return {
-                      ...message,
-                      commandProposals: message.commandProposals?.map(
-                        (proposal) =>
-                          proposal.status === "pending"
-                            ? { ...proposal, status: "rejected" as const }
-                            : proposal,
-                      ),
-                      fileEditProposals: message.fileEditProposals?.map(
-                        (proposal) =>
-                          proposal.status === "pending"
-                            ? { ...proposal, status: "rejected" as const }
-                            : proposal,
-                      ),
-                      fileOperationProposals:
-                        message.fileOperationProposals?.map((proposal) =>
-                          proposal.status === "pending"
-                            ? { ...proposal, status: "rejected" as const }
-                            : proposal,
-                        ),
-                      failed: true,
-                      telemetry: requestTelemetry,
-                      error: cancelled
-                        ? "已停止生成"
-                        : commandErrorMessage(error),
-                      diagnosticPlans: message.diagnosticPlans?.map((plan) =>
-                        plan.status === "pending" || plan.status === "running"
-                          ? completeAiDiagnosticPlan(plan, toolRuns ?? [])
-                          : plan,
-                      ),
-                      toolRuns,
-                    };
-                  })()
-                : message,
-            ),
+        const failedConversation = updateMessages(targetHostId, targetConversationId, (current) =>
+          current.map((message) =>
+            message.id === assistantMessage.id
+              ? (() => {
+                  const toolRuns = message.toolRuns?.map((run) =>
+                    run.status === "running" || run.status === "pending"
+                      ? finishAiToolRun(
+                          run.status === "pending" ? { ...run, startedAt: Date.now() } : run,
+                          {
+                            error: cancelled ? "已停止" : "调用未完成",
+                            status: cancelled ? "cancelled" : "failed",
+                            summary: cancelled ? "用户已停止生成" : "调用未完成",
+                          },
+                        )
+                      : run,
+                  );
+                  return {
+                    ...message,
+                    commandProposals: message.commandProposals?.map((proposal) =>
+                      proposal.status === "pending"
+                        ? { ...proposal, status: "rejected" as const }
+                        : proposal,
+                    ),
+                    fileEditProposals: message.fileEditProposals?.map((proposal) =>
+                      proposal.status === "pending"
+                        ? { ...proposal, status: "rejected" as const }
+                        : proposal,
+                    ),
+                    fileOperationProposals: message.fileOperationProposals?.map((proposal) =>
+                      proposal.status === "pending"
+                        ? { ...proposal, status: "rejected" as const }
+                        : proposal,
+                    ),
+                    failed: true,
+                    telemetry: requestTelemetry,
+                    error: cancelled ? "已停止生成" : commandErrorMessage(error),
+                    diagnosticPlans: message.diagnosticPlans?.map((plan) =>
+                      plan.status === "pending" || plan.status === "running"
+                        ? completeAiDiagnosticPlan(plan, toolRuns ?? [])
+                        : plan,
+                    ),
+                    toolRuns,
+                  };
+                })()
+              : message,
+          ),
         );
         await persistConversation(failedConversation);
         return undefined;
@@ -825,6 +659,8 @@ export function useAiRequestOrchestrator({
       settings.aiFileProposalsEnabled,
       settings.aiModel,
       settings.aiReadOnlyTools,
+      streamBuffer,
+      trackTaskId,
       updateConversation,
       updateMessages,
       waitForCommandApproval,

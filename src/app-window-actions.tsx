@@ -1,11 +1,4 @@
-import {
-  Alert,
-  Message,
-  Modal,
-  Progress,
-  Spin,
-  Typography,
-} from "@arco-design/web-react";
+import { Alert, Message, Modal, Progress, Spin, Typography } from "@arco-design/web-react";
 import { isTauri } from "@tauri-apps/api/core";
 import type { HostRecord } from "./models";
 import ReleaseNotesMarkdown from "./components/ReleaseNotesMarkdown";
@@ -18,11 +11,7 @@ import {
   setApplicationUpdateNotice,
   type ApplicationUpdate,
 } from "./app-updater";
-import {
-  commandErrorMessage,
-  emitProtocolEventTo,
-  type SshConnectResult,
-} from "./tauri-protocol";
+import { commandErrorMessage, emitProtocolEventTo, type SshConnectResult } from "./tauri-protocol";
 import { diagnosticInvoke as invoke, recordDiagnostic } from "./diagnostics";
 import { auxiliaryWindowHref } from "./window-view";
 
@@ -36,18 +25,10 @@ interface StartupUpdateProgress {
   totalBytes: number;
 }
 
-function startupUpdateContent(
-  update: ApplicationUpdate,
-  progress?: StartupUpdateProgress,
-) {
+function startupUpdateContent(update: ApplicationUpdate, progress?: StartupUpdateProgress) {
   const percent =
     progress && progress.totalBytes > 0
-      ? Math.min(
-          100,
-          Math.round(
-            (progress.downloadedBytes / progress.totalBytes) * 100,
-          ),
-        )
+      ? Math.min(100, Math.round((progress.downloadedBytes / progress.totalBytes) * 100))
       : 0;
 
   return (
@@ -56,18 +37,12 @@ function startupUpdateContent(
         当前版本 v{update.currentVersion}，发现新版本 v{update.version}。
       </Typography.Text>
       {update.body && (
-        <ReleaseNotesMarkdown className="startup-update-notes">
-          {update.body}
-        </ReleaseNotesMarkdown>
+        <ReleaseNotesMarkdown className="startup-update-notes">{update.body}</ReleaseNotesMarkdown>
       )}
       {progress && (
         <div className="startup-update-progress">
           {progress.phase === "error" ? (
-            <Alert
-              content={progress.error ?? "更新失败，请重试"}
-              showIcon
-              type="error"
-            />
+            <Alert content={progress.error ?? "更新失败，请重试"} showIcon type="error" />
           ) : (
             <>
               <div className="startup-update-progress-meta">
@@ -79,9 +54,7 @@ function startupUpdateContent(
                 {progress.phase === "downloading" && (
                   <Typography.Text type="secondary">
                     {formatUpdateBytes(progress.downloadedBytes)}
-                    {progress.totalBytes > 0
-                      ? ` / ${formatUpdateBytes(progress.totalBytes)}`
-                      : ""}
+                    {progress.totalBytes > 0 ? ` / ${formatUpdateBytes(progress.totalBytes)}` : ""}
                   </Typography.Text>
                 )}
               </div>
@@ -104,8 +77,7 @@ export function promptStartupApplicationUpdate(update: ApplicationUpdate) {
   if (startupUpdatePromptShown) return;
   startupUpdatePromptShown = true;
 
-  let modalInstance: ReturnType<typeof Modal.confirm>;
-  modalInstance = Modal.confirm({
+  const modalInstance: ReturnType<typeof Modal.confirm> = Modal.confirm({
     autoFocus: false,
     cancelText: "稍后",
     className: "startup-update-modal",
@@ -146,8 +118,7 @@ export function promptStartupApplicationUpdate(update: ApplicationUpdate) {
           } else if (event.event === "Progress") {
             progress = {
               ...progress,
-              downloadedBytes:
-                progress.downloadedBytes + event.data.chunkLength,
+              downloadedBytes: progress.downloadedBytes + event.data.chunkLength,
             };
           } else {
             progress = {
@@ -187,26 +158,20 @@ export function openAuxiliaryWindow(view: AuxiliaryWindow) {
     return;
   }
 
-  const command =
-    view === "settings" ? "open_settings_window" : "open_shortcut_guide_window";
+  const command = view === "settings" ? "open_settings_window" : "open_shortcut_guide_window";
   void invoke(command).catch((error) => {
     const title = view === "settings" ? "设置" : "快捷键说明";
     Message.error(`无法打开${title}：${commandErrorMessage(error)}`);
   });
 }
 
-export async function persistHostFingerprint(
-  host: HostRecord,
-  fingerprint: string,
-) {
+export async function persistHostFingerprint(host: HostRecord, fingerprint: string) {
   try {
     await updateStoredHostFingerprint(host, fingerprint);
     if (isTauri()) {
       await Promise.all([
         emitProtocolEventTo("main", "configuration:changed").catch(() => undefined),
-        emitProtocolEventTo("settings", "configuration:changed").catch(
-          () => undefined,
-        ),
+        emitProtocolEventTo("settings", "configuration:changed").catch(() => undefined),
       ]);
     }
   } catch {
@@ -214,10 +179,7 @@ export async function persistHostFingerprint(
   }
 }
 
-export function confirmHostFingerprint(
-  host: HostRecord,
-  result: SshConnectResult,
-) {
+export function confirmHostFingerprint(host: HostRecord, result: SshConnectResult) {
   const changed = Boolean(result.expectedFingerprint);
   return new Promise<boolean>((resolve) => {
     let settled = false;
@@ -258,12 +220,8 @@ export function confirmHostFingerprint(
             </div>
           )}
           <div className="fingerprint-row">
-            <Typography.Text type="secondary">
-              {changed ? "新指纹" : "SHA256"}
-            </Typography.Text>
-            <Typography.Text className="fingerprint-value">
-              {result.fingerprint}
-            </Typography.Text>
+            <Typography.Text type="secondary">{changed ? "新指纹" : "SHA256"}</Typography.Text>
+            <Typography.Text className="fingerprint-value">{result.fingerprint}</Typography.Text>
           </div>
         </div>
       ),

@@ -24,7 +24,10 @@ describe("app settings", () => {
       terminalBackgroundOpacity: 42,
       terminalCommandBarVisible: false,
     });
-    expect(sanitizeAppSettings({ terminalBackgroundImage: "https://example.invalid/image.png" }).terminalBackgroundImage).toBe("");
+    expect(
+      sanitizeAppSettings({ terminalBackgroundImage: "https://example.invalid/image.png" })
+        .terminalBackgroundImage,
+    ).toBe("");
   });
   test("uses defaults for missing or unsupported values", () => {
     expect(
@@ -118,14 +121,12 @@ describe("app settings", () => {
   });
 
   test("infers an AI provider for settings saved before provider presets", () => {
-    expect(
-      sanitizeAppSettings({ aiBaseUrl: "http://localhost:11434/v1/" })
-        .aiProvider,
-    ).toBe("ollama");
-    expect(
-      sanitizeAppSettings({ aiBaseUrl: "https://llm.example.com/v1" })
-        .aiProvider,
-    ).toBe("custom");
+    expect(sanitizeAppSettings({ aiBaseUrl: "http://localhost:11434/v1/" }).aiProvider).toBe(
+      "ollama",
+    );
+    expect(sanitizeAppSettings({ aiBaseUrl: "https://llm.example.com/v1" }).aiProvider).toBe(
+      "custom",
+    );
   });
 
   test("sanitizes fine-grained AI permissions", () => {
@@ -145,9 +146,7 @@ describe("app settings", () => {
   });
 
   test("compares every persisted setting", () => {
-    expect(appSettingsEqual(DEFAULT_APP_SETTINGS, DEFAULT_APP_SETTINGS)).toBe(
-      true,
-    );
+    expect(appSettingsEqual(DEFAULT_APP_SETTINGS, DEFAULT_APP_SETTINGS)).toBe(true);
     expect(
       appSettingsEqual(DEFAULT_APP_SETTINGS, {
         ...DEFAULT_APP_SETTINGS,

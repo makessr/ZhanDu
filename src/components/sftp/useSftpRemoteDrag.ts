@@ -10,7 +10,7 @@ import {
 import type { SftpEntry } from "../../models";
 import { isRemotePathDescendant } from "../../sftp-utils";
 
-interface RemoteDragPreview {
+export interface RemoteDragPreview {
   count: number;
   kind: SftpEntry["kind"];
   label: string;
@@ -52,9 +52,7 @@ export default function useSftpRemoteDrag({
   const selectedDragEntries = useCallback(
     (entry: SftpEntry) =>
       selectedEntryKeys.includes(entry.id)
-        ? entries.filter((candidate) =>
-            selectedEntryKeys.includes(candidate.id),
-          )
+        ? entries.filter((candidate) => selectedEntryKeys.includes(candidate.id))
         : [entry],
     [entries, selectedEntryKeys],
   );
@@ -64,8 +62,7 @@ export default function useSftpRemoteDrag({
       !dragEntries.some(
         (entry) =>
           entry.kind === "directory" &&
-          (entry.path === targetDirectory ||
-            isRemotePathDescendant(entry.path, targetDirectory)),
+          (entry.path === targetDirectory || isRemotePathDescendant(entry.path, targetDirectory)),
       ),
     [],
   );
@@ -74,9 +71,7 @@ export default function useSftpRemoteDrag({
     (clientX: number, clientY: number) => {
       const target = document.elementFromPoint(clientX, clientY);
       const row = target?.closest<HTMLElement>("[data-sftp-entry-id]");
-      const entry = entries.find(
-        (candidate) => candidate.id === row?.dataset.sftpEntryId,
-      );
+      const entry = entries.find((candidate) => candidate.id === row?.dataset.sftpEntryId);
       return entry?.kind === "directory" ? entry : undefined;
     },
     [entries],
@@ -111,10 +106,7 @@ export default function useSftpRemoteDrag({
       if (!drag || drag.pointerId !== event.pointerId) return;
 
       if (!drag.active) {
-        const distance = Math.hypot(
-          event.clientX - drag.startX,
-          event.clientY - drag.startY,
-        );
+        const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
         if (distance < 5) return;
         drag.active = true;
         const firstEntry = drag.entries[0];
@@ -133,13 +125,8 @@ export default function useSftpRemoteDrag({
 
       event.preventDefault();
       const target = directoryAtPoint(event.clientX, event.clientY);
-      const targetPath =
-        target && canDrop(drag.entries, target.path)
-          ? target.path
-          : undefined;
-      setDropTargetPath((current) =>
-        current === targetPath ? current : targetPath,
-      );
+      const targetPath = target && canDrop(drag.entries, target.path) ? target.path : undefined;
+      setDropTargetPath((current) => (current === targetPath ? current : targetPath));
       setPreview({
         count: drag.entries.length,
         kind: drag.entries[0]?.kind ?? "file",
@@ -158,9 +145,7 @@ export default function useSftpRemoteDrag({
       if (event.currentTarget.hasPointerCapture(event.pointerId)) {
         event.currentTarget.releasePointerCapture(event.pointerId);
       }
-      const target = drag.active
-        ? directoryAtPoint(event.clientX, event.clientY)
-        : undefined;
+      const target = drag.active ? directoryAtPoint(event.clientX, event.clientY) : undefined;
       const shouldMove = target && canDrop(drag.entries, target.path);
       if (drag.active) {
         event.preventDefault();

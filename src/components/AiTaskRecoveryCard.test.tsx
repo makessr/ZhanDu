@@ -38,7 +38,9 @@ test("asks for confirmation when an interrupted command may still be running", a
   expect(onDecision).not.toHaveBeenCalled();
 
   await waitFor(() =>
-    expect(screen.getByText("中断的命令可能仍在服务器上运行。确认已检查过，再继续？")).not.toBeNull(),
+    expect(
+      screen.getByText("中断的命令可能仍在服务器上运行。确认已检查过，再继续？"),
+    ).not.toBeNull(),
   );
   const confirm = screen
     .getAllByRole("button")

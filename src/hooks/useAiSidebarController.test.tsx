@@ -1,9 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import {
-  useAiSidebarController,
-  type AiSidebarWindowAdapter,
-} from "./useAiSidebarController";
+import { useAiSidebarController, type AiSidebarWindowAdapter } from "./useAiSidebarController";
 
 function deferred() {
   let resolve!: () => void;
@@ -126,9 +123,7 @@ describe("useAiSidebarController", () => {
 
     await waitFor(() => expect(view.result.current.phase).toBe("closed"));
     expect(window.currentWidth()).toBe(1_200);
-    expect(window.sizeRequests.map((request) => request.width)).toEqual([
-      1_640, 1_200,
-    ]);
+    expect(window.sizeRequests.map((request) => request.width)).toEqual([1_640, 1_200]);
   });
 
   test("reopens cleanly while a collapse is still running", async () => {
@@ -159,9 +154,7 @@ describe("useAiSidebarController", () => {
 
     await waitFor(() => expect(view.result.current.phase).toBe("open"));
     expect(window.currentWidth()).toBe(1_640);
-    expect(window.sizeRequests.map((request) => request.width)).toEqual([
-      1_640, 1_200, 1_640,
-    ]);
+    expect(window.sizeRequests.map((request) => request.width)).toEqual([1_640, 1_200, 1_640]);
   });
 
   test("opens inside maximized windows without changing native size", async () => {

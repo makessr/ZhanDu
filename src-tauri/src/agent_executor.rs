@@ -1,3 +1,5 @@
+#![allow(deprecated)] // from_message 兼容层，待内部模块改为结构化错误后移除。
+
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
@@ -23,7 +25,17 @@ pub(crate) struct AgentActionExecutionRequest {
     action_id: String,
     #[serde(default)]
     rollback: bool,
-    user_confirmed: bool,
+    approval_credential: Option<String>,
+    content_override: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub(crate) struct AgentActionApprovalRequest {
+    task_id: String,
+    action_id: String,
+    #[serde(default)]
+    rollback: bool,
     content_override: Option<String>,
 }
 
@@ -386,6 +398,21 @@ fn is_conflict(error: &str) -> bool {
 }
 
 #[tauri::command]
+pub(crate) fn ai_task_action_approve(
+    task_manager: State<'_, AgentTaskManager>,
+    request: AgentActionApprovalRequest,
+) -> CommandResult<Option<String>> {
+    task_manager
+        .approve_action_execution(
+            &request.task_id,
+            &request.action_id,
+            request.rollback,
+            request.content_override,
+        )
+        .map_err(|error| CommandError::from_message("ai_task_action_approve", error))
+}
+
+#[tauri::command]
 pub(crate) async fn ai_task_action_execute(
     app: AppHandle,
     task_manager: State<'_, AgentTaskManager>,
@@ -411,7 +438,7 @@ pub(crate) async fn ai_task_action_execute(
             &request.task_id,
             &request.action_id,
             request.rollback,
-            request.user_confirmed,
+            request.approval_credential.as_deref(),
             request.content_override,
         )
         .map_err(|error| CommandError::from_message(operation, error))?;

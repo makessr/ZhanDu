@@ -1,19 +1,8 @@
 import { useEffect, useState } from "react";
-import {
-  Button,
-  Dropdown,
-  Menu as ArcoMenu,
-  Message,
-  Tooltip,
-} from "@arco-design/web-react";
+import { Button, Dropdown, Menu as ArcoMenu, Message, Tooltip } from "@arco-design/web-react";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import {
-  Maximize,
-  Minimize,
-  Minus,
-  X,
-} from "lucide-react";
+import { Maximize, Minimize, Minus, X } from "lucide-react";
 import { isApplePlatform } from "../platform-utils";
 import { APP_DISPLAY_NAME } from "../application-brand";
 import WorkspaceIcon from "./WorkspaceIcon";
@@ -97,9 +86,7 @@ export default function ApplicationTitleBar({
   return (
     <header
       className={`application-titlebar ${
-        applePlatform
-          ? "application-titlebar-macos"
-          : "application-titlebar-custom"
+        applePlatform ? "application-titlebar-macos" : "application-titlebar-custom"
       }`}
     >
       <div
@@ -114,14 +101,10 @@ export default function ApplicationTitleBar({
       </div>
 
       <div className="application-titlebar-toolbar">
-        <Tooltip
-          content={serverMonitorCollapsed ? "显示服务器监控" : "隐藏服务器监控"}
-        >
+        <Tooltip content={serverMonitorCollapsed ? "显示服务器监控" : "隐藏服务器监控"}>
           <span className="application-titlebar-action-wrapper">
             <Button
-              aria-label={
-                serverMonitorCollapsed ? "显示服务器监控" : "隐藏服务器监控"
-              }
+              aria-label={serverMonitorCollapsed ? "显示服务器监控" : "隐藏服务器监控"}
               aria-pressed={!serverMonitorCollapsed}
               className="application-titlebar-action-button"
               disabled={!hasActiveSession}
@@ -167,10 +150,7 @@ export default function ApplicationTitleBar({
                     <span>快捷键</span>
                   </span>
                 </ArcoMenu.Item>
-                <ArcoMenu.Item
-                  className="application-titlebar-menu-settings"
-                  key="settings"
-                >
+                <ArcoMenu.Item className="application-titlebar-menu-settings" key="settings">
                   <span className="application-titlebar-menu-label">
                     <WorkspaceIcon name="settings" />
                     <span>设置</span>
@@ -198,9 +178,7 @@ export default function ApplicationTitleBar({
           <button
             aria-label="最小化窗口"
             className="application-window-control"
-            onClick={() =>
-              runWindowOperation(() => getCurrentWindow().minimize())
-            }
+            onClick={() => runWindowOperation(() => getCurrentWindow().minimize())}
             type="button"
           >
             <Minus aria-hidden="true" />
@@ -211,11 +189,7 @@ export default function ApplicationTitleBar({
             onClick={toggleMaximize}
             type="button"
           >
-            {maximized ? (
-              <Minimize aria-hidden="true" />
-            ) : (
-              <Maximize aria-hidden="true" />
-            )}
+            {maximized ? <Minimize aria-hidden="true" /> : <Maximize aria-hidden="true" />}
           </button>
           <button
             aria-label="关闭窗口"

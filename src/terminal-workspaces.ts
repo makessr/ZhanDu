@@ -17,14 +17,22 @@ export function readTerminalWorkspaces(): TerminalWorkspace[] {
   try {
     const saved = JSON.parse(localStorage.getItem(workspaceKey) ?? "[]");
     if (!Array.isArray(saved)) return [];
-    return saved.filter((item) =>
-      item && typeof item.id === "string" && typeof item.name === "string" &&
-      Array.isArray(item.hostIds) && item.hostIds.length > 0 &&
-      item.hostIds.every((id: unknown) => typeof id === "string") &&
-      Number.isInteger(item.active) && item.active >= 0 && item.active < item.hostIds.length &&
-      ["single", "columns", "rows"].includes(item.layout) &&
-      Array.isArray(item.panes) && item.panes.every((index: number) =>
-        Number.isInteger(index) && index >= 0 && index < item.hostIds.length),
+    return saved.filter(
+      (item) =>
+        item &&
+        typeof item.id === "string" &&
+        typeof item.name === "string" &&
+        Array.isArray(item.hostIds) &&
+        item.hostIds.length > 0 &&
+        item.hostIds.every((id: unknown) => typeof id === "string") &&
+        Number.isInteger(item.active) &&
+        item.active >= 0 &&
+        item.active < item.hostIds.length &&
+        ["single", "columns", "rows"].includes(item.layout) &&
+        Array.isArray(item.panes) &&
+        item.panes.every(
+          (index: number) => Number.isInteger(index) && index >= 0 && index < item.hostIds.length,
+        ),
     );
   } catch {
     return [];
@@ -53,7 +61,8 @@ export function resolveWorkspaceConnection(
   const proxy = proxyFor(host);
   if (!host.jumpHostId) return [withKey(host), proxy];
   const jump = configuration.hosts.find(({ id }) => id === host.jumpHostId);
-  if (!jump || jump.id === host.id || jump.jumpHostId) throw new Error(host.name + " 的跳板机配置无效");
+  if (!jump || jump.id === host.id || jump.jumpHostId)
+    throw new Error(host.name + " 的跳板机配置无效");
   if (!jump.hostFingerprint) throw new Error("请先连接并信任跳板机 " + jump.name);
   return [withKey(host), proxy, { host: withKey(jump), proxy: proxyFor(jump) }];
 }

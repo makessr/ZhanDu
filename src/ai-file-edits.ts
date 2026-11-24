@@ -14,12 +14,7 @@ export const AI_FILE_EDIT_TOOL_NAME = "propose_file_edit";
 export const MAX_AI_FILE_EDIT_CHARS = 60_000;
 
 export type AiFileEditProposalStatus =
-  | "pending"
-  | "applied"
-  | "rolled-back"
-  | "rejected"
-  | "conflict"
-  | "failed";
+  "pending" | "applied" | "rolled-back" | "rejected" | "conflict" | "failed";
 
 export interface AiFileEditProposal {
   appliedAt?: string;
@@ -35,9 +30,7 @@ export interface AiFileEditProposal {
   status: AiFileEditProposalStatus;
 }
 
-export type AiFileChangeStatus =
-  | Exclude<AiFileEditProposalStatus, "pending">
-  | "not-applied";
+export type AiFileChangeStatus = Exclude<AiFileEditProposalStatus, "pending"> | "not-applied";
 
 export type AiFileChangeOperation = "edit" | "create" | "rename" | "delete";
 
@@ -108,11 +101,7 @@ export function aiFileEditEligibilityError(
     [source.id],
     Math.max(maxContextChars, source.content.length + source.label.length + 128),
   );
-  const boundedContext = buildAiContextPayload(
-    [source],
-    [source.id],
-    maxContextChars,
-  );
+  const boundedContext = buildAiContextPayload([source], [source.id], maxContextChars);
   if (
     !completeContext ||
     boundedContext !== completeContext ||
@@ -133,10 +122,7 @@ export function aiFileEditSourceSafetyError(file: AiRemoteFileContext) {
   return null;
 }
 
-export function proposedFileContentError(
-  content: string,
-  originalContent: string,
-) {
+export function proposedFileContentError(content: string, originalContent: string) {
   if (content.includes("\0")) return "建议内容包含无效的二进制字符";
   if (containsAiRedactionMarker(content)) {
     return "建议内容包含脱敏占位符，已阻止写入远程文件";
@@ -162,12 +148,9 @@ export function createAiFileEditProposal(
   const argumentsValue = parseArguments(call);
   const path = argumentsValue.path;
   const content = argumentsValue.content;
-  const files = Array.isArray(availableFiles)
-    ? availableFiles
-    : [availableFiles];
-  const file = typeof path === "string"
-    ? files.find((candidate) => candidate.path === path)
-    : undefined;
+  const files = Array.isArray(availableFiles) ? availableFiles : [availableFiles];
+  const file =
+    typeof path === "string" ? files.find((candidate) => candidate.path === path) : undefined;
   if (!file) {
     throw new Error("AI 提议修改的文件与当前上下文不一致");
   }
@@ -187,10 +170,7 @@ export function createAiFileEditProposal(
   };
 }
 
-export function aiFileEditToolResult(
-  call: AiToolCall,
-  error?: string,
-): AiToolResult {
+export function aiFileEditToolResult(call: AiToolCall, error?: string): AiToolResult {
   return {
     callId: call.id,
     name: call.name,
@@ -213,17 +193,14 @@ export function aiFileEditDiff(
   const changes = diffLines(originalContent, proposedContent, {
     maxEditLength: 20_000,
   });
-  const values =
-    changes ?? [
-      { removed: true, value: originalContent },
-      { added: true, value: proposedContent },
-    ];
+  const values = changes ?? [
+    { removed: true, value: originalContent },
+    { added: true, value: proposedContent },
+  ];
   return values.map((change) => ({
     count:
       ("count" in change ? change.count : undefined) ??
-      (change.value
-        ? change.value.split("\n").length - (change.value.endsWith("\n") ? 1 : 0)
-        : 0),
+      (change.value ? change.value.split("\n").length - (change.value.endsWith("\n") ? 1 : 0) : 0),
     kind: change.added ? "added" : change.removed ? "removed" : "unchanged",
     value: change.value,
   }));
@@ -233,7 +210,7 @@ function diffPartLines(value: string) {
   if (!value) return [];
   const lines = value.split("\n");
   if (lines[lines.length - 1] === "") lines.pop();
-  return lines.map((line) => line.endsWith("\r") ? line.slice(0, -1) : line);
+  return lines.map((line) => (line.endsWith("\r") ? line.slice(0, -1) : line));
 }
 
 export function aiFileEditDiffLines(
@@ -300,10 +277,7 @@ export function aiFileEditSideBySideRows(
   return rows;
 }
 
-export function aiFileEditLineSummary(
-  originalContent: string,
-  proposedContent: string,
-) {
+export function aiFileEditLineSummary(originalContent: string, proposedContent: string) {
   return aiFileEditDiff(originalContent, proposedContent).reduce(
     (summary, part) => {
       if (part.kind === "added") summary.addedLines += part.count;
@@ -320,10 +294,7 @@ export function markAiFileEditApplied(
   appliedFile: AiRemoteFileContext,
   appliedAt: string,
 ) {
-  if (
-    appliedFile.path !== proposal.originalFile.path ||
-    appliedFile.content !== content
-  ) {
+  if (appliedFile.path !== proposal.originalFile.path || appliedFile.content !== content) {
     throw new Error("远程文件写入结果与修改提案不一致");
   }
   return {
@@ -338,9 +309,7 @@ export function markAiFileEditApplied(
   };
 }
 
-export function aiFileEditRollbackEligibilityError(
-  proposal: AiFileEditProposal,
-) {
+export function aiFileEditRollbackEligibilityError(proposal: AiFileEditProposal) {
   if (proposal.status !== "applied" || !proposal.appliedFile) {
     return "当前文件修改没有可回滚的应用快照";
   }
@@ -350,10 +319,7 @@ export function aiFileEditRollbackEligibilityError(
   return null;
 }
 
-export function markAiFileEditRolledBack(
-  proposal: AiFileEditProposal,
-  rolledBackAt: string,
-) {
+export function markAiFileEditRolledBack(proposal: AiFileEditProposal, rolledBackAt: string) {
   const error = aiFileEditRollbackEligibilityError(proposal);
   if (error) throw new Error(error);
   return {

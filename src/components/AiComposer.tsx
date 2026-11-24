@@ -9,12 +9,7 @@ import {
   Tooltip,
   Typography,
 } from "@arco-design/web-react";
-import {
-  IconFile,
-  IconSearch,
-  IconSend,
-  IconStop,
-} from "@arco-design/web-react/icon";
+import { IconFile, IconSearch, IconSend, IconStop } from "@arco-design/web-react/icon";
 import {
   MAX_AI_REMOTE_FILES,
   aiRemoteFileContextSource,
@@ -89,13 +84,8 @@ function AiComposer({
   sending,
   tokenBudget,
 }: AiComposerProps) {
-  const remoteFileContextBytes = remoteFiles.reduce(
-    (total, file) => total + file.size,
-    0,
-  );
-  const hasSelectedRemoteFile = selectedContextIds.some(
-    isAiRemoteFileContextSourceId,
-  );
+  const remoteFileContextBytes = remoteFiles.reduce((total, file) => total + file.size, 0);
+  const hasSelectedRemoteFile = selectedContextIds.some(isAiRemoteFileContextSourceId);
 
   return (
     <div className="ai-assistant-composer">
@@ -104,8 +94,8 @@ function AiComposer({
           <div className="ai-remote-file-contexts-heading">
             <Typography.Text type="secondary">文件上下文</Typography.Text>
             <Typography.Text type="secondary">
-              {remoteFiles.length}/{MAX_AI_REMOTE_FILES} ·
-              {Math.ceil(remoteFileContextBytes / 1024)}/512 KiB
+              {remoteFiles.length}/{MAX_AI_REMOTE_FILES} ·{Math.ceil(remoteFileContextBytes / 1024)}
+              /512 KiB
             </Typography.Text>
           </div>
           <div className="ai-remote-file-context-list">
@@ -148,29 +138,20 @@ function AiComposer({
           </span>
         }
         onChange={(value) =>
-          onChange(
-            separateAiContextMentions(value, contextSources).slice(0, 4_000),
-          )
+          onChange(separateAiContextMentions(value, contextSources).slice(0, 4_000))
         }
         onKeyDownCapture={(event) => {
-          if (
-            event.key !== "Enter" ||
-            event.nativeEvent.isComposing ||
-            event.keyCode === 229
-          ) {
+          if (event.key !== "Enter" || event.nativeEvent.isComposing || event.keyCode === 229) {
             return;
           }
 
           const textarea = event.currentTarget;
-          const selectionStart =
-            textarea.selectionStart ?? textarea.value.length;
+          const selectionStart = textarea.selectionStart ?? textarea.value.length;
           const selectionEnd = textarea.selectionEnd ?? selectionStart;
           const textBeforeCursor = textarea.value.slice(0, selectionStart);
           const mentionIndex = textBeforeCursor.lastIndexOf("@");
-          const mentionSearch =
-            mentionIndex >= 0 ? textBeforeCursor.slice(mentionIndex + 1) : "";
-          const mentionActive =
-            mentionIndex >= 0 && !mentionSearch.includes(" ");
+          const mentionSearch = mentionIndex >= 0 ? textBeforeCursor.slice(mentionIndex + 1) : "";
+          const mentionActive = mentionIndex >= 0 && !mentionSearch.includes(" ");
 
           if (!event.shiftKey && mentionActive) return;
 
@@ -199,9 +180,7 @@ function AiComposer({
               <span className="ai-context-mention-option">
                 <span>{source.label}</span>
                 <Typography.Text type="secondary">
-                  {available
-                    ? `${source.content.trim().length} 字符`
-                    : "暂无内容"}
+                  {available ? `${source.content.trim().length} 字符` : "暂无内容"}
                 </Typography.Text>
               </span>
             ),
@@ -229,7 +208,7 @@ function AiComposer({
               Modal.confirm({
                 cancelText: "取消",
                 content:
-                  "完全访问会自动执行 AI 提出的终端命令和文件操作，仅在当前主机和当前连接周期内生效。",
+                  "完全访问会自动执行 AI 提出的终端命令和文件操作，仅在当前主机和当前连接周期内生效。管道到 shell、解释器内联代码（bash -c、python -c 等）、命令替换、下载后执行和 base64 解码执行仍会逐条请求确认。",
                 okButtonProps: { status: "danger" },
                 okText: "启用",
                 onOk: () => onApprovalModeChange(next),
@@ -242,10 +221,7 @@ function AiComposer({
           />
           {hasSelectedRemoteFile && (
             <Tooltip content={fileEditEligibility ?? "修改前需要手动审阅确认"}>
-              <Tag
-                color={editableRemoteFileCount ? "green" : "gray"}
-                size="small"
-              >
+              <Tag color={editableRemoteFileCount ? "green" : "gray"} size="small">
                 {editableRemoteFileCount
                   ? `可修改 ${editableRemoteFileCount} 个文件`
                   : "文件仅分析"}
@@ -264,41 +240,24 @@ function AiComposer({
         </span>
         <span className="ai-assistant-composer-submit">
           <Tooltip content={model || "未配置模型"}>
-            <Typography.Text
-              className="ai-assistant-composer-model"
-              ellipsis
-              type="secondary"
-            >
+            <Typography.Text className="ai-assistant-composer-model" ellipsis type="secondary">
               {model || "未配置模型"}
             </Typography.Text>
           </Tooltip>
           <Tooltip
             content={
               <div className="ai-token-budget-tooltip">
-                <div>
-                  对话历史：约 {formatTokenCount(tokenBudget.historyTokens)}{" "}
-                  Token
-                </div>
-                <div>
-                  当前输入：约 {formatTokenCount(tokenBudget.inputTokens)} Token
-                </div>
-                <div>
-                  上下文：约 {formatTokenCount(tokenBudget.contextTokens)} Token
-                </div>
-                {tokenBudget.contextTruncated && (
-                  <div>上下文已按设置上限截断</div>
-                )}
+                <div>对话历史：约 {formatTokenCount(tokenBudget.historyTokens)} Token</div>
+                <div>当前输入：约 {formatTokenCount(tokenBudget.inputTokens)} Token</div>
+                <div>上下文：约 {formatTokenCount(tokenBudget.contextTokens)} Token</div>
+                {tokenBudget.contextTruncated && <div>上下文已按设置上限截断</div>}
                 {lastTelemetry && (
                   <>
-                    <div className="ai-token-budget-tooltip-heading">
-                      上次响应
-                    </div>
+                    <div className="ai-token-budget-tooltip-heading">上次响应</div>
                     {lastTelemetry.usage ? (
                       <div>
-                        实际 {formatTokenCount(lastTelemetry.usage.totalTokens)}{" "}
-                        Token （输入{" "}
-                        {formatTokenCount(lastTelemetry.usage.inputTokens)} /
-                        输出{" "}
+                        实际 {formatTokenCount(lastTelemetry.usage.totalTokens)} Token （输入{" "}
+                        {formatTokenCount(lastTelemetry.usage.inputTokens)} / 输出{" "}
                         {formatTokenCount(lastTelemetry.usage.outputTokens)}）
                       </div>
                     ) : (
@@ -327,11 +286,7 @@ function AiComposer({
           </Tooltip>
           {sending ? (
             <Tooltip content="停止生成。切换到其他终端也会中断当前 AI 任务">
-              <Button
-                icon={<IconStop />}
-                onClick={() => void onCancel()}
-                size="small"
-              >
+              <Button icon={<IconStop />} onClick={() => void onCancel()} size="small">
                 停止
               </Button>
             </Tooltip>

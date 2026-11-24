@@ -5,14 +5,8 @@ import {
   type AgentTaskSync,
 } from "../tauri-protocol";
 
-function newerTask(
-  current: AgentTask | undefined,
-  candidate: AgentTask,
-): AgentTask {
-  if (
-    current?.id === candidate.id &&
-    current.lastEventSequence >= candidate.lastEventSequence
-  ) {
+function newerTask(current: AgentTask | undefined, candidate: AgentTask): AgentTask {
+  if (current?.id === candidate.id && current.lastEventSequence >= candidate.lastEventSequence) {
     return current;
   }
   return candidate;

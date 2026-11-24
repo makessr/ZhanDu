@@ -40,11 +40,7 @@ export function canFetchAiModels(baseUrl: string, hasApiKey: boolean) {
   }
 }
 
-export function aiModelFetchSignature(
-  baseUrl: string,
-  hasApiKey: boolean,
-  credentialRevision = 0,
-) {
+export function aiModelFetchSignature(baseUrl: string, hasApiKey: boolean, credentialRevision = 0) {
   if (!canFetchAiModels(baseUrl, hasApiKey)) return "";
   const normalized = baseUrl.trim().replace(/\/+$/, "");
   return `${normalized}:${hasApiKey ? "key" : "local"}:${credentialRevision}`;
@@ -54,8 +50,7 @@ export function inferAiProvider(baseUrl: string): AiProvider {
   const normalized = normalizedBaseUrl(baseUrl);
   return (
     AI_PROVIDER_PRESETS.find(
-      (preset) =>
-        preset.baseUrl && normalizedBaseUrl(preset.baseUrl) === normalized,
+      (preset) => preset.baseUrl && normalizedBaseUrl(preset.baseUrl) === normalized,
     )?.value ?? "custom"
   );
 }

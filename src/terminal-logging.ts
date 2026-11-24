@@ -59,8 +59,7 @@ export function createTerminalLogTransport(): TerminalLogTransport {
       diagnosticInvoke<TerminalLogStartResult>("terminal_log_start", {
         request,
       }),
-    append: (logId, data) =>
-      diagnosticInvoke("terminal_log_append", { data, logId }),
+    append: (logId, data) => diagnosticInvoke("terminal_log_append", { data, logId }),
     marker: (logId, timestamp, message) =>
       diagnosticInvoke("terminal_log_marker", {
         logId,
@@ -90,14 +89,10 @@ export class TerminalLogBatcher {
   private timer?: ReturnType<typeof setTimeout>;
   private queue: Promise<void> = Promise.resolve();
 
-  constructor(
-    options: TerminalLogStartOptions,
-    batcherOptions: TerminalLogBatcherOptions = {},
-  ) {
+  constructor(options: TerminalLogStartOptions, batcherOptions: TerminalLogBatcherOptions = {}) {
     this.options = options;
     this.batchSize = batcherOptions.batchSize ?? DEFAULT_BATCH_SIZE;
-    this.flushDelayMs =
-      batcherOptions.flushDelayMs ?? DEFAULT_FLUSH_DELAY_MS;
+    this.flushDelayMs = batcherOptions.flushDelayMs ?? DEFAULT_FLUSH_DELAY_MS;
     this.onError = batcherOptions.onError;
     this.transport = batcherOptions.transport ?? createTerminalLogTransport();
     this.ready = this.transport
@@ -133,27 +128,20 @@ export class TerminalLogBatcher {
     const data = combineChunks(this.chunks, this.byteLength);
     this.chunks = [];
     this.byteLength = 0;
-    return this.enqueue(() =>
-      this.transport.append(this.options.logId, encodeBase64(data)),
-    );
+    return this.enqueue(() => this.transport.append(this.options.logId, encodeBase64(data)));
   }
 
   marker(timestamp: string, message: string) {
     if (this.stopped || this.failed) return this.queue;
     void this.flush();
-    return this.enqueue(() =>
-      this.transport.marker(this.options.logId, timestamp, message),
-    );
+    return this.enqueue(() => this.transport.marker(this.options.logId, timestamp, message));
   }
 
   stop() {
     if (this.stopped) return this.queue;
     this.stopped = true;
     void this.flush();
-    return this.enqueue(
-      () => this.transport.stop(this.options.logId),
-      true,
-    );
+    return this.enqueue(() => this.transport.stop(this.options.logId), true);
   }
 
   private enqueue(operation: () => Promise<void>, cleanup = false) {
@@ -184,10 +172,7 @@ export class TerminalLogBatcher {
   }
 }
 
-export function terminalLogStatusMessage(
-  status: TerminalSessionStatus,
-  error?: string,
-) {
+export function terminalLogStatusMessage(status: TerminalSessionStatus, error?: string) {
   if (status === "connecting") return "开始连接";
   if (status === "connected") return "连接成功";
   if (status === "suspect") return "连接状态异常";

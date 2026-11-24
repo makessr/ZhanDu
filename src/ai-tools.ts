@@ -5,10 +5,7 @@ import type {
   ServerMonitorSnapshot,
   ServerProcessListResult,
 } from "./models";
-import type {
-  AiToolCall,
-  AiToolResult,
-} from "./tauri-protocol";
+import type { AiToolCall, AiToolResult } from "./tauri-protocol";
 import { redactAiContext } from "./ai-utils";
 import {
   aiReadOnlyToolLabel,
@@ -20,13 +17,7 @@ export type { AiReadOnlyToolName } from "./ai-permissions";
 export { isAiReadOnlyToolName } from "./ai-permissions";
 
 export type AiToolRunStatus =
-  | "pending"
-  | "running"
-  | "success"
-  | "failed"
-  | "cancelled"
-  | "skipped"
-  | "unavailable";
+  "pending" | "running" | "success" | "failed" | "cancelled" | "skipped" | "unavailable";
 
 export interface AiToolRun {
   callId: string;
@@ -44,10 +35,7 @@ export interface AiToolRun {
   status: AiToolRunStatus;
 }
 
-const TARGET_TOOLS = new Set<AiReadOnlyToolName>([
-  "ping_target",
-  "trace_route",
-]);
+const TARGET_TOOLS = new Set<AiReadOnlyToolName>(["ping_target", "trace_route"]);
 const MAX_DATE_TIMESTAMP = 8_640_000_000_000_000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -61,9 +49,7 @@ function boundedSafeText(value: unknown, maxLength: number) {
 }
 
 function finiteNumber(value: unknown) {
-  return typeof value === "number" && Number.isFinite(value)
-    ? value
-    : undefined;
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 function percent(value: unknown) {
@@ -102,9 +88,7 @@ export function aiToolTarget(call: AiToolCall): string | undefined {
 }
 
 export function aiToolLabel(name: string) {
-  return isAiReadOnlyToolName(name)
-    ? aiReadOnlyToolLabel(name)
-    : "未知只读工具";
+  return isAiReadOnlyToolName(name) ? aiReadOnlyToolLabel(name) : "未知只读工具";
 }
 
 export function finishAiToolRun(
@@ -127,10 +111,7 @@ export function finishAiToolRun(
   };
 }
 
-export function aiToolResult(
-  call: AiToolCall,
-  value: unknown,
-): AiToolResult {
+export function aiToolResult(call: AiToolCall, value: unknown): AiToolResult {
   return {
     callId: call.id,
     name: call.name,
@@ -138,10 +119,7 @@ export function aiToolResult(
   };
 }
 
-export function aiToolResultSummary(
-  call: AiToolCall,
-  result: AiToolResult,
-) {
+export function aiToolResultSummary(call: AiToolCall, result: AiToolResult) {
   let value: unknown;
   try {
     value = JSON.parse(result.content);
@@ -174,9 +152,7 @@ export function aiToolResultSummary(
       const processes = Array.isArray(value.processes) ? value.processes : [];
       const names = processes
         .slice(0, 5)
-        .map((process) =>
-          isRecord(process) ? boundedSafeText(process.name, 80) : undefined,
-        )
+        .map((process) => (isRecord(process) ? boundedSafeText(process.name, 80) : undefined))
         .filter((name): name is string => Boolean(name));
       summary = `进程总数：${finiteNumber(value.total) ?? "-"} · 返回：${finiteNumber(value.returned) ?? processes.length}${names.length ? `\n高占用进程：${names.join("、")}` : ""}`;
       break;
@@ -185,9 +161,7 @@ export function aiToolResultSummary(
       summary = `当前目录：${boundedSafeText(value.path, 500) ?? "-"}`;
       break;
     case "get_network_connections": {
-      const connections = Array.isArray(value.connections)
-        ? value.connections
-        : [];
+      const connections = Array.isArray(value.connections) ? value.connections : [];
       const states = new Map<string, number>();
       for (const connection of connections) {
         if (!isRecord(connection)) continue;
@@ -270,9 +244,7 @@ export function sanitizePersistedAiToolRuns(value: unknown): AiToolRun[] | undef
         callId,
         detail: boundedSafeText(item.detail, 253),
         durationMs:
-          duration === undefined
-            ? undefined
-            : Math.min(60_000, Math.max(0, Math.round(duration))),
+          duration === undefined ? undefined : Math.min(60_000, Math.max(0, Math.round(duration))),
         error: boundedSafeText(item.error, 300),
         label: aiReadOnlyToolLabel(name),
         name,
@@ -280,9 +252,7 @@ export function sanitizePersistedAiToolRuns(value: unknown): AiToolRun[] | undef
         planId,
         reason: boundedSafeText(item.reason, 240),
         startedAt:
-          startedAt === undefined ||
-          startedAt < 0 ||
-          startedAt > MAX_DATE_TIMESTAMP
+          startedAt === undefined || startedAt < 0 || startedAt > MAX_DATE_TIMESTAMP
             ? 0
             : Math.round(startedAt),
         status: item.status,
@@ -321,10 +291,7 @@ export function serverStatusToolValue(snapshot: ServerMonitorSnapshot) {
   };
 }
 
-export function processListToolValue(
-  result: ServerProcessListResult,
-  limit = 15,
-) {
+export function processListToolValue(result: ServerProcessListResult, limit = 15) {
   const processes = [...result.processes]
     .sort(
       (left, right) =>
@@ -360,10 +327,7 @@ export function currentDirectoryToolValue(path: string) {
     : { ok: false, error: "SFTP 当前目录尚不可用" };
 }
 
-export function networkConnectionsToolValue(
-  result: NetworkConnectionsResult,
-  limit = 40,
-) {
+export function networkConnectionsToolValue(result: NetworkConnectionsResult, limit = 40) {
   const connections = result.connections
     .slice(0, Math.min(50, Math.max(1, limit)))
     .map((connection) => ({
@@ -379,8 +343,7 @@ export function networkConnectionsToolValue(
     ok: true,
     total: result.connections.length,
     returned: connections.length,
-    truncated:
-      result.truncated || connections.length < result.connections.length,
+    truncated: result.truncated || connections.length < result.connections.length,
     connections,
   };
 }

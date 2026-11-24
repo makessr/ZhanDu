@@ -36,7 +36,11 @@ export function WorkspaceToolPanel({
           <Tabs.TabPane key={id} title={label} />
         ))}
       </Tabs>
-      <div aria-label={TOOLS.find(([id]) => id === activeTool)?.[1]} className="workspace-tool-body" role="tabpanel">
+      <div
+        aria-label={TOOLS.find(([id]) => id === activeTool)?.[1]}
+        className="workspace-tool-body"
+        role="tabpanel"
+      >
         {children}
       </div>
     </section>
@@ -50,9 +54,5 @@ export function WorkspaceToolSurface({
 }: ComponentProps<typeof Drawer> & { embedded?: boolean }) {
   if (!embedded) return <Drawer {...drawer}>{children}</Drawer>;
   if (!drawer.visible) return null;
-  return (
-    <div className={`workspace-tool-surface ${drawer.className ?? ""}`}>
-      {children}
-    </div>
-  );
+  return <div className={`workspace-tool-surface ${drawer.className ?? ""}`}>{children}</div>;
 }

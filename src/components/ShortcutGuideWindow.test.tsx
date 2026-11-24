@@ -21,9 +21,7 @@ describe("ShortcutGuideWindow", () => {
   });
 
   test("returns shortcuts only for the current platform", () => {
-    expect(shortcutGuideRows("MacIntel")[0].shortcut).toBe(
-      "Command + Shift + P",
-    );
+    expect(shortcutGuideRows("MacIntel")[0].shortcut).toBe("Command + Shift + P");
     expect(shortcutGuideRows("Win32")[0].shortcut).toBe("Ctrl + Shift + P");
   });
 });

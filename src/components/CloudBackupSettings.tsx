@@ -50,20 +50,12 @@ import {
   parseConfigurationExport,
   serializeConfigurationExport,
 } from "../config-database";
-import {
-  importConfiguration,
-  restoreCredentialReferences,
-} from "../configuration-mutations";
+import { importConfiguration, restoreCredentialReferences } from "../configuration-mutations";
+import { formatFileSize as formatBytes } from "../sftp-utils";
 import { emitProtocolEventTo } from "../tauri-protocol";
 
 interface CloudBackupSettingsProps {
   onConfigurationImported?: (settings: AppSettings) => void;
-}
-
-function formatBytes(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function formatTime(value: string) {
@@ -92,9 +84,7 @@ function protectionLabel(mode?: CloudBackupProtectionMode) {
   }
 }
 
-function CloudBackupSettings({
-  onConfigurationImported,
-}: CloudBackupSettingsProps) {
+function CloudBackupSettings({ onConfigurationImported }: CloudBackupSettingsProps) {
   const [settings, setSettings] = useState(loadCloudBackupSettings);
   const [accessKeyId, setAccessKeyId] = useState("");
   const [secretAccessKey, setSecretAccessKey] = useState("");
@@ -106,8 +96,7 @@ function CloudBackupSettings({
   const [acting, setActing] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const effectiveProtection =
-    repository?.protectionMode ?? settings.protectionMode;
+  const effectiveProtection = repository?.protectionMode ?? settings.protectionMode;
   const canIncludeCredentials = effectiveProtection !== "none";
 
   const updateStorage = useCallback(
@@ -164,11 +153,7 @@ function CloudBackupSettings({
     const saved = saveCloudBackupSettings(settings);
     setSettings(saved);
     if (accessKeyId.trim() || secretAccessKey) {
-      await storeCloudBackupCredentials(
-        saved.storage.profileId,
-        accessKeyId,
-        secretAccessKey,
-      );
+      await storeCloudBackupCredentials(saved.storage.profileId, accessKeyId, secretAccessKey);
       setCredentialConfigured(true);
       setAccessKeyId("");
       setSecretAccessKey("");
@@ -196,9 +181,7 @@ function CloudBackupSettings({
     try {
       await saveConnection();
       const status = await refreshRepository();
-      Message.success(
-        status.exists ? "已读取云备份仓库" : "连接成功，可以初始化仓库",
-      );
+      Message.success(status.exists ? "已读取云备份仓库" : "连接成功，可以初始化仓库");
     } catch (error) {
       Message.error(String(error));
     } finally {
@@ -212,9 +195,7 @@ function CloudBackupSettings({
       const saved = saveCloudBackupSettings({
         ...settings,
         includeCredentials:
-          settings.protectionMode === "none"
-            ? false
-            : settings.includeCredentials,
+          settings.protectionMode === "none" ? false : settings.includeCredentials,
       });
       setSettings(saved);
       const result = await initializeCloudBackupRepository(
@@ -229,7 +210,8 @@ function CloudBackupSettings({
           content: (
             <div className="cloud-backup-recovery-key">
               <Typography.Paragraph>
-                这是解锁云备份的唯一恢复密钥。{APP_DISPLAY_NAME}不会上传或再次显示它，请立即保存到安全位置。
+                这是解锁云备份的唯一恢复密钥。{APP_DISPLAY_NAME}
+                不会上传或再次显示它，请立即保存到安全位置。
               </Typography.Paragraph>
               <Typography.Paragraph copyable code>
                 {result.recoveryKey}
@@ -268,9 +250,7 @@ function CloudBackupSettings({
     try {
       const saved = saveCloudBackupSettings({
         ...settings,
-        includeCredentials: canIncludeCredentials
-          ? settings.includeCredentials
-          : false,
+        includeCredentials: canIncludeCredentials ? settings.includeCredentials : false,
       });
       setSettings(saved);
       const configuration = await loadConfiguration();
@@ -297,10 +277,7 @@ function CloudBackupSettings({
     setActing(true);
     let pendingRestoreToken: string | undefined;
     try {
-      const downloaded = await downloadCloudBackupSnapshot(
-        settings.storage,
-        snapshot.key,
-      );
+      const downloaded = await downloadCloudBackupSnapshot(settings.storage, snapshot.key);
       pendingRestoreToken = downloaded.restoreToken;
       const imported = parseConfigurationExport(downloaded.configuration);
       Modal.confirm({
@@ -331,11 +308,7 @@ function CloudBackupSettings({
           onConfigurationImported?.(configuration.settings);
           await Promise.allSettled([
             emitProtocolEventTo("main", "configuration:changed"),
-            emitProtocolEventTo(
-              "main",
-              "settings:changed",
-              configuration.settings,
-            ),
+            emitProtocolEventTo("main", "settings:changed", configuration.settings),
           ]);
           Message.success("云备份已恢复");
         },
@@ -351,9 +324,7 @@ function CloudBackupSettings({
       });
     } catch (error) {
       if (pendingRestoreToken) {
-        await discardCloudBackupRestore(pendingRestoreToken).catch(
-          () => undefined,
-        );
+        await discardCloudBackupRestore(pendingRestoreToken).catch(() => undefined);
       }
       Message.error(String(error));
     } finally {
@@ -425,8 +396,7 @@ function CloudBackupSettings({
           <div>
             <Typography.Title heading={6}>S3 存储</Typography.Title>
             <Typography.Text type="secondary">
-              支持 Cloudflare R2、MinIO、阿里云 OSS 等具有自定义 Endpoint
-              的 S3 兼容服务。
+              支持 Cloudflare R2、MinIO、阿里云 OSS 等具有自定义 Endpoint 的 S3 兼容服务。
             </Typography.Text>
           </div>
           <Space>
@@ -483,9 +453,7 @@ function CloudBackupSettings({
             <span>Access Key</span>
             <Input
               onChange={setAccessKeyId}
-              placeholder={
-                credentialConfigured ? "已保存，留空保持不变" : "Access Key ID"
-              }
+              placeholder={credentialConfigured ? "已保存，留空保持不变" : "Access Key ID"}
               value={accessKeyId}
             />
           </label>
@@ -493,11 +461,7 @@ function CloudBackupSettings({
             <span>Secret Key</span>
             <Input.Password
               onChange={setSecretAccessKey}
-              placeholder={
-                credentialConfigured
-                  ? "已保存，留空保持不变"
-                  : "Secret Access Key"
-              }
+              placeholder={credentialConfigured ? "已保存，留空保持不变" : "Secret Access Key"}
               value={secretAccessKey}
             />
           </label>
@@ -534,18 +498,13 @@ function CloudBackupSettings({
                   setSettings((current) => ({
                     ...current,
                     protectionMode: value,
-                    includeCredentials:
-                      value === "none" ? false : current.includeCredentials,
+                    includeCredentials: value === "none" ? false : current.includeCredentials,
                   }))
                 }
                 value={settings.protectionMode}
               >
-                <Radio value="password">
-                  备份密码：在每台新设备输入同一密码
-                </Radio>
-                <Radio value="recoveryKey">
-                  恢复密钥：首次生成一次，适合密码管理器保存
-                </Radio>
+                <Radio value="password">备份密码：在每台新设备输入同一密码</Radio>
+                <Radio value="recoveryKey">恢复密钥：首次生成一次，适合密码管理器保存</Radio>
                 <Radio value="none">不加密：仅备份配置，禁止包含主机凭据</Radio>
               </Radio.Group>
               {settings.protectionMode === "password" && (
@@ -574,9 +533,7 @@ function CloudBackupSettings({
                 <Input.Password
                   onChange={setUnlockSecret}
                   placeholder={
-                    repository.protectionMode === "recoveryKey"
-                      ? "恢复密钥"
-                      : "备份密码"
+                    repository.protectionMode === "recoveryKey" ? "恢复密钥" : "备份密码"
                   }
                   value={unlockSecret}
                 />

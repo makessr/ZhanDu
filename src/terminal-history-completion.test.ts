@@ -9,9 +9,7 @@ function disposable(onDispose = () => undefined): IDisposable {
 
 function keyboardEvent(
   key: string,
-  modifiers: Partial<
-    Pick<KeyboardEvent, "altKey" | "ctrlKey" | "metaKey" | "shiftKey">
-  > = {},
+  modifiers: Partial<Pick<KeyboardEvent, "altKey" | "ctrlKey" | "metaKey" | "shiftKey">> = {},
 ) {
   let prevented = false;
   let stopped = false;
@@ -71,11 +69,7 @@ function fakeTerminal() {
       if (!line) return undefined;
       return {
         isWrapped: line.isWrapped,
-        translateToString: (
-          trimRight = false,
-          startColumn = 0,
-          endColumn = line.text.length,
-        ) => {
+        translateToString: (trimRight = false, startColumn = 0, endColumn = line.text.length) => {
           const value = line.text.slice(startColumn, endColumn);
           return trimRight ? value.trimEnd() : value;
         },

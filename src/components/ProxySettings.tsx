@@ -14,16 +14,10 @@ import {
   Typography,
 } from "@arco-design/web-react";
 import type { TableColumnProps } from "@arco-design/web-react";
-import {
-  IconDelete,
-  IconEdit,
-  IconPlus,
-} from "@arco-design/web-react/icon";
+import { IconDelete, IconEdit, IconPlus } from "@arco-design/web-react/icon";
 import { isTauri } from "@tauri-apps/api/core";
 import { diagnosticInvoke as invoke } from "../diagnostics";
-import {
-  loadConfiguration,
-} from "../config-database";
+import { loadConfiguration } from "../config-database";
 import {
   deleteProxy,
   removeCredentialReference,
@@ -31,15 +25,8 @@ import {
   upsertProxy,
 } from "../configuration-mutations";
 import { createCredentialReference } from "../credential-registry";
-import type {
-  ProxyFormValues,
-  ProxyRecord,
-  ProxyType,
-} from "../models";
-import {
-  emitProtocolEventTo,
-  listenProtocolEvent,
-} from "../tauri-protocol";
+import type { ProxyFormValues, ProxyRecord, ProxyType } from "../models";
+import { emitProtocolEventTo, listenProtocolEvent } from "../tauri-protocol";
 
 function createProxyId() {
   return `proxy-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -62,16 +49,9 @@ interface ProxyEditorModalProps {
   onSubmit: (values: ProxyFormValues) => void;
 }
 
-function ProxyEditorModal({
-  proxy,
-  visible,
-  onCancel,
-  onSubmit,
-}: ProxyEditorModalProps) {
+function ProxyEditorModal({ proxy, visible, onCancel, onSubmit }: ProxyEditorModalProps) {
   const [form] = Form.useForm<ProxyFormValues>();
-  const [proxyType, setProxyType] = useState<ProxyType>(
-    proxy?.type ?? "socks5",
-  );
+  const [proxyType, setProxyType] = useState<ProxyType>(proxy?.type ?? "socks5");
   const [username, setUsername] = useState(proxy?.username ?? "");
 
   return (
@@ -127,33 +107,20 @@ function ProxyEditorModal({
           >
             <Input placeholder="127.0.0.1 或 proxy.example.com" />
           </Form.Item>
-          <Form.Item
-            field="port"
-            label="端口"
-            rules={[{ required: true, message: "请输入端口" }]}
-          >
+          <Form.Item field="port" label="端口" rules={[{ required: true, message: "请输入端口" }]}>
             <InputNumber max={65535} min={1} mode="button" />
           </Form.Item>
         </div>
         <Form.Item field="username" label="用户名">
-          <Input
-            onChange={setUsername}
-            placeholder="无需认证可留空"
-          />
+          <Input onChange={setUsername} placeholder="无需认证可留空" />
         </Form.Item>
         {username.trim() && (
           <Form.Item
             field="password"
             label="密码"
-            rules={
-              proxy?.username
-                ? undefined
-                : [{ required: true, message: "请输入代理密码" }]
-            }
+            rules={proxy?.username ? undefined : [{ required: true, message: "请输入代理密码" }]}
           >
-            <Input.Password
-              placeholder={proxy?.username ? "留空则保留原密码" : "代理密码"}
-            />
+            <Input.Password placeholder={proxy?.username ? "留空则保留原密码" : "代理密码"} />
           </Form.Item>
         )}
         <div className="modal-actions">
@@ -219,9 +186,7 @@ function ProxySettings() {
 
   const notifyMainWindow = async () => {
     if (!isTauri()) return;
-    await emitProtocolEventTo("main", "configuration:changed").catch(
-      () => undefined,
-    );
+    await emitProtocolEventTo("main", "configuration:changed").catch(() => undefined);
   };
 
   const saveProxy = async (values: ProxyFormValues) => {
@@ -252,11 +217,7 @@ function ProxySettings() {
       setProxies(configuration.proxies);
       if (username && password) {
         await upsertCredentialReference(
-          createCredentialReference(
-            "proxyPassword",
-            proxyId,
-            `代理：${proxy.name}`,
-          ),
+          createCredentialReference("proxyPassword", proxyId, `代理：${proxy.name}`),
         ).catch(() => {
           Message.warning("代理已保存，但凭据索引更新失败，可重新扫描");
         });

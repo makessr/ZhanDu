@@ -1,18 +1,11 @@
 import { normalizeAiRemotePath } from "./ai-file-operations";
-import {
-  createAiCommandProposal,
-  normalizeAiCommandVerification,
-} from "./ai-command-proposals";
+import { createAiCommandProposal, normalizeAiCommandVerification } from "./ai-command-proposals";
 import {
   combineAiTerminalCommandAssessment,
   normalizeAiTerminalCommand,
   type AiCommandRisk,
 } from "./ai-utils";
-import type {
-  AgentActionIntent,
-  AgentActionRisk,
-  AiToolCall,
-} from "./tauri-protocol";
+import type { AgentActionIntent, AgentActionRisk, AiToolCall } from "./tauri-protocol";
 
 const PROPOSAL_TOOLS = new Set([
   "propose_file_edit",
@@ -36,8 +29,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function exactKeys(value: Record<string, unknown>, keys: string[]) {
   const actual = Object.keys(value).sort();
   const expected = [...keys].sort();
-  return actual.length === expected.length &&
-    actual.every((key, index) => key === expected[index]);
+  return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
 }
 
 function parseArguments(call: AiToolCall) {
@@ -78,8 +70,10 @@ function normalizedCallArguments(call: AiToolCall): {
     }
     const path = normalizeAiRemotePath(value.path);
     if (value.operation === "create") {
-      if (!exactKeys(value, ["operation", "path", "content"]) ||
-        typeof value.content !== "string") {
+      if (
+        !exactKeys(value, ["operation", "path", "content"]) ||
+        typeof value.content !== "string"
+      ) {
         throw new Error("AI 新建文件动作参数无效");
       }
       return {
@@ -88,8 +82,10 @@ function normalizedCallArguments(call: AiToolCall): {
       };
     }
     if (value.operation === "rename") {
-      if (!exactKeys(value, ["operation", "path", "target_path"]) ||
-        typeof value.target_path !== "string") {
+      if (
+        !exactKeys(value, ["operation", "path", "target_path"]) ||
+        typeof value.target_path !== "string"
+      ) {
         throw new Error("AI 重命名文件动作参数无效");
       }
       return {
@@ -101,8 +97,7 @@ function normalizedCallArguments(call: AiToolCall): {
         risk: "reversible_write",
       };
     }
-    if (value.operation === "delete" &&
-      exactKeys(value, ["operation", "path"])) {
+    if (value.operation === "delete" && exactKeys(value, ["operation", "path"])) {
       return {
         arguments: { operation: value.operation, path },
         risk: "elevated",
@@ -111,18 +106,14 @@ function normalizedCallArguments(call: AiToolCall): {
     throw new Error("AI 文件操作动作参数无效");
   }
   if (call.name === "propose_terminal_command") {
-    if ((!exactKeys(value, ["command", "purpose", "risk", "risk_reason"]) &&
-      !exactKeys(value, [
-        "command",
-        "purpose",
-        "risk",
-        "risk_reason",
-        "verification",
-      ])) ||
+    if (
+      (!exactKeys(value, ["command", "purpose", "risk", "risk_reason"]) &&
+        !exactKeys(value, ["command", "purpose", "risk", "risk_reason", "verification"])) ||
       typeof value.command !== "string" ||
       typeof value.purpose !== "string" ||
       !["safe", "caution", "danger"].includes(String(value.risk)) ||
-      typeof value.risk_reason !== "string") {
+      typeof value.risk_reason !== "string"
+    ) {
       throw new Error("AI 终端命令动作参数无效");
     }
     const command = normalizeAiTerminalCommand(value.command);
@@ -136,9 +127,7 @@ function normalizedCallArguments(call: AiToolCall): {
       purpose: value.purpose.trim().replace(/\s+/g, " "),
     };
     if (value.verification !== undefined) {
-      normalizedArguments.verification = normalizeAiCommandVerification(
-        value.verification,
-      );
+      normalizedArguments.verification = normalizeAiCommandVerification(value.verification);
     }
     return {
       arguments: normalizedArguments,
@@ -151,9 +140,7 @@ function normalizedCallArguments(call: AiToolCall): {
       arguments: {
         command: proposal.command,
         purpose: proposal.purpose,
-        ...(proposal.verification
-          ? { verification: proposal.verification }
-          : {}),
+        ...(proposal.verification ? { verification: proposal.verification } : {}),
       },
       risk: proposal.assessment.risk === "safe" ? "low_risk" : "elevated",
     };
@@ -166,17 +153,15 @@ function canonicalJson(value: unknown): string {
     return `[${value.map(canonicalJson).join(",")}]`;
   }
   if (isRecord(value)) {
-    return `{${Object.keys(value).sort().map((key) =>
-      `${JSON.stringify(key)}:${canonicalJson(value[key])}`
-    ).join(",")}}`;
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`)
+      .join(",")}}`;
   }
   return JSON.stringify(value);
 }
 
-export function validateAiActionIntents(
-  calls: AiToolCall[],
-  intents: AgentActionIntent[],
-) {
+export function validateAiActionIntents(calls: AiToolCall[], intents: AgentActionIntent[]) {
   const proposalCalls = calls.filter((call) => PROPOSAL_TOOLS.has(call.name));
   if (proposalCalls.length !== intents.length) {
     throw new Error("AI 动作意图与提案数量不一致");

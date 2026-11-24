@@ -10,10 +10,7 @@ interface AiDiagnosticPlanListProps {
   messageId: string;
   onAddToDraft: (run: AiToolRun) => void;
   onCancel: (planId: string) => unknown | Promise<unknown>;
-  onConfirm: (
-    planId: string,
-    selectedCallIds: string[],
-  ) => unknown | Promise<unknown>;
+  onConfirm: (planId: string, selectedCallIds: string[]) => unknown | Promise<unknown>;
   onRevise?: (planId: string, feedback: string) => unknown | Promise<unknown>;
   onStop: (planId: string) => void;
   onToggleRun: (key: string) => void;
@@ -64,9 +61,7 @@ function AiDiagnosticPlanList({
         const selectedCallIds = steps
           .filter((run) => run.status === "pending")
           .map((run) => run.callId);
-        const executableCount = steps.filter(
-          (run) => run.status !== "unavailable",
-        ).length;
+        const executableCount = steps.filter((run) => run.status !== "unavailable").length;
         return (
           <section className="ai-diagnostic-plan" key={plan.id}>
             <div className="ai-diagnostic-plan-heading">
@@ -95,21 +90,15 @@ function AiDiagnosticPlanList({
                   const unavailable = run.status === "unavailable";
                   return (
                     <div className="ai-diagnostic-plan-step" key={run.callId}>
-                      <span className="ai-diagnostic-plan-step-index">
-                        {index + 1}
-                      </span>
+                      <span className="ai-diagnostic-plan-step-index">{index + 1}</span>
                       <div className="ai-diagnostic-plan-step-content">
                         <div className="ai-diagnostic-plan-step-title">
                           <Typography.Text>{run.label}</Typography.Text>
-                          {run.detail && (
-                            <Typography.Text code>{run.detail}</Typography.Text>
-                          )}
+                          {run.detail && <Typography.Text code>{run.detail}</Typography.Text>}
                           {run.detail && <Tag color="orange">主动探测</Tag>}
                           {unavailable && <Tag color="gray">权限已关闭</Tag>}
                         </div>
-                        <Typography.Text type="secondary">
-                          {run.reason}
-                        </Typography.Text>
+                        <Typography.Text type="secondary">{run.reason}</Typography.Text>
                       </div>
                     </div>
                   );
@@ -120,11 +109,7 @@ function AiDiagnosticPlanList({
                   feedbackPlaceholder="输入其他处理要求，例如：不要探测公网，只读取本机连接"
                   onApprove={() => onConfirm(plan.id, selectedCallIds)}
                   onReject={() => onCancel(plan.id)}
-                  onRevise={
-                    onRevise
-                      ? (feedback) => onRevise(plan.id, feedback)
-                      : undefined
-                  }
+                  onRevise={onRevise ? (feedback) => onRevise(plan.id, feedback) : undefined}
                 />
               </div>
             ) : (

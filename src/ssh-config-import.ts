@@ -16,7 +16,10 @@ function words(line: string) {
     const char = line[index];
     const next = line[index + 1];
     if (!quote && char === "#") break;
-    if (char === "\\" && (next === quote || next === "\\" || (!quote && /[\s"#']/.test(next ?? "")))) {
+    if (
+      char === "\\" &&
+      (next === quote || next === "\\" || (!quote && /[\s"#']/.test(next ?? "")))
+    ) {
       token += next;
       index++;
     } else if (quote ? char === quote : char === '"' || char === "'") {
@@ -80,13 +83,18 @@ export async function expandSshConfig(
 }
 
 function matches(pattern: string, alias: string) {
-  const regex = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".");
+  const regex = pattern
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*/g, ".*")
+    .replace(/\?/g, ".");
   return new RegExp("^" + regex + "$", "i").test(alias);
 }
 
 function applies({ patterns }: Section, alias: string) {
-  return patterns.some((pattern) => !pattern.startsWith("!") && matches(pattern, alias)) &&
-    !patterns.some((pattern) => pattern.startsWith("!") && matches(pattern.slice(1), alias));
+  return (
+    patterns.some((pattern) => !pattern.startsWith("!") && matches(pattern, alias)) &&
+    !patterns.some((pattern) => pattern.startsWith("!") && matches(pattern.slice(1), alias))
+  );
 }
 
 function sshPort(value: string | undefined) {
@@ -133,20 +141,29 @@ export function parseSshConfig(contents: string, defaultUser: string) {
       const address = (options.get("hostname") ?? alias).replace(/%h/g, alias);
       const identity = options.get("identityfile");
       const proxyCommand = options.get("proxycommand");
-      if (proxyCommand && proxyCommand.toLowerCase() !== "none") throw new Error("使用 ProxyCommand");
+      if (proxyCommand && proxyCommand.toLowerCase() !== "none")
+        throw new Error("使用 ProxyCommand");
       const jump = options.get("proxyjump");
       const jumpAlias = jump?.toLowerCase() === "none" ? undefined : jump?.toLowerCase();
-      if (jumpAlias && !aliases.has(jumpAlias)) throw new Error("跳板机需为文件中定义的单一 Host 别名");
+      if (jumpAlias && !aliases.has(jumpAlias))
+        throw new Error("跳板机需为文件中定义的单一 Host 别名");
       if (!username || /[%\s]/.test(username)) throw new Error("缺少可用的 SSH 用户名");
       if (!address || /[%\s]/.test(address)) throw new Error("主机地址包含未支持的占位符");
       const privateKeyPath = identity?.toLowerCase() === "none" ? undefined : identity;
-      if (privateKeyPath && (privateKeyPath.includes("%") ||
-        !/^(?:~[\\/]|[\\/]|[a-z]:[\\/])/i.test(privateKeyPath))) {
+      if (
+        privateKeyPath &&
+        (privateKeyPath.includes("%") || !/^(?:~[\\/]|[\\/]|[a-z]:[\\/])/i.test(privateKeyPath))
+      ) {
         throw new Error("私钥路径必须为绝对路径或以 ~/ 开头");
       }
       const { id: _id, ...host } = withHostDefaults({
-        id: "", name: alias, address, username, port: sshPort(options.get("port")),
-        authMethod: privateKeyPath ? "privateKey" : "agent", privateKeyPath,
+        id: "",
+        name: alias,
+        address,
+        username,
+        port: sshPort(options.get("port")),
+        authMethod: privateKeyPath ? "privateKey" : "agent",
+        privateKeyPath,
         group: "OpenSSH",
       });
       hosts.push({ ...host, jumpAlias });
@@ -169,21 +186,39 @@ export function parseSshConfig(contents: string, defaultUser: string) {
   };
 }
 
-function sameTarget(a: Pick<HostRecord, "address" | "port" | "username">,
-  b: Pick<HostRecord, "address" | "port" | "username">) {
-  return a.address.toLowerCase() === b.address.toLowerCase() && a.port === b.port && a.username === b.username;
+function sameTarget(
+  a: Pick<HostRecord, "address" | "port" | "username">,
+  b: Pick<HostRecord, "address" | "port" | "username">,
+) {
+  return (
+    a.address.toLowerCase() === b.address.toLowerCase() &&
+    a.port === b.port &&
+    a.username === b.username
+  );
 }
 
-export function mergeSshConfig(existing: HostRecord[], incoming: ImportedHost[], createId: () => string) {
+export function mergeSshConfig(
+  existing: HostRecord[],
+  incoming: ImportedHost[],
+  createId: () => string,
+) {
   const result = [...existing];
   const byAlias = new Map<string, HostRecord>();
   let skipped = 0;
-  for (const host of [...incoming.filter((item) => !item.jumpAlias), ...incoming.filter((item) => item.jumpAlias)]) {
+  for (const host of [
+    ...incoming.filter((item) => !item.jumpAlias),
+    ...incoming.filter((item) => item.jumpAlias),
+  ]) {
     const { jumpAlias, ...fields } = host;
     const jumpHostId = jumpAlias ? byAlias.get(jumpAlias)?.id : undefined;
     const duplicate = result.find((item) => item.name.toLowerCase() === host.name.toLowerCase());
     if (duplicate || (jumpAlias && !jumpHostId)) {
-      if (duplicate && sameTarget(duplicate, host) && duplicate.jumpHostId === jumpHostId && !duplicate.proxyId) {
+      if (
+        duplicate &&
+        sameTarget(duplicate, host) &&
+        duplicate.jumpHostId === jumpHostId &&
+        !duplicate.proxyId
+      ) {
         byAlias.set(host.name.toLowerCase(), duplicate);
       }
       skipped++;

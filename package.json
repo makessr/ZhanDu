@@ -8,8 +8,13 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "test": "bun test",
+    "test:app": "bun test ./src/App.golden-path.e2e.tsx",
+    "test:coverage": "bun scripts/check-coverage.ts",
     "test:components": "bun test src/components/*.test.tsx",
-    "check": "bun test && bun run build",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "bun run lint && bun run format:check && bun test && bun run test:app && bun run build",
     "release:check": "bun scripts/check-release-version.ts",
     "release:notes": "bun scripts/extract-release-notes.ts",
     "release:prepare": "bun scripts/prepare-release.ts",
@@ -38,6 +43,7 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@happy-dom/global-registrator": "^20.11.1",
     "@tauri-apps/cli": "^2",
     "@testing-library/react": "^16.3.2",
@@ -46,8 +52,15 @@
     "@types/react": "18",
     "@types/react-dom": "18",
     "@vitejs/plugin-react": "^4.6.0",
+    "eslint": "^9",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.8",
+    "fake-indexeddb": "^6.2.8",
+    "globals": "^17.14.0",
     "happy-dom": "^20.11.1",
+    "prettier": "^3.10.1",
     "typescript": "~5.8.3",
+    "typescript-eslint": "^8.74.0",
     "vite": "^7.0.4"
   }
 }

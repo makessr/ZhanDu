@@ -147,13 +147,26 @@ export const TERMINAL_THEMES = {
 } satisfies Record<string, TerminalThemeDefinition>;
 
 export const ANSI_COLOR_KEYS = [
-  "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
-  "brightBlack", "brightRed", "brightGreen", "brightYellow", "brightBlue",
-  "brightMagenta", "brightCyan", "brightWhite",
+  "black",
+  "red",
+  "green",
+  "yellow",
+  "blue",
+  "magenta",
+  "cyan",
+  "white",
+  "brightBlack",
+  "brightRed",
+  "brightGreen",
+  "brightYellow",
+  "brightBlue",
+  "brightMagenta",
+  "brightCyan",
+  "brightWhite",
 ] as const;
 
 export type TerminalColorScheme =
-  | "appearance" | keyof typeof TERMINAL_THEMES | `base24:${string}` | `ghostty:${string}`;
+  "appearance" | keyof typeof TERMINAL_THEMES | `base24:${string}` | `ghostty:${string}`;
 
 export interface StoredTerminalTheme {
   name: string;
@@ -190,15 +203,17 @@ function terminalColors(
 }
 
 export const BASE24_TERMINAL_THEMES = new Map(
-  Object.entries(base24).map(([slug, [label, author, background, foreground, selectionBackground, ...palette]]) => [
-    `base24:${slug}`,
-    {
-      label,
-      author,
-      swatch: background,
-      theme: { ...terminalColors(background, foreground, palette), selectionBackground },
-    },
-  ]),
+  Object.entries(base24).map(
+    ([slug, [label, author, background, foreground, selectionBackground, ...palette]]) => [
+      `base24:${slug}`,
+      {
+        label,
+        author,
+        swatch: background,
+        theme: { ...terminalColors(background, foreground, palette), selectionBackground },
+      },
+    ],
+  ),
 );
 
 export function parseGhosttyTheme(fileName: string, contents: string): StoredTerminalTheme {
@@ -217,7 +232,10 @@ export function parseGhosttyTheme(fileName: string, contents: string): StoredTer
       const entry = /^(0|[1-9]\d*)\s*=\s*(#?[0-9a-f]{6})$/i.exec(value);
       const ansiKey = entry && ANSI_COLOR_KEYS[Number(entry[1])];
       if (ansiKey && entry) colors[ansiKey] = `#${entry[2].replace(/^#/, "")}`.toLowerCase();
-    } else if (Object.prototype.hasOwnProperty.call(GHOSTTY_COLOR_KEYS, key) && HEX_COLOR.test(value)) {
+    } else if (
+      Object.prototype.hasOwnProperty.call(GHOSTTY_COLOR_KEYS, key) &&
+      HEX_COLOR.test(value)
+    ) {
       colors[GHOSTTY_COLOR_KEYS[key as keyof typeof GHOSTTY_COLOR_KEYS]] =
         `#${value.replace(/^#/, "")}`.toLowerCase();
     }
@@ -229,7 +247,10 @@ export function parseGhosttyTheme(fileName: string, contents: string): StoredTer
   return {
     name,
     theme: {
-      ...fallback, ...colors, background, foreground,
+      ...fallback,
+      ...colors,
+      background,
+      foreground,
       cursor: colors.cursor ?? foreground,
       cursorAccent: colors.cursorAccent ?? background,
     },
@@ -240,13 +261,21 @@ export function sanitizeCustomTerminalThemes(input: unknown): StoredTerminalThem
   if (!Array.isArray(input)) return [];
   const result = new Map<string, StoredTerminalTheme>();
   for (const item of input.slice(0, MAX_CUSTOM_TERMINAL_THEMES)) {
-    if (!item || typeof item.name !== "string" || !item.name.trim() ||
-        item.name.length > 255 || /[\x00-\x1f\x7f]/.test(item.name) ||
-        !item.theme || typeof item.theme !== "object") continue;
+    if (
+      !item ||
+      typeof item.name !== "string" ||
+      !item.name.trim() ||
+      item.name.length > 255 ||
+      /[\x00-\x1f\x7f]/.test(item.name) ||
+      !item.theme ||
+      typeof item.theme !== "object"
+    )
+      continue;
     const theme = { ...TERMINAL_THEMES.fineshellDark.theme } as StoredTerminalTheme["theme"];
     for (const key of [...ANSI_COLOR_KEYS, ...Object.values(GHOSTTY_COLOR_KEYS)]) {
       const value: unknown = item.theme[key];
-      if (typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value)) theme[key] = value.toLowerCase();
+      if (typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value))
+        theme[key] = value.toLowerCase();
     }
     result.set(item.name, { name: item.name, theme });
   }
@@ -273,7 +302,8 @@ export function resolveTerminalTheme(
 ): TerminalThemeDefinition {
   if (scheme.startsWith("ghostty:")) {
     const selected = custom.find(({ name }) => customTerminalThemeId(name) === scheme);
-    if (selected) return { label: selected.name, swatch: selected.theme.background, theme: selected.theme };
+    if (selected)
+      return { label: selected.name, swatch: selected.theme.background, theme: selected.theme };
   } else if (scheme.startsWith("base24:")) {
     const selected = BASE24_TERMINAL_THEMES.get(scheme);
     if (selected) return selected;

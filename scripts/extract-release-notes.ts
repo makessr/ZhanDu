@@ -1,16 +1,12 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const RELEASE_TAG_PATTERN =
-  /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
-const VERSION_HEADING_PATTERN =
-  /^##[ \t]+\[([^\]]+)\](?:[ \t]+-[ \t]+[^\r\n]+)?[ \t]*$/gm;
+const RELEASE_TAG_PATTERN = /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+const VERSION_HEADING_PATTERN = /^##[ \t]+\[([^\]]+)\](?:[ \t]+-[ \t]+[^\r\n]+)?[ \t]*$/gm;
 
 export function releaseVersionFromTag(releaseTag: string) {
   if (!RELEASE_TAG_PATTERN.test(releaseTag)) {
-    throw new Error(
-      `版本标签“${releaseTag}”格式无效，应使用 v1.2.3 或 v1.2.3-beta.1`,
-    );
+    throw new Error(`版本标签“${releaseTag}”格式无效，应使用 v1.2.3 或 v1.2.3-beta.1`);
   }
 
   return releaseTag.slice(1);
@@ -19,9 +15,7 @@ export function releaseVersionFromTag(releaseTag: string) {
 export function extractReleaseNotes(changelog: string, releaseTag: string) {
   const version = releaseVersionFromTag(releaseTag);
   const normalizedChangelog = changelog.replaceAll("\r\n", "\n");
-  const headings = Array.from(
-    normalizedChangelog.matchAll(VERSION_HEADING_PATTERN),
-  );
+  const headings = Array.from(normalizedChangelog.matchAll(VERSION_HEADING_PATTERN));
   const headingIndex = headings.findIndex((match) => match[1] === version);
 
   if (headingIndex < 0) {

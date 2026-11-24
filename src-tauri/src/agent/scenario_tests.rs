@@ -91,7 +91,7 @@ fn approved_command_completes_and_restores_the_full_agent_timeline() {
     );
     let (execution, approved) = scenario
         .manager
-        .authorize_action_execution(&context.id, "command-scenario", false, true, None)
+        .authorize_action_execution_confirmed(&context.id, "command-scenario", false, None)
         .unwrap();
     assert_eq!(execution.session_id, "session-scenario");
     scenario.record(approved);
@@ -216,7 +216,7 @@ fn disconnected_action_is_closed_before_a_fresh_recovery_task_runs() {
     assert!(completed[0].task.actions.is_empty());
     assert_eq!(
         manager
-            .authorize_action_execution(&context.id, "command-scenario", false, true, None,)
+            .authorize_action_execution_confirmed(&context.id, "command-scenario", false, None)
             .unwrap_err(),
         "AI 任务已经结束"
     );

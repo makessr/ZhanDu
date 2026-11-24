@@ -136,8 +136,7 @@ impl TerminalLogWriter {
         if request.directory.trim().is_empty() {
             return Err("终端日志目录不能为空".to_string());
         }
-        fs::create_dir_all(&directory)
-            .map_err(|error| format!("无法创建终端日志目录：{error}"))?;
+        fs::create_dir_all(&directory).map_err(|error| format!("无法创建终端日志目录：{error}"))?;
         let metadata =
             fs::metadata(&directory).map_err(|error| format!("无法访问终端日志目录：{error}"))?;
         if !metadata.is_dir() {

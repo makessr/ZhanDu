@@ -1,10 +1,7 @@
 import { useState } from "react";
 import { describe, expect, test } from "bun:test";
 import { fireEvent, render, screen } from "@testing-library/react";
-import AiFileDiffView, {
-  aiFileLanguage,
-  type AiFileDiffMode,
-} from "./AiFileDiffView";
+import AiFileDiffView, { aiFileLanguage, type AiFileDiffMode } from "./AiFileDiffView";
 
 function DiffHarness() {
   const [mode, setMode] = useState<AiFileDiffMode>("unified");
@@ -47,10 +44,7 @@ describe("AiFileDiffView", () => {
   });
 
   test("bounds large unchanged regions around the actual change", () => {
-    const original = Array.from(
-      { length: 2_100 },
-      (_, index) => `line ${index + 1}`,
-    );
+    const original = Array.from({ length: 2_100 }, (_, index) => `line ${index + 1}`);
     const proposed = [...original];
     proposed[2_099] = "changed";
 
@@ -65,7 +59,6 @@ describe("AiFileDiffView", () => {
     );
 
     expect(screen.getByRole("note").textContent).toContain("省略");
-    expect(screen.getByRole("region", { name: "文件修改差异" }).textContent)
-      .toContain("changed");
+    expect(screen.getByRole("region", { name: "文件修改差异" }).textContent).toContain("changed");
   });
 });

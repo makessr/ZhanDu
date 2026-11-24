@@ -1,8 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 import { fireEvent, render, screen } from "@testing-library/react";
-import AiConversationHistoryDrawer, {
-  aiConversationTime,
-} from "./AiConversationHistoryDrawer";
+import AiConversationHistoryDrawer, { aiConversationTime } from "./AiConversationHistoryDrawer";
 
 describe("AiConversationHistoryDrawer", () => {
   test("renders history and delegates item actions", () => {

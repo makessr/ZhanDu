@@ -1,7 +1,4 @@
-import type {
-  ServerMonitorHistoryPoint,
-  ServerMonitorSnapshot,
-} from "./models";
+import type { ServerMonitorHistoryPoint, ServerMonitorSnapshot } from "./models";
 
 export function appendMonitorHistory(
   history: ServerMonitorHistoryPoint[],
@@ -10,24 +7,17 @@ export function appendMonitorHistory(
   limit = 48,
 ) {
   const previous = history[history.length - 1];
-  const elapsedSeconds = previous
-    ? (collectedAt - previous.collectedAt) / 1_000
-    : 0;
+  const elapsedSeconds = previous ? (collectedAt - previous.collectedAt) / 1_000 : 0;
   const interfaceCounters = new Map(previous?.networkInterfaces?.map((item) => [item.name, item]));
   const receiveBytesPerSecond =
     previous && elapsedSeconds > 0
-      ? Math.max(
-          0,
-          (snapshot.networkReceiveBytes - previous.networkReceiveBytes) /
-            elapsedSeconds,
-        )
+      ? Math.max(0, (snapshot.networkReceiveBytes - previous.networkReceiveBytes) / elapsedSeconds)
       : 0;
   const transmitBytesPerSecond =
     previous && elapsedSeconds > 0
       ? Math.max(
           0,
-          (snapshot.networkTransmitBytes - previous.networkTransmitBytes) /
-            elapsedSeconds,
+          (snapshot.networkTransmitBytes - previous.networkTransmitBytes) / elapsedSeconds,
         )
       : 0;
 
@@ -48,12 +38,14 @@ export function appendMonitorHistory(
           const prior = interfaceCounters.get(item.name);
           return {
             ...item,
-            receiveBytesPerSecond: prior && elapsedSeconds > 0
-              ? Math.max(0, (item.receiveBytes - prior.receiveBytes) / elapsedSeconds)
-              : 0,
-            transmitBytesPerSecond: prior && elapsedSeconds > 0
-              ? Math.max(0, (item.transmitBytes - prior.transmitBytes) / elapsedSeconds)
-              : 0,
+            receiveBytesPerSecond:
+              prior && elapsedSeconds > 0
+                ? Math.max(0, (item.receiveBytes - prior.receiveBytes) / elapsedSeconds)
+                : 0,
+            transmitBytesPerSecond:
+              prior && elapsedSeconds > 0
+                ? Math.max(0, (item.transmitBytes - prior.transmitBytes) / elapsedSeconds)
+                : 0,
           };
         }),
       }),
@@ -61,19 +53,26 @@ export function appendMonitorHistory(
   ].slice(-Math.max(1, limit));
 }
 
-export function monitorNetworkRates(point: ServerMonitorHistoryPoint | undefined, interfaceName: string) {
+export function monitorNetworkRates(
+  point: ServerMonitorHistoryPoint | undefined,
+  interfaceName: string,
+) {
   const selected = point?.networkInterfaces?.find((item) => item.name === interfaceName);
-  if (interfaceName) return { receive: selected?.receiveBytesPerSecond ?? 0, transmit: selected?.transmitBytesPerSecond ?? 0 };
-  return { receive: point?.networkReceiveBytesPerSecond ?? 0, transmit: point?.networkTransmitBytesPerSecond ?? 0 };
+  if (interfaceName)
+    return {
+      receive: selected?.receiveBytesPerSecond ?? 0,
+      transmit: selected?.transmitBytesPerSecond ?? 0,
+    };
+  return {
+    receive: point?.networkReceiveBytesPerSecond ?? 0,
+    transmit: point?.networkTransmitBytesPerSecond ?? 0,
+  };
 }
 
 export function formatMonitorBytes(bytes: number) {
   if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB"];
-  const unitIndex = Math.min(
-    Math.floor(Math.log(bytes) / Math.log(1024)),
-    units.length - 1,
-  );
+  const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
   const value = bytes / 1024 ** unitIndex;
   return `${value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
 }
@@ -103,9 +102,7 @@ export function normalizeMonitorPercent(value: unknown) {
     return value;
   }
   const numericValue = Number(value);
-  return Number.isFinite(numericValue)
-    ? formatMonitorPercent(numericValue)
-    : undefined;
+  return Number.isFinite(numericValue) ? formatMonitorPercent(numericValue) : undefined;
 }
 
 export function formatUptime(seconds: number) {

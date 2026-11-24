@@ -1,8 +1,4 @@
-import type {
-  ConnectionHistoryRecord,
-  HostRecord,
-  KnownHostRecord,
-} from "./models";
+import type { ConnectionHistoryRecord, HostRecord, KnownHostRecord } from "./models";
 
 interface KnownHostTarget {
   address: string;
@@ -16,9 +12,7 @@ function validTimestamp(value: string | undefined, fallback: string) {
 export function normalizeHostFingerprint(value: string) {
   const fingerprint = value.trim();
   if (!fingerprint) return "";
-  return fingerprint.startsWith("SHA256:")
-    ? fingerprint
-    : `SHA256:${fingerprint}`;
+  return fingerprint.startsWith("SHA256:") ? fingerprint : `SHA256:${fingerprint}`;
 }
 
 export function knownHostTargetKey(address: string, port: number) {
@@ -40,15 +34,13 @@ export function upsertKnownHostRecord(
   const existing = records.find(
     (record) => knownHostTargetKey(record.address, record.port) === key,
   );
-  const fingerprintChanged =
-    existing && existing.fingerprint !== normalizedFingerprint;
+  const fingerprintChanged = existing && existing.fingerprint !== normalizedFingerprint;
   const next: KnownHostRecord = {
     id: existing?.id ?? knownHostRecordId(target.address, target.port),
     address: target.address.trim(),
     port: target.port,
     fingerprint: normalizedFingerprint,
-    firstSeenAt:
-      existing && !fingerprintChanged ? existing.firstSeenAt : verifiedAt,
+    firstSeenAt: existing && !fingerprintChanged ? existing.firstSeenAt : verifiedAt,
     lastVerifiedAt: verifiedAt,
   };
 
@@ -88,10 +80,7 @@ export function deriveKnownHostRecords(
           ]
         : [],
     ),
-  ].sort(
-    (left, right) =>
-      Date.parse(left.verifiedAt) - Date.parse(right.verifiedAt),
-  );
+  ].sort((left, right) => Date.parse(left.verifiedAt) - Date.parse(right.verifiedAt));
 
   for (const candidate of candidates) {
     const key = knownHostTargetKey(candidate.address, candidate.port);
@@ -111,16 +100,13 @@ export function deriveKnownHostRecords(
       existing.fingerprint === normalizeHostFingerprint(candidate.fingerprint)
     ) {
       records = records.map((record) =>
-        record.id === existing.id
-          ? { ...record, firstSeenAt: previousFirstSeenAt }
-          : record,
+        record.id === existing.id ? { ...record, firstSeenAt: previousFirstSeenAt } : record,
       );
     }
   }
 
   return records.sort(
-    (left, right) =>
-      Date.parse(right.lastVerifiedAt) - Date.parse(left.lastVerifiedAt),
+    (left, right) => Date.parse(right.lastVerifiedAt) - Date.parse(left.lastVerifiedAt),
   );
 }
 

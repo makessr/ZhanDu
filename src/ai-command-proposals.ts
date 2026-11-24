@@ -130,8 +130,7 @@ export interface AiCommandRecord {
 
 function summarizeAiCommandOutput(output: string) {
   if (output.length <= MAX_AI_COMMAND_OUTPUT_SUMMARY_CHARS) return output;
-  const available =
-    MAX_AI_COMMAND_OUTPUT_SUMMARY_CHARS - AI_COMMAND_OUTPUT_OMISSION.length;
+  const available = MAX_AI_COMMAND_OUTPUT_SUMMARY_CHARS - AI_COMMAND_OUTPUT_OMISSION.length;
   const headLength = Math.ceil(available / 2);
   const tailLength = available - headLength;
   return `${output.slice(0, headLength)}${AI_COMMAND_OUTPUT_OMISSION}${output.slice(-tailLength)}`;
@@ -146,8 +145,7 @@ function combineAiCommandOutput(stdout: string, stderr: string) {
 function businessVerificationResult(
   verification?: AiCommandExecutionVerificationState,
 ): AiCommandBusinessVerificationResult | undefined {
-  if (!verification || verification.status === "not_applicable")
-    return undefined;
+  if (!verification || verification.status === "not_applicable") return undefined;
   const evidence = [...verification.evidence]
     .reverse()
     .find((item) => item.kind !== "command_exit_status");
@@ -162,9 +160,7 @@ function businessVerificationResult(
   return {
     status: verification.status,
     summary: evidence?.summary || fallback,
-    ...(evidence
-      ? { observedAt: new Date(evidence.observedAt).toISOString() }
-      : {}),
+    ...(evidence ? { observedAt: new Date(evidence.observedAt).toISOString() } : {}),
   };
 }
 
@@ -175,15 +171,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function exactKeys(value: Record<string, unknown>, keys: string[]) {
   const actual = Object.keys(value).sort();
   const expected = [...keys].sort();
-  return (
-    actual.length === expected.length &&
-    actual.every((key, index) => key === expected[index])
-  );
+  return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
 }
 
-export function normalizeAiCommandVerification(
-  value: unknown,
-): AiCommandVerification {
+export function normalizeAiCommandVerification(value: unknown): AiCommandVerification {
   if (!isRecord(value) || typeof value.kind !== "string") {
     throw new Error("AI 返回的业务验证参数无效");
   }
@@ -211,11 +202,8 @@ export function normalizeAiCommandVerification(
   }
   if (
     value.kind === "config_syntax" &&
-    (exactKeys(value, ["kind", "validator"]) ||
-      exactKeys(value, ["kind", "validator", "path"])) &&
-    ["nginx", "apache", "caddy", "sshd", "haproxy"].includes(
-      String(value.validator),
-    ) &&
+    (exactKeys(value, ["kind", "validator"]) || exactKeys(value, ["kind", "validator", "path"])) &&
+    ["nginx", "apache", "caddy", "sshd", "haproxy"].includes(String(value.validator)) &&
     (value.path === undefined ||
       (typeof value.path === "string" &&
         value.path.startsWith("/") &&
@@ -223,8 +211,7 @@ export function normalizeAiCommandVerification(
         !value.path.split("/").some((part) => part === "." || part === "..") &&
         !/[\x00-\x1f\x7f]/.test(value.path)))
   ) {
-    const validator = value.validator as
-      "nginx" | "apache" | "caddy" | "sshd" | "haproxy";
+    const validator = value.validator as "nginx" | "apache" | "caddy" | "sshd" | "haproxy";
     return {
       kind: value.kind,
       validator,
@@ -328,13 +315,7 @@ export function createAiCommandProposal(
   }
   if (
     !exactKeys(value, ["command", "purpose", "risk", "risk_reason"]) &&
-    !exactKeys(value, [
-      "command",
-      "purpose",
-      "risk",
-      "risk_reason",
-      "verification",
-    ])
+    !exactKeys(value, ["command", "purpose", "risk", "risk_reason", "verification"])
   ) {
     throw new Error("AI 返回了无效的终端命令参数");
   }
@@ -353,19 +334,13 @@ export function createAiCommandProposal(
   ) {
     throw new Error("AI 返回的命令用途无效");
   }
-  if (
-    value.risk !== "safe" &&
-    value.risk !== "caution" &&
-    value.risk !== "danger"
-  ) {
+  if (value.risk !== "safe" && value.risk !== "caution" && value.risk !== "danger") {
     throw new Error("AI 返回的命令风险等级无效");
   }
   if (typeof value.risk_reason !== "string") {
     throw new Error("AI 返回的命令风险说明无效");
   }
-  const riskReason = redactAiContext(value.risk_reason)
-    .trim()
-    .replace(/\s+/g, " ");
+  const riskReason = redactAiContext(value.risk_reason).trim().replace(/\s+/g, " ");
   if (
     !riskReason ||
     riskReason.length > MAX_AI_COMMAND_RISK_REASON_CHARS ||
@@ -390,10 +365,7 @@ export function createAiCommandProposal(
   };
 }
 
-export function aiCommandProposalToolResult(
-  call: AiToolCall,
-  error: string,
-): AiToolResult {
+export function aiCommandProposalToolResult(call: AiToolCall, error: string): AiToolResult {
   return {
     callId: call.id,
     name: call.name,
@@ -484,17 +456,13 @@ export function updateAiCommandProposalOutput(
   return {
     ...proposal,
     approvedAt:
-      proposal.approvedAt ??
-      (proposal.status === "pending" ? new Date().toISOString() : undefined),
+      proposal.approvedAt ?? (proposal.status === "pending" ? new Date().toISOString() : undefined),
     fullResultOutput: redactedOutput,
     resultOutput,
     resultOutputTruncated:
-      outputTruncated ||
-      resultOutput.length < redactedOutput.length ||
-      undefined,
+      outputTruncated || resultOutput.length < redactedOutput.length || undefined,
     executionPhase: proposal.executionPhase ?? "running",
-    status:
-      proposal.status === "pending" ? ("approved" as const) : proposal.status,
+    status: proposal.status === "pending" ? ("approved" as const) : proposal.status,
   };
 }
 
@@ -507,27 +475,16 @@ export function reconcileAiCommandProposalExecution(
     return proposal;
   }
   const streamsSeparated =
-    execution.stdoutExcerpt !== undefined ||
-    execution.stderrExcerpt !== undefined;
-  const stdout = streamsSeparated
-    ? redactAiContext(execution.stdoutExcerpt ?? "")
-    : "";
-  const stderr = streamsSeparated
-    ? redactAiContext(execution.stderrExcerpt ?? "")
-    : "";
+    execution.stdoutExcerpt !== undefined || execution.stderrExcerpt !== undefined;
+  const stdout = streamsSeparated ? redactAiContext(execution.stdoutExcerpt ?? "") : "";
+  const stderr = streamsSeparated ? redactAiContext(execution.stderrExcerpt ?? "") : "";
   const redactedOutput = streamsSeparated
     ? combineAiCommandOutput(stdout, stderr)
     : redactAiContext(execution.outputExcerpt ?? "");
   const resultOutput = summarizeAiCommandOutput(redactedOutput);
-  const resultStdout = streamsSeparated
-    ? summarizeAiCommandOutput(stdout)
-    : undefined;
-  const resultStderr = streamsSeparated
-    ? summarizeAiCommandOutput(stderr)
-    : undefined;
-  const running = ["connecting", "running", "cancelling"].includes(
-    execution.phase,
-  );
+  const resultStdout = streamsSeparated ? summarizeAiCommandOutput(stdout) : undefined;
+  const resultStderr = streamsSeparated ? summarizeAiCommandOutput(stderr) : undefined;
+  const running = ["connecting", "running", "cancelling"].includes(execution.phase);
   const completedAt = execution.completedAt
     ? new Date(execution.completedAt).toISOString()
     : undefined;
@@ -542,64 +499,46 @@ export function reconcileAiCommandProposalExecution(
         : "unavailable";
   return {
     ...proposal,
-    approvedAt:
-      proposal.approvedAt ?? new Date(execution.submittedAt).toISOString(),
+    approvedAt: proposal.approvedAt ?? new Date(execution.submittedAt).toISOString(),
     completedAt,
     durationMs: execution.durationMs ?? undefined,
     executionPhase: execution.phase,
     executedAt: new Date(execution.submittedAt).toISOString(),
     exitCode: execution.exitCode ?? undefined,
-    businessVerification:
-      businessVerificationResult(verification) ?? proposal.businessVerification,
+    businessVerification: businessVerificationResult(verification) ?? proposal.businessVerification,
     fullResultOutput: redactedOutput || proposal.fullResultOutput,
     fullResultStdout: streamsSeparated ? stdout : proposal.fullResultStdout,
     fullResultStderr: streamsSeparated ? stderr : proposal.fullResultStderr,
-    outputStreamsSeparated:
-      streamsSeparated || proposal.outputStreamsSeparated || undefined,
+    outputStreamsSeparated: streamsSeparated || proposal.outputStreamsSeparated || undefined,
     resultOutput:
-      redactedOutput ||
-      execution.phase === "completed" ||
-      execution.phase === "failed"
+      redactedOutput || execution.phase === "completed" || execution.phase === "failed"
         ? resultOutput
         : proposal.resultOutput,
     resultOutputTruncated:
-      execution.outputTruncated ||
-      resultOutput.length < redactedOutput.length ||
-      undefined,
+      execution.outputTruncated || resultOutput.length < redactedOutput.length || undefined,
     resultStdout: streamsSeparated ? resultStdout : proposal.resultStdout,
     resultStdoutTruncated: streamsSeparated
-      ? execution.stdoutTruncated === true ||
-        resultStdout!.length < stdout.length ||
-        undefined
+      ? execution.stdoutTruncated === true || resultStdout!.length < stdout.length || undefined
       : proposal.resultStdoutTruncated,
     resultStderr: streamsSeparated ? resultStderr : proposal.resultStderr,
     resultStderrTruncated: streamsSeparated
-      ? execution.stderrTruncated === true ||
-        resultStderr!.length < stderr.length ||
-        undefined
+      ? execution.stderrTruncated === true || resultStderr!.length < stderr.length || undefined
       : proposal.resultStderrTruncated,
     resultUnavailableReason:
-      status === "unavailable"
-        ? execution.reason?.trim() || "后台命令执行已中断"
-        : undefined,
+      status === "unavailable" ? execution.reason?.trim() || "后台命令执行已中断" : undefined,
     status,
     submissionId: execution.submissionId,
   };
 }
 
-export function markAiCommandProposalUnavailable(
-  proposal: AiCommandProposal,
-  reason: string,
-) {
+export function markAiCommandProposalUnavailable(proposal: AiCommandProposal, reason: string) {
   if (proposal.status !== "approved" && proposal.status !== "executed") {
     return proposal;
   }
   return {
     ...proposal,
     completedAt: new Date().toISOString(),
-    executionPhase: reason.includes("取消")
-      ? ("interrupted" as const)
-      : ("failed" as const),
+    executionPhase: reason.includes("取消") ? ("interrupted" as const) : ("failed" as const),
     resultUnavailableReason: reason.trim() || "后台命令执行结果不可用",
     status: "unavailable" as const,
   };
@@ -609,10 +548,7 @@ export function aiCommandProposalMatchesSubmission(
   proposal: AiCommandProposal,
   submission: TerminalCommandSubmission,
 ) {
-  if (
-    proposal.status !== "approved" ||
-    proposal.sessionId !== submission.sessionId
-  ) {
+  if (proposal.status !== "approved" || proposal.sessionId !== submission.sessionId) {
     return false;
   }
   try {
@@ -673,17 +609,13 @@ export function aiCommandApprovalDecisionFromSubmission(
     exitCode: submission.exitCode,
     kind: "execution_completed",
     output,
-    outputTruncated:
-      submission.outputTruncated === true ||
-      output.length < redactedOutput.length,
+    outputTruncated: submission.outputTruncated === true || output.length < redactedOutput.length,
     stdout: summarizeAiCommandOutput(stdout),
     stdoutTruncated:
-      submission.stdoutTruncated === true ||
-      stdout.length > MAX_AI_COMMAND_OUTPUT_SUMMARY_CHARS,
+      submission.stdoutTruncated === true || stdout.length > MAX_AI_COMMAND_OUTPUT_SUMMARY_CHARS,
     stderr: summarizeAiCommandOutput(stderr),
     stderrTruncated:
-      submission.stderrTruncated === true ||
-      stderr.length > MAX_AI_COMMAND_OUTPUT_SUMMARY_CHARS,
+      submission.stderrTruncated === true || stderr.length > MAX_AI_COMMAND_OUTPUT_SUMMARY_CHARS,
   };
 }
 
@@ -713,17 +645,14 @@ export function markAiCommandProposalCompleted(
   const resultOutput = summarizeAiCommandOutput(redactedOutput);
   const resultStdout = summarizeAiCommandOutput(stdout);
   const resultStderr = summarizeAiCommandOutput(stderr);
-  const streamsSeparated =
-    result.stdout !== undefined || result.stderr !== undefined;
+  const streamsSeparated = result.stdout !== undefined || result.stderr !== undefined;
   const outputTruncated =
-    result.outputTruncated === true ||
-    resultOutput.length < redactedOutput.length;
+    result.outputTruncated === true || resultOutput.length < redactedOutput.length;
   return {
     ...proposal,
     completedAt: result.completedAt,
     durationMs: result.durationMs,
-    executionPhase:
-      result.exitCode === 0 ? ("completed" as const) : ("failed" as const),
+    executionPhase: result.exitCode === 0 ? ("completed" as const) : ("failed" as const),
     exitCode: result.exitCode,
     fullResultOutput: redactedOutput,
     fullResultStdout: streamsSeparated ? stdout : undefined,
@@ -733,18 +662,13 @@ export function markAiCommandProposalCompleted(
     resultOutputTruncated: outputTruncated,
     resultStdout: streamsSeparated ? resultStdout : undefined,
     resultStdoutTruncated: streamsSeparated
-      ? result.stdoutTruncated === true ||
-        resultStdout.length < stdout.length ||
-        undefined
+      ? result.stdoutTruncated === true || resultStdout.length < stdout.length || undefined
       : undefined,
     resultStderr: streamsSeparated ? resultStderr : undefined,
     resultStderrTruncated: streamsSeparated
-      ? result.stderrTruncated === true ||
-        resultStderr.length < stderr.length ||
-        undefined
+      ? result.stderrTruncated === true || resultStderr.length < stderr.length || undefined
       : undefined,
-    status:
-      result.exitCode === 0 ? ("succeeded" as const) : ("failed" as const),
+    status: result.exitCode === 0 ? ("succeeded" as const) : ("failed" as const),
   };
 }
 
@@ -762,30 +686,20 @@ export function markAiCommandProposalVerified(
   return { ...proposal, status: "verified" as const, verifiedAt };
 }
 
-export function aiCommandRecordFromProposal(
-  proposal: AiCommandProposal,
-): AiCommandRecord {
+export function aiCommandRecordFromProposal(proposal: AiCommandProposal): AiCommandRecord {
   return {
     id: proposal.id,
     occurredAt:
-      proposal.verifiedAt ??
-      proposal.completedAt ??
-      proposal.executedAt ??
-      proposal.approvedAt,
+      proposal.verifiedAt ?? proposal.completedAt ?? proposal.executedAt ?? proposal.approvedAt,
     durationMs: proposal.durationMs,
     exitCode: proposal.exitCode,
-    purpose: redactAiContext(proposal.purpose).slice(
-      0,
-      MAX_AI_COMMAND_PURPOSE_CHARS,
-    ),
+    purpose: redactAiContext(proposal.purpose).slice(0, MAX_AI_COMMAND_PURPOSE_CHARS),
     risk: proposal.assessment.risk,
     status: proposal.status === "pending" ? "not-executed" : proposal.status,
   };
 }
 
-export function aiCommandResultContextSource(
-  proposal: AiCommandProposal,
-): AiContextSource | null {
+export function aiCommandResultContextSource(proposal: AiCommandProposal): AiContextSource | null {
   if (
     (proposal.status !== "succeeded" && proposal.status !== "failed") ||
     proposal.exitCode === undefined

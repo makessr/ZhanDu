@@ -17,11 +17,7 @@ import {
   Typography,
 } from "@arco-design/web-react";
 import type { TableColumnProps } from "@arco-design/web-react";
-import {
-  IconDelete,
-  IconEdit,
-  IconPlus,
-} from "@arco-design/web-react/icon";
+import { IconDelete, IconEdit, IconPlus } from "@arco-design/web-react/icon";
 import type {
   DynamicPortForwardRule,
   LocalPortForwardRule,
@@ -132,36 +128,27 @@ function PortForwardRulesEditor({
         rule.bindPort === normalized.bindPort,
     );
     if (duplicate) {
-      Message.error(
-        `该${editing.kind === "remote" ? "远程" : "本地"}监听地址和端口已存在`,
-      );
+      Message.error(`该${editing.kind === "remote" ? "远程" : "本地"}监听地址和端口已存在`);
       return;
     }
 
     changeRules(
       editing.kind,
       rules.some((rule) => rule.id === normalized.id)
-        ? rules.map((rule) =>
-            rule.id === normalized.id ? normalized : rule,
-          )
+        ? rules.map((rule) => (rule.id === normalized.id ? normalized : rule))
         : [...rules, normalized],
     );
     setVisible(false);
     setEditing(undefined);
   };
 
-  const columnsFor = (
-    kind: ForwardKind,
-    rules: ForwardRule[],
-  ): TableColumnProps<ForwardRule>[] => {
+  const columnsFor = (kind: ForwardKind, rules: ForwardRule[]): TableColumnProps<ForwardRule>[] => {
     const columns: TableColumnProps<ForwardRule>[] = [
       {
         dataIndex: "name",
         title: "名称",
         render: (name: string) => (
-          <Typography.Text ellipsis={{ showTooltip: true }}>
-            {name}
-          </Typography.Text>
+          <Typography.Text ellipsis={{ showTooltip: true }}>{name}</Typography.Text>
         ),
       },
       {
@@ -190,9 +177,7 @@ function PortForwardRulesEditor({
             onChange={(enabled) =>
               changeRules(
                 kind,
-                rules.map((item) =>
-                  item.id === rule.id ? { ...item, enabled } : item,
-                ),
+                rules.map((item) => (item.id === rule.id ? { ...item, enabled } : item)),
               )
             }
             size="small"
@@ -242,15 +227,8 @@ function PortForwardRulesEditor({
   const ruleTable = (kind: ForwardKind, rules: ForwardRule[]) => (
     <div className="port-forward-rule-list">
       <div className="port-forward-rules-toolbar">
-        <Typography.Text type="secondary">
-          {rules.length} 条规则
-        </Typography.Text>
-        <Button
-          icon={<IconPlus />}
-          onClick={() => openEditor(kind)}
-          size="small"
-          type="primary"
-        >
+        <Typography.Text type="secondary">{rules.length} 条规则</Typography.Text>
+        <Button icon={<IconPlus />} onClick={() => openEditor(kind)} size="small" type="primary">
           新增规则
         </Button>
       </div>
@@ -296,11 +274,7 @@ function PortForwardRulesEditor({
         title={`${editing?.rule.name ? "编辑" : "新增"}${editingKind === "local" ? "本地" : editingKind === "remote" ? "远程" : "动态"}转发`}
         visible={visible}
       >
-        <Form<ForwardRule>
-          form={form}
-          layout="vertical"
-          onSubmit={saveRule}
-        >
+        <Form<ForwardRule> form={form} layout="vertical" onSubmit={saveRule}>
           <Form.Item field="id" hidden>
             <Input />
           </Form.Item>
@@ -333,33 +307,27 @@ function PortForwardRulesEditor({
               <InputNumber max={65535} min={1} mode="button" />
             </Form.Item>
           </div>
-          {editingKind !== "dynamic" && <div className="port-forward-rule-row">
-            <Form.Item
-              field="targetAddress"
-              label={editingKind === "local" ? "远端目标地址" : "本地目标地址"}
-              rules={[{ required: true, message: "请输入目标地址" }]}
-            >
-              <Input
-                placeholder={
-                  editingKind === "local"
-                    ? "服务器可访问的地址"
-                    : "本机可访问的地址"
-                }
-              />
-            </Form.Item>
-            <Form.Item
-              field="targetPort"
-              label="目标端口"
-              rules={[{ required: true, message: "请输入目标端口" }]}
-            >
-              <InputNumber max={65535} min={1} mode="button" />
-            </Form.Item>
-          </div>}
-          <Form.Item
-            field="enabled"
-            label="连接后自动启用"
-            triggerPropName="checked"
-          >
+          {editingKind !== "dynamic" && (
+            <div className="port-forward-rule-row">
+              <Form.Item
+                field="targetAddress"
+                label={editingKind === "local" ? "远端目标地址" : "本地目标地址"}
+                rules={[{ required: true, message: "请输入目标地址" }]}
+              >
+                <Input
+                  placeholder={editingKind === "local" ? "服务器可访问的地址" : "本机可访问的地址"}
+                />
+              </Form.Item>
+              <Form.Item
+                field="targetPort"
+                label="目标端口"
+                rules={[{ required: true, message: "请输入目标端口" }]}
+              >
+                <InputNumber max={65535} min={1} mode="button" />
+              </Form.Item>
+            </div>
+          )}
+          <Form.Item field="enabled" label="连接后自动启用" triggerPropName="checked">
             <Switch />
           </Form.Item>
           <div className="modal-actions">

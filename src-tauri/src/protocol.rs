@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-pub(crate) const PROTOCOL_VERSION: u16 = 52;
+pub(crate) const PROTOCOL_VERSION: u16 = 53;
 
 pub(crate) const SSH_OUTPUT_EVENT: &str = "ssh-output";
 pub(crate) const SSH_STATUS_EVENT: &str = "ssh-status";
@@ -43,6 +43,79 @@ pub(crate) struct CommandError {
 pub(crate) type CommandResult<T> = Result<T, CommandError>;
 
 impl CommandError {
+    fn new(
+        code: CommandErrorCode,
+        retryable: bool,
+        operation: &'static str,
+        message: impl Into<String>,
+    ) -> Self {
+        Self {
+            code,
+            message: message.into(),
+            retryable,
+            operation,
+        }
+    }
+
+    pub(crate) fn invalid_request(operation: &'static str, message: impl Into<String>) -> Self {
+        Self::new(CommandErrorCode::InvalidRequest, false, operation, message)
+    }
+
+    pub(crate) fn not_found(operation: &'static str, message: impl Into<String>) -> Self {
+        Self::new(CommandErrorCode::NotFound, false, operation, message)
+    }
+
+    // 具名构造器覆盖全部契约错误码；尚未迁移的内部模块暂时用不到这几个。
+    #[allow(dead_code)]
+    pub(crate) fn not_connected(operation: &'static str, message: impl Into<String>) -> Self {
+        Self::new(CommandErrorCode::NotConnected, true, operation, message)
+    }
+
+    pub(crate) fn permission_denied(operation: &'static str, message: impl Into<String>) -> Self {
+        Self::new(
+            CommandErrorCode::PermissionDenied,
+            false,
+            operation,
+            message,
+        )
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn connection_failed(operation: &'static str, message: impl Into<String>) -> Self {
+        Self::new(CommandErrorCode::ConnectionFailed, true, operation, message)
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn timeout(operation: &'static str, message: impl Into<String>) -> Self {
+        Self::new(CommandErrorCode::Timeout, true, operation, message)
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn cancelled(operation: &'static str, message: impl Into<String>) -> Self {
+        Self::new(CommandErrorCode::Cancelled, false, operation, message)
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn conflict(operation: &'static str, message: impl Into<String>) -> Self {
+        Self::new(CommandErrorCode::Conflict, false, operation, message)
+    }
+
+    pub(crate) fn io(operation: &'static str, message: impl Into<String>) -> Self {
+        Self::new(CommandErrorCode::Io, false, operation, message)
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn unsupported(operation: &'static str, message: impl Into<String>) -> Self {
+        Self::new(CommandErrorCode::Unsupported, false, operation, message)
+    }
+
+    pub(crate) fn internal(operation: &'static str, message: impl Into<String>) -> Self {
+        Self::new(CommandErrorCode::Internal, false, operation, message)
+    }
+
+    /// 兼容层：把历史字符串错误按关键字归类。新命令边界应直接使用上面的
+    /// 具名构造器，只有内部模块仍以字符串传递错误时才使用本函数。
+    #[deprecated(note = "兼容层：新代码请使用具名构造器（invalid_request 等）")]
     pub(crate) fn from_message(operation: &'static str, message: impl Into<String>) -> Self {
         let message = message.into();
         let normalized = message.to_lowercase();
@@ -213,6 +286,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn classifies_command_errors_at_the_protocol_boundary() {
         let permission = CommandError::from_message("read_config_file", "Permission denied");
         assert!(matches!(

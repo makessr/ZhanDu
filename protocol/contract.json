@@ -1,5 +1,5 @@
 {
-  "version": 52,
+  "version": 53,
   "commands": {
     "ip_region_status": true,
     "ip_region_update": true,
@@ -65,6 +65,7 @@
     "ai_task_plan_decide": true,
     "ai_task_action_transition": true,
     "ai_task_command_observe": true,
+    "ai_task_action_approve": true,
     "ai_task_action_execute": true,
     "managed_ssh_key_import": true,
     "managed_ssh_key_delete": true,
@@ -77,6 +78,7 @@
     "diagnostic_open_log_directory": true,
     "local_file_reveal": true,
     "local_file_open": true,
+    "pick_local_path": true,
     "terminal_log_start": true,
     "terminal_log_default_directory": true,
     "terminal_log_append": true,
@@ -145,6 +147,7 @@
     "host-sync:status": true,
     "settings:changed": true,
     "appearance:preview": true,
+    "local-encryption:changed": true,
     "menu-select-all": true
   },
   "agentTaskStatuses": {

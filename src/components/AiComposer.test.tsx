@@ -167,18 +167,13 @@ describe("AiComposer", () => {
 
     expect(screen.queryByText("约 2.0k Token")).toBeNull();
     const model = screen.getByText("deepseek-chat");
-    const budget = screen.getByLabelText(
-      "本次请求约 2020 Token，上下文占用 25%",
-    );
+    const budget = screen.getByLabelText("本次请求约 2020 Token，上下文占用 25%");
     const progress = screen.getByRole("progressbar");
     expect(progress.getAttribute("aria-valuenow")).toBe("25");
+    expect(model.compareDocumentPosition(budget) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(
-      model.compareDocumentPosition(budget) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(
-      budget.compareDocumentPosition(
-        screen.getByRole("button", { name: "发送" }),
-      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+      budget.compareDocumentPosition(screen.getByRole("button", { name: "发送" })) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
 
@@ -209,9 +204,7 @@ describe("AiComposer", () => {
       },
     });
 
-    fireEvent.mouseEnter(
-      screen.getByLabelText("本次请求约 2020 Token，上下文占用 25%"),
-    );
+    fireEvent.mouseEnter(screen.getByLabelText("本次请求约 2020 Token，上下文占用 25%"));
     await waitFor(() => expect(screen.getByText("上次响应")).not.toBeNull());
     expect(screen.getByText(/实际 1.8k Token/)).not.toBeNull();
     expect(screen.getByText("2 次请求 · 1.3 秒")).not.toBeNull();
@@ -220,8 +213,6 @@ describe("AiComposer", () => {
   test("places the approval mode selector in the composer footer", () => {
     renderComposer();
 
-    expect(
-      screen.getByRole("combobox", { name: "AI 审批模式" }),
-    ).not.toBeNull();
+    expect(screen.getByRole("combobox", { name: "AI 审批模式" })).not.toBeNull();
   });
 });

@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  jumpHostSelectionError,
-  normalizeHostForm,
-  withHostDefaults,
-} from "./host-storage";
+import { jumpHostSelectionError, normalizeHostForm, withHostDefaults } from "./host-storage";
 
 describe("normalizeHostForm", () => {
   test("trims metadata without putting the password in the stored host", () => {
@@ -293,14 +289,8 @@ describe("jumpHostSelectionError", () => {
 
   test("rejects self references, missing hosts and nested routes", () => {
     expect(jumpHostSelectionError("jump", "jump", hosts)).toContain("自身");
-    expect(jumpHostSelectionError("target", "missing", hosts)).toContain(
-      "不存在",
-    );
-    expect(jumpHostSelectionError("target", "nested", hosts)).toContain(
-      "一级",
-    );
-    expect(jumpHostSelectionError("jump", "other", hosts)).toContain(
-      "其他主机",
-    );
+    expect(jumpHostSelectionError("target", "missing", hosts)).toContain("不存在");
+    expect(jumpHostSelectionError("target", "nested", hosts)).toContain("一级");
+    expect(jumpHostSelectionError("jump", "other", hosts)).toContain("其他主机");
   });
 });

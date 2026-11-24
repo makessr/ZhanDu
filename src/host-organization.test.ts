@@ -39,12 +39,7 @@ describe("host group organization", () => {
   });
 
   test("collects selectable group paths including parent groups", () => {
-    expect(collectHostGroupPaths(hosts)).toEqual([
-      "测试",
-      "生产",
-      "生产/华东",
-      "生产/华西",
-    ]);
+    expect(collectHostGroupPaths(hosts)).toEqual(["测试", "生产", "生产/华东", "生产/华西"]);
   });
 
   test("builds grouped table rows and keeps ungrouped hosts at root", () => {

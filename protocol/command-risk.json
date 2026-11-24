@@ -10,7 +10,17 @@
     "\\bprune\\b",
     "\\bgit\\b[^|;&]*\\b(clean\\s+-\\w*f|reset\\s+--hard)",
     ">\\s*/dev/(sd|hd|vd|xvd|nvme|mmcblk)",
-    ":\\(\\)\\s*\\{\\s*:\\s*\\|\\s*:\\s*&\\s*\\}\\s*;\\s*:"
+    ":\\(\\)\\s*\\{\\s*:\\s*\\|\\s*:\\s*&\\s*\\}\\s*;\\s*:",
+    "\\|\\s*(?:\\w+=\\S*\\s+)*(?:(?:sudo|exec|env|stdbuf|nice|ionice|time)(?:\\s+-\\S+)*\\s+)?(?:\\w+=\\S*\\s+)*(?:sh|bash|dash|zsh|ksh|csh|tcsh|fish|pwsh|powershell|python[0-9.]*|perl|ruby|node|php|lua)(?:\\s|$)",
+    "\\b(?:ba|da|z|k|fi|tc|c)?sh\\s+(?:-\\S+\\s+)*-\\S*c(?:\\s|$)",
+    "\\bpython[0-9.]*\\b[^|;&\\n]*\\s-(?:c|e)(?:\\s|$)",
+    "\\b(?:perl|ruby|node|lua|osascript)\\b[^|;&\\n]*\\s-(?:c|e)(?:\\s|$)",
+    "\\bphp\\b[^|;&\\n]*\\s-(?:r|R)(?:\\s|$)",
+    "\\$\\(",
+    "`",
+    "(?:^|[|;&])\\s*eval(?:\\s|$)",
+    "\\b(?:curl|wget|fetch|aria2c)\\b[^|;&\\n]*(?:&&|;)\\s*(?:\\w+=\\S*\\s+)*(?:sudo\\s+)?(?:sh|bash|dash|zsh|ksh|csh|tcsh|fish|pwsh|powershell|python[0-9.]*|perl|ruby|node|php|lua)(?:\\s|$)",
+    "\\b(?:curl|wget|fetch)\\b[^|;&\\n]*(?:&&|;)[^|;&\\n]*chmod\\s+[^;|&\\n]*\\+x"
   ],
   "unsafeCharacters": ";&<>`$(){}\\!\n\r",
   "readOnlyCommands": {
@@ -65,11 +75,64 @@
     "whoami": {},
     "which": {},
     "whereis": {},
-    "dmesg": { "forbiddenArguments": ["-c", "-C", "--clear", "--read-clear", "-n", "--console-level", "-D", "--console-off", "-E", "--console-on"] },
-    "find": { "forbiddenArguments": ["-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint", "-fprint0", "-fprintf", "-fls"] },
-    "journalctl": { "forbiddenArguments": ["--vacuum-size", "--vacuum-time", "--vacuum-files", "--rotate", "--flush", "--sync", "--relinquish-var", "--smart-relinquish-var", "--setup-keys", "--update-catalog"] },
-    "systemctl": { "subcommands": ["status", "is-active", "is-enabled", "is-failed", "list-units", "list-unit-files", "list-timers", "list-sockets", "show", "cat"] },
-    "docker": { "subcommands": ["ps", "images", "logs", "inspect", "version", "info", "stats", "top", "port"] },
+    "dmesg": {
+      "forbiddenArguments": [
+        "-c",
+        "-C",
+        "--clear",
+        "--read-clear",
+        "-n",
+        "--console-level",
+        "-D",
+        "--console-off",
+        "-E",
+        "--console-on"
+      ]
+    },
+    "find": {
+      "forbiddenArguments": [
+        "-delete",
+        "-exec",
+        "-execdir",
+        "-ok",
+        "-okdir",
+        "-fprint",
+        "-fprint0",
+        "-fprintf",
+        "-fls"
+      ]
+    },
+    "journalctl": {
+      "forbiddenArguments": [
+        "--vacuum-size",
+        "--vacuum-time",
+        "--vacuum-files",
+        "--rotate",
+        "--flush",
+        "--sync",
+        "--relinquish-var",
+        "--smart-relinquish-var",
+        "--setup-keys",
+        "--update-catalog"
+      ]
+    },
+    "systemctl": {
+      "subcommands": [
+        "status",
+        "is-active",
+        "is-enabled",
+        "is-failed",
+        "list-units",
+        "list-unit-files",
+        "list-timers",
+        "list-sockets",
+        "show",
+        "cat"
+      ]
+    },
+    "docker": {
+      "subcommands": ["ps", "images", "logs", "inspect", "version", "info", "stats", "top", "port"]
+    },
     "nginx": { "requiredArguments": ["-t", "-T"] }
   }
 }

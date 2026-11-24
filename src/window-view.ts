@@ -7,18 +7,12 @@ function supportedWindowView(value: string | null): WindowView | null {
 export function windowViewFromLocation(
   location: Pick<Location, "hash" | "search"> = window.location,
 ) {
-  const fragment = location.hash.startsWith("#")
-    ? location.hash.slice(1)
-    : location.hash;
-  const fragmentView = supportedWindowView(
-    new URLSearchParams(fragment).get("view"),
-  );
+  const fragment = location.hash.startsWith("#") ? location.hash.slice(1) : location.hash;
+  const fragmentView = supportedWindowView(new URLSearchParams(fragment).get("view"));
 
   if (fragmentView) return fragmentView;
 
-  return supportedWindowView(
-    new URLSearchParams(location.search).get("view"),
-  );
+  return supportedWindowView(new URLSearchParams(location.search).get("view"));
 }
 
 export function windowViewFromWindowLabel(label: string | null) {
@@ -36,10 +30,7 @@ export function windowViewFromContext({
   location = window.location,
   windowLabel = null,
 }: WindowViewContext = {}) {
-  return (
-    windowViewFromWindowLabel(windowLabel) ??
-    windowViewFromLocation(location)
-  );
+  return windowViewFromWindowLabel(windowLabel) ?? windowViewFromLocation(location);
 }
 
 export function auxiliaryWindowHref(view: WindowView) {

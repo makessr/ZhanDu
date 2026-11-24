@@ -17,7 +17,8 @@ test("searches bundled themes and previews scanned and imported Ghostty files", 
     if (command === "read_ghostty_themes") {
       return [{ name: "本机主题", contents: "background = #121314" }];
     }
-    if (command === "plugin:dialog|open") return "C:\\themes\\手动导入.conf";
+    if (command === "pick_local_path")
+      return { path: "C:\\themes\\手动导入.conf", token: "theme-token" };
     if (command === "read_config_file") return "background = #223344\npalette = 15=#cccccc";
     throw new Error(command);
   });
@@ -39,7 +40,9 @@ test("searches bundled themes and previews scanned and imported Ghostty files", 
     fireEvent.click(screen.getByRole("button", { name: "导入 Ghostty 主题" }));
     await within(picker).findByRole("option", { name: "手动导入" });
     expect(picker.value).toBe("ghostty:手动导入");
-    expect(within(screen.getByLabelText("16 色 ANSI 色板")).getByTitle("ANSI 15 · #cccccc")).not.toBeNull();
+    expect(
+      within(screen.getByLabelText("16 色 ANSI 色板")).getByTitle("ANSI 15 · #cccccc"),
+    ).not.toBeNull();
   } finally {
     view.unmount();
     clearMocks();

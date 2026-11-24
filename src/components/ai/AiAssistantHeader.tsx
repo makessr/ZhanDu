@@ -1,10 +1,4 @@
-import {
-  Button,
-  Space,
-  Tag,
-  Tooltip,
-  Typography,
-} from "@arco-design/web-react";
+import { Button, Space, Tag, Tooltip, Typography } from "@arco-design/web-react";
 import { IconHistory, IconPlus } from "@arco-design/web-react/icon";
 
 interface AiAssistantHeaderProps {

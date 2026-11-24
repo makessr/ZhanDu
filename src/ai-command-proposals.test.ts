@@ -186,10 +186,7 @@ describe("AI terminal command proposals", () => {
       }),
       "session-1",
     );
-    const approved = markAiCommandProposalApproved(
-      proposal,
-      "2026-07-28T08:00:00.000Z",
-    );
+    const approved = markAiCommandProposalApproved(proposal, "2026-07-28T08:00:00.000Z");
     const record = aiCommandRecordFromProposal(approved);
     expect(record).toEqual({
       id: "command-1",
@@ -343,10 +340,7 @@ describe("AI terminal command proposals", () => {
 
   test("matches only the approved command submitted in the same session", () => {
     const proposal = markAiCommandProposalApproved(
-      createAiCommandProposal(
-        commandCall({ command: "pwd", purpose: "检查目录" }),
-        "session-1",
-      ),
+      createAiCommandProposal(commandCall({ command: "pwd", purpose: "检查目录" }), "session-1"),
       "2026-07-28T08:00:00.000Z",
     );
     const submission = {
@@ -375,20 +369,17 @@ describe("AI terminal command proposals", () => {
       executedAt: submission.submittedAt,
       status: "executed",
     });
-    expect(
-      markAiCommandProposalVerified(executed, "2026-07-28T08:02:00.000Z"),
-    ).toMatchObject({
+    expect(markAiCommandProposalVerified(executed, "2026-07-28T08:02:00.000Z")).toMatchObject({
       status: "verified",
       verifiedAt: "2026-07-28T08:02:00.000Z",
     });
   });
 
   test("returns local validation errors without accepting a proposal", () => {
-    expect(
-      JSON.parse(
-        aiCommandProposalToolResult(commandCall({}), "命令无效").content,
-      ),
-    ).toEqual({ error: "命令无效", ok: false });
+    expect(JSON.parse(aiCommandProposalToolResult(commandCall({}), "命令无效").content)).toEqual({
+      error: "命令无效",
+      ok: false,
+    });
   });
 
   test("returns the user's approval decision to the suspended tool call", () => {
@@ -490,9 +481,7 @@ describe("AI terminal command proposals", () => {
       resultOutput: "token=[已隐藏]\nfailed",
       status: "failed",
     });
-    expect(aiCommandResultContextSource(completed)?.content).toContain(
-      "退出码: 1",
-    );
+    expect(aiCommandResultContextSource(completed)?.content).toContain("退出码: 1");
     const record = aiCommandRecordFromProposal(completed);
     expect(record).toMatchObject({ durationMs: 1_250, exitCode: 1 });
     expect(JSON.stringify(record)).not.toContain("must-not-leak");

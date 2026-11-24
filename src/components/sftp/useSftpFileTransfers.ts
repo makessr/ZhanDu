@@ -58,10 +58,7 @@ export default function useSftpFileTransfers({
     if (!sessionId || !currentDirectory || !ready) return;
     let inspection: LocalUploadInspection;
     try {
-      inspection = await invoke<LocalUploadInspection>(
-        "sftp_inspect_upload_paths",
-        { paths },
-      );
+      inspection = await invoke<LocalUploadInspection>("sftp_inspect_upload_paths", { paths });
     } catch (error) {
       Message.error(commandErrorMessage(error));
       return;
@@ -89,31 +86,22 @@ export default function useSftpFileTransfers({
       }
     }
 
-    const directoryRoots = new Set(
-      inspection.directories.filter((path) => !path.includes("/")),
-    );
+    const directoryRoots = new Set(inspection.directories.filter((path) => !path.includes("/")));
     const rootNames = new Set([
       ...directoryRoots,
       ...inspection.files.map((file) => file.relativePath.split("/")[0]),
     ]);
-    const existingEntries = new Map(
-      targetEntries.map((entry) => [entry.name, entry]),
-    );
+    const existingEntries = new Map(targetEntries.map((entry) => [entry.name, entry]));
     const incompatibleRoot = [...rootNames].find((name) => {
       const existing = existingEntries.get(name);
-      return (
-        existing &&
-        (directoryRoots.has(name) !== (existing.kind === "directory"))
-      );
+      return existing && directoryRoots.has(name) !== (existing.kind === "directory");
     });
     if (incompatibleRoot) {
       Message.error(`远程目标“${incompatibleRoot}”与本地项目类型不一致`);
       return;
     }
 
-    const conflictingRoots = new Set(
-      [...rootNames].filter((name) => existingEntries.has(name)),
-    );
+    const conflictingRoots = new Set([...rootNames].filter((name) => existingEntries.has(name)));
     if (
       conflictingRoots.size > 0 &&
       !(await confirmOverwrite(
@@ -135,8 +123,7 @@ export default function useSftpFileTransfers({
       return;
     }
 
-    const batchId =
-      inspection.files.length > 1 ? createUploadBatchId() : undefined;
+    const batchId = inspection.files.length > 1 ? createUploadBatchId() : undefined;
     for (const file of inspection.files) {
       const rootName = file.relativePath.split("/")[0];
       onQueueTransfer({

@@ -15,18 +15,9 @@ import {
   Typography,
 } from "@arco-design/web-react";
 import type { TableColumnProps } from "@arco-design/web-react";
-import {
-  IconRefresh,
-  IconRobot,
-  IconStop,
-  IconThunderbolt,
-} from "@arco-design/web-react/icon";
+import { IconRefresh, IconRobot, IconStop, IconThunderbolt } from "@arco-design/web-react/icon";
 import { diagnosticInvoke as invoke } from "../diagnostics";
-import type {
-  ServerProcess,
-  ServerProcessListResult,
-  TerminalSession,
-} from "../models";
+import type { ServerProcess, ServerProcessListResult, TerminalSession } from "../models";
 import { formatMonitorBytes } from "../monitor-utils";
 import { isTerminalSessionOperational } from "../terminal-utils";
 import {
@@ -44,7 +35,6 @@ interface ServerProcessDrawerProps {
   visible: boolean;
   embedded?: boolean;
 }
-
 
 const PROCESS_REFRESH_INTERVAL_MS = 5_000;
 
@@ -135,10 +125,7 @@ function ServerProcessDrawer({
     if (!visible || !isTerminalSessionOperational(session.status)) return;
     void loadProcesses();
     if (!autoRefresh) return;
-    const timer = window.setInterval(
-      () => void loadProcesses(false),
-      PROCESS_REFRESH_INTERVAL_MS,
-    );
+    const timer = window.setInterval(() => void loadProcesses(false), PROCESS_REFRESH_INTERVAL_MS);
     return () => window.clearInterval(timer);
   }, [autoRefresh, loadProcesses, session.status, visible]);
 
@@ -148,9 +135,7 @@ function ServerProcessDrawer({
   );
   const selectedProcesses = useMemo(() => {
     const selectedIds = new Set(selectedProcessIds);
-    return (result?.processes ?? []).filter((process) =>
-      selectedIds.has(process.id),
-    );
+    return (result?.processes ?? []).filter((process) => selectedIds.has(process.id));
   }, [result, selectedProcessIds]);
   const signalProcess = useCallback(
     async (process: ServerProcess, force: boolean) => {
@@ -203,7 +188,11 @@ function ServerProcessDrawer({
         sorter: (left, right) => left.user.localeCompare(right.user),
         title: "用户",
         width: 100,
-        render: (user: string) => <span className="server-process-cell" title={user}>{user}</span>,
+        render: (user: string) => (
+          <span className="server-process-cell" title={user}>
+            {user}
+          </span>
+        ),
       },
       {
         align: "right",
@@ -244,7 +233,9 @@ function ServerProcessDrawer({
         title: "命令行",
         width: 200,
         render: (command: string) => (
-          <span className="server-process-cell" title={command}>{command || "—"}</span>
+          <span className="server-process-cell" title={command}>
+            {command || "—"}
+          </span>
         ),
       },
       {
@@ -253,7 +244,11 @@ function ServerProcessDrawer({
         width: 160,
         render: (_, process) => {
           const path = process.command?.trimStart().match(/^\/\S+/)?.[0];
-          return <span className="server-process-cell" title={path}>{path ?? "—"}</span>;
+          return (
+            <span className="server-process-cell" title={path}>
+              {path ?? "—"}
+            </span>
+          );
         },
       },
       {
@@ -267,10 +262,7 @@ function ServerProcessDrawer({
                 aria-label={`结束进程 ${process.pid}`}
                 disabled={process.pid <= 1 || signalingProcess !== null}
                 icon={<IconStop />}
-                loading={
-                  signalingProcess?.pid === process.pid &&
-                  !signalingProcess.force
-                }
+                loading={signalingProcess?.pid === process.pid && !signalingProcess.force}
                 onClick={() => confirmSignalProcess(process, false)}
                 size="mini"
               />
@@ -280,10 +272,7 @@ function ServerProcessDrawer({
                 aria-label={`强制结束进程 ${process.pid}`}
                 disabled={process.pid <= 1 || signalingProcess !== null}
                 icon={<IconThunderbolt />}
-                loading={
-                  signalingProcess?.pid === process.pid &&
-                  signalingProcess.force
-                }
+                loading={signalingProcess?.pid === process.pid && signalingProcess.force}
                 onClick={() => confirmSignalProcess(process, true)}
                 size="mini"
                 status="danger"
@@ -331,10 +320,7 @@ function ServerProcessDrawer({
             />
             <Typography.Text>自动刷新</Typography.Text>
           </span>
-          <Tooltip
-            content="刷新进程列表"
-            getPopupContainer={() => document.body}
-          >
+          <Tooltip content="刷新进程列表" getPopupContainer={() => document.body}>
             <Button
               aria-label="刷新进程列表"
               icon={<IconRefresh />}
@@ -346,9 +332,7 @@ function ServerProcessDrawer({
           <Button
             disabled={!selectedProcesses.length}
             icon={<IconRobot />}
-            onClick={() =>
-              onSendToAi(createProcessesAiHandoff(selectedProcesses))
-            }
+            onClick={() => onSendToAi(createProcessesAiHandoff(selectedProcesses))}
             size="small"
           >
             交给 AI
@@ -359,11 +343,7 @@ function ServerProcessDrawer({
         <div className="server-process-alerts">
           {error && <Alert content={error} showIcon type="error" />}
           {result?.truncated && (
-            <Alert
-              content="进程数量较多，仅显示 CPU 占用最高的前 500 条"
-              showIcon
-              type="warning"
-            />
+            <Alert content="进程数量较多，仅显示 CPU 占用最高的前 500 条" showIcon type="warning" />
           )}
         </div>
       )}
@@ -372,16 +352,13 @@ function ServerProcessDrawer({
         columns={processTable.columns}
         data={filteredProcesses}
         loading={loading && !result}
-        noDataElement={
-          <Empty description={query ? "没有匹配的进程" : "暂无进程"} />
-        }
+        noDataElement={<Empty description={query ? "没有匹配的进程" : "暂无进程"} />}
         pagination={false}
         rowKey="id"
         rowSelection={{
           checkAll: true,
           columnWidth: 36,
-          onChange: (keys) =>
-            setSelectedProcessIds(keys.map((key) => String(key))),
+          onChange: (keys) => setSelectedProcessIds(keys.map((key) => String(key))),
           selectedRowKeys: selectedProcessIds,
           type: "checkbox",
         }}

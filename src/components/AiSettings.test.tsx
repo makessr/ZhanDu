@@ -38,9 +38,7 @@ describe("AiSettings", () => {
       />,
     );
 
-    await waitFor(() =>
-      expect(invokeCommandMock).toHaveBeenCalledWith("ai_api_key_status"),
-    );
+    await waitFor(() => expect(invokeCommandMock).toHaveBeenCalledWith("ai_api_key_status"));
     await user.click(screen.getByRole("button", { name: "检测能力" }));
 
     await waitFor(() =>
@@ -82,9 +80,7 @@ describe("AiSettings", () => {
         updateSetting={() => undefined}
       />,
     );
-    await waitFor(() =>
-      expect(invokeCommandMock).toHaveBeenCalledWith("ai_api_key_status"),
-    );
+    await waitFor(() => expect(invokeCommandMock).toHaveBeenCalledWith("ai_api_key_status"));
     await user.click(screen.getByRole("button", { name: "检测能力" }));
     view.rerender(
       <AiSettings

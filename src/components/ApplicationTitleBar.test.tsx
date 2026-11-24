@@ -45,12 +45,8 @@ describe("ApplicationTitleBar", () => {
   });
 
   test("keeps one application menu immediately before custom window controls", () => {
-    const {
-      container,
-      onOpenQuickCommands,
-      onOpenSettings,
-      onOpenShortcutGuide,
-    } = renderTitleBar();
+    const { container, onOpenQuickCommands, onOpenSettings, onOpenShortcutGuide } =
+      renderTitleBar();
     const menuButton = screen.getByRole("button", { name: "打开应用菜单" });
 
     fireEvent.click(menuButton);
@@ -66,9 +62,7 @@ describe("ApplicationTitleBar", () => {
     expect(screen.getByRole("button", { name: "最小化窗口" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "最大化窗口" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "关闭窗口" })).toBeTruthy();
-    expect(
-      container.querySelectorAll(".application-titlebar-toolbar button"),
-    ).toHaveLength(3);
+    expect(container.querySelectorAll(".application-titlebar-toolbar button")).toHaveLength(3);
     expect(
       container
         .querySelector(".application-titlebar-toolbar")
@@ -95,13 +89,9 @@ describe("ApplicationTitleBar", () => {
     ] as HTMLButtonElement[];
     expect(panelButtons.every((button) => button.disabled)).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "打开应用菜单" }));
-    const quickCommandItem = screen
-      .getByText("快捷命令")
-      .closest(".arco-dropdown-menu-item");
+    const quickCommandItem = screen.getByText("快捷命令").closest(".arco-dropdown-menu-item");
 
-    expect(
-      quickCommandItem?.classList.contains("arco-dropdown-menu-disabled"),
-    ).toBe(true);
+    expect(quickCommandItem?.classList.contains("arco-dropdown-menu-disabled")).toBe(true);
     fireEvent.click(quickCommandItem!);
     expect(onOpenQuickCommands).not.toHaveBeenCalled();
   });
@@ -113,24 +103,22 @@ describe("ApplicationTitleBar", () => {
     });
     const sftpButton = screen.getByRole("button", { name: "隐藏文件管理" });
     const toolbarButtons = Array.from(
-      container.querySelectorAll<HTMLButtonElement>(
-        ".application-titlebar-toolbar button",
-      ),
+      container.querySelectorAll<HTMLButtonElement>(".application-titlebar-toolbar button"),
     );
 
     fireEvent.click(monitorButton);
     fireEvent.click(sftpButton);
     expect(onToggleServerMonitor).toHaveBeenCalledTimes(1);
     expect(onToggleSftp).toHaveBeenCalledTimes(1);
-    expect(
-      toolbarButtons.map((button) => button.getAttribute("aria-label")),
-    ).toEqual(["隐藏服务器监控", "隐藏文件管理", "打开应用菜单"]);
+    expect(toolbarButtons.map((button) => button.getAttribute("aria-label"))).toEqual([
+      "隐藏服务器监控",
+      "隐藏文件管理",
+      "打开应用菜单",
+    ]);
 
     fireEvent.click(screen.getByRole("button", { name: "打开应用菜单" }));
     const items = Array.from(
-      document.querySelectorAll(
-        ".application-titlebar-menu .arco-dropdown-menu-item",
-      ),
+      document.querySelectorAll(".application-titlebar-menu .arco-dropdown-menu-item"),
     );
     expect(items[items.length - 1]?.textContent).toContain("设置");
   });
@@ -147,8 +135,6 @@ describe("ApplicationTitleBar", () => {
     expect(monitorButton.querySelector("img")?.getAttribute("src")).toBe(
       "/icons/kubai/monitor.svg",
     );
-    expect(sftpButton.querySelector("img")?.getAttribute("src")).toBe(
-      "/icons/kubai/folder.svg",
-    );
+    expect(sftpButton.querySelector("img")?.getAttribute("src")).toBe("/icons/kubai/folder.svg");
   });
 });

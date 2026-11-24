@@ -22,9 +22,9 @@ describe("release preparation", () => {
   });
 
   test("synchronizes JSON, Cargo and lockfile versions", () => {
-    expect(
-      updateJsonVersion('{"name":"fineshell","version":"1.2.3"}', "1.2.4"),
-    ).toContain('"version": "1.2.4"');
+    expect(updateJsonVersion('{"name":"fineshell","version":"1.2.3"}', "1.2.4")).toContain(
+      '"version": "1.2.4"',
+    );
     expect(
       updateCargoPackageVersion(
         '[package]\nname = "fineshell"\nversion = "1.2.3"\n\n[dependencies]\n',
@@ -42,18 +42,14 @@ describe("release preparation", () => {
 
   test("moves Unreleased notes into the new version and resets the section", () => {
     const result = prepareReleaseChangelog(
-      '# 更新日志\n\n## [Unreleased]\n\n### 修复\n\n- 修复问题\n\n## [1.2.3] - 2026-08-01\n\n- 旧版本\n',
+      "# 更新日志\n\n## [Unreleased]\n\n### 修复\n\n- 修复问题\n\n## [1.2.3] - 2026-08-01\n\n- 旧版本\n",
       "1.2.4",
       "2026-08-06",
     );
 
     expect(result).toContain("## [Unreleased]\n\n### 新增");
-    expect(result).toContain(
-      "## [1.2.4] - 2026-08-06\n\n### 修复\n\n- 修复问题",
-    );
-    expect(result.indexOf("## [1.2.4]")).toBeLessThan(
-      result.indexOf("## [1.2.3]"),
-    );
+    expect(result).toContain("## [1.2.4] - 2026-08-06\n\n### 修复\n\n- 修复问题");
+    expect(result.indexOf("## [1.2.4]")).toBeLessThan(result.indexOf("## [1.2.3]"));
   });
 
   test("rejects an empty Unreleased section", () => {

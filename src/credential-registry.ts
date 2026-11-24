@@ -1,14 +1,6 @@
-import type {
-  ConnectionHistoryRecord,
-  HostRecord,
-  ProxyRecord,
-  SshKeyRecord,
-} from "./models";
+import type { ConnectionHistoryRecord, HostRecord, ProxyRecord, SshKeyRecord } from "./models";
 
-export type CredentialKind =
-  | "hostPassword"
-  | "privateKeyPassphrase"
-  | "proxyPassword";
+export type CredentialKind = "hostPassword" | "privateKeyPassphrase" | "proxyPassword";
 
 export interface CredentialReferenceRecord {
   id: string;
@@ -40,19 +32,13 @@ export function credentialReferenceId(kind: CredentialKind, ownerId: string) {
 }
 
 export function connectionTargetKey(
-  target: Pick<
-    HostRecord,
-    "address" | "port" | "username" | "proxyId" | "jumpHostId"
-  >,
+  target: Pick<HostRecord, "address" | "port" | "username" | "proxyId" | "jumpHostId">,
 ) {
   return `${target.username}@${target.address}:${target.port}#${target.proxyId ?? "direct"}#${target.jumpHostId ?? "no-jump"}`;
 }
 
 export function quickCredentialOwnerId(
-  target: Pick<
-    HostRecord,
-    "address" | "port" | "username" | "proxyId" | "jumpHostId"
-  >,
+  target: Pick<HostRecord, "address" | "port" | "username" | "proxyId" | "jumpHostId">,
 ) {
   return `quick-${connectionTargetKey(target)}`;
 }
@@ -72,9 +58,7 @@ export function createCredentialReference(
   };
 }
 
-export function sanitizeCredentialReference(
-  value: unknown,
-): CredentialReferenceRecord | undefined {
+export function sanitizeCredentialReference(value: unknown): CredentialReferenceRecord | undefined {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return undefined;
   }
@@ -83,14 +67,11 @@ export function sanitizeCredentialReference(
   const ownerId = typeof record.ownerId === "string" ? record.ownerId.trim() : "";
   const label = typeof record.label === "string" ? record.label.trim() : "";
   const updatedAt =
-    typeof record.updatedAt === "string" &&
-    Number.isFinite(Date.parse(record.updatedAt))
+    typeof record.updatedAt === "string" && Number.isFinite(Date.parse(record.updatedAt))
       ? record.updatedAt
       : "";
   if (
-    (kind !== "hostPassword" &&
-      kind !== "privateKeyPassphrase" &&
-      kind !== "proxyPassword") ||
+    (kind !== "hostPassword" && kind !== "privateKeyPassphrase" && kind !== "proxyPassword") ||
     !ownerId ||
     !label ||
     !updatedAt
@@ -111,9 +92,7 @@ function hostCredentialCandidate(host: HostRecord) {
   return undefined;
 }
 
-export function buildCredentialCandidates(
-  configuration: CredentialConfiguration,
-) {
+export function buildCredentialCandidates(configuration: CredentialConfiguration) {
   const candidates = [
     ...configuration.hosts.flatMap((host) => {
       const candidate = hostCredentialCandidate(host);
@@ -147,21 +126,11 @@ export function buildCredentialCandidates(
       return [];
     }),
     ...configuration.sshKeys.map((sshKey) =>
-      createCredentialReference(
-        "privateKeyPassphrase",
-        sshKey.id,
-        `密钥：${sshKey.name}`,
-      ),
+      createCredentialReference("privateKeyPassphrase", sshKey.id, `密钥：${sshKey.name}`),
     ),
     ...configuration.proxies.flatMap((proxy) =>
       proxy.username
-        ? [
-            createCredentialReference(
-              "proxyPassword",
-              proxy.id,
-              `代理：${proxy.name}`,
-            ),
-          ]
+        ? [createCredentialReference("proxyPassword", proxy.id, `代理：${proxy.name}`)]
         : [],
     ),
   ];
@@ -180,17 +149,13 @@ export function reconcileCredentialReferences(
       .filter((result) => result.exists)
       .map((result) => credentialReferenceId(result.kind, result.ownerId)),
   );
-  const labels = new Map(
-    [...registered, ...candidates].map((item) => [item.id, item.label]),
-  );
+  const labels = new Map([...registered, ...candidates].map((item) => [item.id, item.label]));
   return [...existingIds].flatMap((id) => {
     const separator = id.indexOf(":");
     const kind = id.slice(0, separator) as CredentialKind;
     const ownerId = id.slice(separator + 1);
     const label = labels.get(id);
-    return label
-      ? [createCredentialReference(kind, ownerId, label, now)]
-      : [];
+    return label ? [createCredentialReference(kind, ownerId, label, now)] : [];
   });
 }
 

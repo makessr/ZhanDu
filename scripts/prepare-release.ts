@@ -7,8 +7,7 @@ export type ReleaseBump = "patch" | "minor" | "major";
 
 const SEMVER_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/;
 const UNRELEASED_HEADING_PATTERN = /^##[ \t]+\[Unreleased\][ \t]*$/m;
-const VERSION_HEADING_PATTERN =
-  /^##[ \t]+\[[^\]]+\](?:[ \t]+-[ \t]+[^\r\n]+)?[ \t]*$/gm;
+const VERSION_HEADING_PATTERN = /^##[ \t]+\[[^\]]+\](?:[ \t]+-[ \t]+[^\r\n]+)?[ \t]*$/gm;
 
 export function nextReleaseVersion(current: string, bump: ReleaseBump) {
   const match = current.match(SEMVER_PATTERN);
@@ -54,11 +53,7 @@ export function updateCargoPackageVersion(contents: string, version: string) {
   return contents.replace(packageMatch[0], updatedPackage);
 }
 
-export function updateCargoLockVersion(
-  contents: string,
-  currentVersion: string,
-  version: string,
-) {
+export function updateCargoLockVersion(contents: string, currentVersion: string, version: string) {
   const packageBlocks = Array.from(
     contents.matchAll(/\[\[package\]\][\s\S]*?(?=\n\[\[package\]\]|$)/g),
   );
@@ -72,10 +67,7 @@ export function updateCargoLockVersion(
     throw new Error(`Cargo.lock 缺少 fineshell ${currentVersion} 包记录`);
   }
 
-  const updatedPackage = rootPackage[0].replace(
-    /^version = "[^"]+"$/m,
-    `version = "${version}"`,
-  );
+  const updatedPackage = rootPackage[0].replace(/^version = "[^"]+"$/m, `version = "${version}"`);
   return contents.replace(rootPackage[0], updatedPackage);
 }
 
@@ -88,11 +80,7 @@ function hasReleaseNotes(contents: string) {
   );
 }
 
-export function prepareReleaseChangelog(
-  changelog: string,
-  version: string,
-  releaseDate: string,
-) {
+export function prepareReleaseChangelog(changelog: string, version: string, releaseDate: string) {
   const normalized = changelog.replaceAll("\r\n", "\n");
   const unreleased = normalized.match(UNRELEASED_HEADING_PATTERN);
   if (!unreleased || unreleased.index === undefined) {
@@ -108,8 +96,7 @@ export function prepareReleaseChangelog(
     throw new Error("CHANGELOG.md 的 Unreleased 区域没有可发布内容");
   }
 
-  const freshUnreleased =
-    "## [Unreleased]\n\n### 新增\n\n### 修复\n\n### 优化\n\n### 工程";
+  const freshUnreleased = "## [Unreleased]\n\n### 新增\n\n### 修复\n\n### 优化\n\n### 工程";
   const releaseHeading = `## [${version}] - ${releaseDate}`;
   const replacement = `${freshUnreleased}\n\n${releaseHeading}\n\n${releaseNotes}\n\n`;
   return `${normalized.slice(0, unreleased.index)}${replacement}${normalized
@@ -174,17 +161,13 @@ function prepareRelease(bump: ReleaseBump) {
   const nextPackageContents = updateJsonVersion(packageContents, version);
   const nextTauriContents = updateJsonVersion(tauriContents, version);
   const nextCargoContents = updateCargoPackageVersion(cargoContents, version);
-  const nextCargoLockContents = updateCargoLockVersion(
-    cargoLockContents,
+  const nextCargoLockContents = updateCargoLockVersion(cargoLockContents, currentVersion, version);
+  const nextReadmeContents = updateReadmeVersion(
+    readFileSync(readmePath, "utf8"),
     currentVersion,
     version,
   );
-  const nextReadmeContents = updateReadmeVersion(readFileSync(readmePath, "utf8"), currentVersion, version);
-  const nextChangelogContents = prepareReleaseChangelog(
-    changelogContents,
-    version,
-    releaseDate,
-  );
+  const nextChangelogContents = prepareReleaseChangelog(changelogContents, version, releaseDate);
 
   writeFileSync(packagePath, nextPackageContents);
   writeFileSync(tauriPath, nextTauriContents);

@@ -31,17 +31,25 @@ const snapshot: ServerMonitorSnapshot = {
 
 describe("server monitor display helpers", () => {
   test("derives individual interface rates and handles a reset counter", () => {
-    const first = appendMonitorHistory([], {
-      ...snapshot,
-      networkInterfaces: [{ name: "eth0", receiveBytes: 100, transmitBytes: 200 }],
-    }, 1000);
-    const next = appendMonitorHistory(first, {
-      ...snapshot,
-      networkInterfaces: [
-        { name: "eth0", receiveBytes: 120, transmitBytes: 10 },
-        { name: "eth1", receiveBytes: 300, transmitBytes: 400 },
-      ],
-    }, 3000);
+    const first = appendMonitorHistory(
+      [],
+      {
+        ...snapshot,
+        networkInterfaces: [{ name: "eth0", receiveBytes: 100, transmitBytes: 200 }],
+      },
+      1000,
+    );
+    const next = appendMonitorHistory(
+      first,
+      {
+        ...snapshot,
+        networkInterfaces: [
+          { name: "eth0", receiveBytes: 120, transmitBytes: 10 },
+          { name: "eth1", receiveBytes: 300, transmitBytes: 400 },
+        ],
+      },
+      3000,
+    );
     expect(monitorNetworkRates(next[1], "eth0")).toEqual({ receive: 10, transmit: 0 });
     expect(monitorNetworkRates(next[1], "eth1")).toEqual({ receive: 0, transmit: 0 });
   });
@@ -59,9 +67,7 @@ describe("server monitor display helpers", () => {
     expect(formatLatency(15.123)).toBe("15.1 ms");
     expect(formatLatency()).toBe("--");
     expect(formatNetworkEndpoint("0.0.0.0", "22")).toBe("0.0.0.0:22");
-    expect(formatNetworkEndpoint("2001:db8::1", "443")).toBe(
-      "[2001:db8::1]:443",
-    );
+    expect(formatNetworkEndpoint("2001:db8::1", "443")).toBe("[2001:db8::1]:443");
     expect(formatUptime(90_000)).toBe("1 天 1 小时");
     expect(formatUptime(7_500)).toBe("2 小时 5 分钟");
   });

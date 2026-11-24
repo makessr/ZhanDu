@@ -1,10 +1,7 @@
 import { describe, expect, mock, test } from "bun:test";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { AiPromptPreset } from "../ai-presets";
-import type {
-  AiContextSource,
-  AiRemoteFileContext,
-} from "../ai-utils";
+import type { AiContextSource, AiRemoteFileContext } from "../ai-utils";
 import { aiRemoteFileContextSource } from "../ai-utils";
 import { useAiDraftActions } from "./useAiDraftActions";
 
@@ -32,13 +29,9 @@ function renderActions(options?: {
   prompt?: string;
   sessionId?: string | null;
 }) {
-  const updateDraft = mock(
-    (_value: string, _conversationId?: string) => undefined,
-  );
+  const updateDraft = mock((_value: string, _conversationId?: string) => undefined);
   const onNotice = mock((_content: string) => undefined);
-  const onRemoveRemoteFile = mock(
-    (_sessionId: string, _path: string) => undefined,
-  );
+  const onRemoveRemoteFile = mock((_sessionId: string, _path: string) => undefined);
   const hook = renderHook(() =>
     useAiDraftActions({
       contextSources: options?.contextSources ?? [terminalOutput],
@@ -68,9 +61,7 @@ describe("useAiDraftActions", () => {
     act(() => {
       view.result.current.updateRemoteFileMention(remoteFile, true);
     });
-    expect(view.updateDraft).toHaveBeenLastCalledWith(
-      "检查配置\n\n@文件:/etc/nginx/nginx.conf",
-    );
+    expect(view.updateDraft).toHaveBeenLastCalledWith("检查配置\n\n@文件:/etc/nginx/nginx.conf");
 
     const selected = renderActions({
       contextSources: [terminalOutput, aiRemoteFileContextSource(remoteFile)],
@@ -80,10 +71,7 @@ describe("useAiDraftActions", () => {
       selected.result.current.removeRemoteFile(remoteFile);
     });
     expect(selected.updateDraft).toHaveBeenLastCalledWith("检查配置");
-    expect(selected.onRemoveRemoteFile).toHaveBeenCalledWith(
-      "session-1",
-      remoteFile.path,
-    );
+    expect(selected.onRemoveRemoteFile).toHaveBeenCalledWith("session-1", remoteFile.path);
   });
 
   test("applies only the preset context sources that have content", () => {
@@ -107,9 +95,7 @@ describe("useAiDraftActions", () => {
   });
 
   test("waits for requested initial context and applies it only once", async () => {
-    const updateDraft = mock(
-      (_value: string, _conversationId?: string) => undefined,
-    );
+    const updateDraft = mock((_value: string, _conversationId?: string) => undefined);
     const { rerender } = renderHook(
       ({ sources }: { sources: AiContextSource[] }) =>
         useAiDraftActions({
@@ -132,10 +118,7 @@ describe("useAiDraftActions", () => {
     expect(updateDraft).not.toHaveBeenCalled();
     rerender({ sources: [terminalOutput] });
     await waitFor(() => expect(updateDraft).toHaveBeenCalledTimes(1));
-    expect(updateDraft).toHaveBeenCalledWith(
-      "解释输出\n\n@最近终端输出",
-      "conversation-1",
-    );
+    expect(updateDraft).toHaveBeenCalledWith("解释输出\n\n@最近终端输出", "conversation-1");
 
     rerender({ sources: [terminalOutput] });
     expect(updateDraft).toHaveBeenCalledTimes(1);

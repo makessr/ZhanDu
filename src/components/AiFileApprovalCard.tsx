@@ -1,14 +1,6 @@
 import { Button, Tag, Typography } from "@arco-design/web-react";
-import {
-  IconDelete,
-  IconEdit,
-  IconFile,
-  IconPlus,
-} from "@arco-design/web-react/icon";
-import {
-  aiFileEditLineSummary,
-  type AiFileEditProposal,
-} from "../ai-file-edits";
+import { IconDelete, IconEdit, IconFile, IconPlus } from "@arco-design/web-react/icon";
+import { aiFileEditLineSummary, type AiFileEditProposal } from "../ai-file-edits";
 import {
   aiFileOperationLabel,
   aiFileOperationLineSummary,
@@ -55,31 +47,19 @@ function AiFileApprovalCard({
       ? `${operationProposal!.path} → ${operationProposal!.targetPath}`
       : operationProposal!.path;
   const summary = editProposal
-    ? aiFileEditLineSummary(
-        editProposal.originalFile.content,
-        editProposal.content,
-      )
+    ? aiFileEditLineSummary(editProposal.originalFile.content, editProposal.content)
     : aiFileOperationLineSummary(operationProposal!);
 
   return (
     <div className="ai-file-approval-card">
       <div className="ai-file-approval-heading">
         <span className="ai-file-approval-title">
-          {editProposal ? (
-            <IconFile />
-          ) : (
-            operationIcon(operationProposal!.operation)
-          )}
+          {editProposal ? <IconFile /> : operationIcon(operationProposal!.operation)}
           <Typography.Text bold>{title}</Typography.Text>
         </span>
         {queueCount > 1 && <Tag size="small">待审批 {queueCount}</Tag>}
       </div>
-      <Typography.Text
-        className="ai-file-approval-path"
-        ellipsis
-        title={path}
-        type="secondary"
-      >
+      <Typography.Text className="ai-file-approval-path" ellipsis title={path} type="secondary">
         {path}
       </Typography.Text>
       {(summary.addedLines > 0 || summary.removedLines > 0) && (
