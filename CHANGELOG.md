@@ -25,6 +25,7 @@
 - 新增覆盖率门槛、ESLint 与 Prettier 配置、CodeQL 与 Dependabot 配置，以及发布资产校验、OTA 基线下载和同步服务运维文档。
 - 新增 SECURITY、ARCHITECTURE、CONTRIBUTING 文档。
 - 同步 Tauri Rust 依赖至 2.12，修复自定义 NSIS 模板缺少 `RestartManager` 引用导致的 Windows 打包失败。
+- 全量更新 Rust 依赖并收敛 S3 客户端特性，移除 legacy rustls 0.21、hyper 0.14 与 h2 0.3 依赖链，依赖审计恢复通过。
 
 ## [0.10.0] - 2026-11-23
 
