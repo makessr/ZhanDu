@@ -12,7 +12,6 @@ import {
   validateReleaseAssetList,
   validateReleaseMetadata,
   validateUpdaterManifest,
-  WINDOWS_ASSET_PREFIXES,
   RELEASE_SCOPES,
   RELEASE_VISIBILITIES,
 } from "./release-assets.mjs";
@@ -27,18 +26,16 @@ const [
   commit,
   scope,
   visibility,
-  windowsPrefix = "FineShell",
 ] = process.argv.slice(2);
 assert.ok(RELEASE_SCOPES.includes(scope), "Invalid release platform scope");
 assert.ok(RELEASE_VISIBILITIES.includes(visibility), "Invalid release visibility");
-assert.ok(WINDOWS_ASSET_PREFIXES.includes(windowsPrefix), "Invalid Windows asset prefix");
 releaseVersion(tag);
 
 const release = JSON.parse(await readFile(releaseFile, "utf8"));
 validateReleaseMetadata(release, { tag, commit, visibility });
 
 const version = releaseVersion(tag);
-const expectedAssets = expectedAssetNames(tag, scope, windowsPrefix);
+const expectedAssets = expectedAssetNames(tag, scope);
 validateReleaseAssetList(release, expectedAssets);
 assert.deepEqual((await readdir(assetDir)).sort(), expectedAssets);
 for (const { name, digest } of release.assets) {
@@ -53,7 +50,7 @@ assert.ok(typeof pubkey === "string" && pubkey.length > 0, "Missing updater publ
 assert.equal(endpoints[0], `https://github.com/${repository}/releases/latest/download/latest.json`);
 
 const platforms = expectedPlatforms(scope);
-const signedPackages = signedPackageNames(tag, scope, windowsPrefix);
+const signedPackages = signedPackageNames(tag, scope);
 for (const name of signedPackages) {
   execFileSync(verifier, [pubkey, join(assetDir, name), join(assetDir, name + ".sig")], {
     stdio: "inherit",
@@ -73,7 +70,6 @@ validateUpdaterManifest(manifest, {
   repository,
   tag,
   platforms,
-  windowsPrefix,
   signatureFor: (name) => {
     const signature = signatureFiles.get(name);
     assert.ok(signature !== undefined, `Missing signature for ${name}`);

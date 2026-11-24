@@ -25,8 +25,9 @@ export function assertTargetNewer(baseline, target) {
 
 export function baselineAssetNames(platform, baseline) {
   assert.ok(Object.hasOwn(OTA_PLATFORMS, platform), `Unknown OTA platform: ${platform}`);
-  const prefixes = platform.startsWith("windows-") ? ["FineShell", "ZhanDu"] : ["FineShell"];
-  return prefixes.map((prefix) => [prefix, baseline, OTA_PLATFORMS[platform]].join("_"));
+  return ["FineShell", "ZhanDu"].map((prefix) =>
+    [prefix, baseline, OTA_PLATFORMS[platform]].join("_"),
+  );
 }
 
 export function validateLatestRelease(latest, target) {

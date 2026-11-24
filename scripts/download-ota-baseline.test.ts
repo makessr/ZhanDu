@@ -26,13 +26,18 @@ describe("OTA version ordering", () => {
 });
 
 describe("OTA baseline asset selection", () => {
-  test("accepts both Windows prefixes and a single macOS prefix", () => {
+  test("accepts historical and rebranded installers on each platform", () => {
     expect(baselineAssetNames("windows-x64", "1.2.2")).toEqual([
       "FineShell_1.2.2_windows_x64-setup.exe",
       "ZhanDu_1.2.2_windows_x64-setup.exe",
     ]);
     expect(baselineAssetNames("macos-arm64", "1.2.2")).toEqual([
       "FineShell_1.2.2_darwin_aarch64.dmg",
+      "ZhanDu_1.2.2_darwin_aarch64.dmg",
+    ]);
+    expect(baselineAssetNames("linux-amd64", "1.2.2")).toEqual([
+      "FineShell_1.2.2_linux_amd64.deb",
+      "ZhanDu_1.2.2_linux_amd64.deb",
     ]);
   });
 

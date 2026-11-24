@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 
-export const WINDOWS_ASSET_PREFIXES = ["FineShell", "ZhanDu"];
 export const RELEASE_SCOPES = ["all", "windows"];
 export const RELEASE_VISIBILITIES = ["draft", "public"];
 
@@ -35,11 +34,11 @@ export function releaseVersion(tag) {
   return tag.slice(1);
 }
 
-export function releaseAssetName(tag, suffix, windowsPrefix = "FineShell") {
+export function releaseAssetName(tag, suffix) {
   const version = releaseVersion(tag);
-  return suffix.startsWith("windows_")
-    ? `${windowsPrefix}_${version}_${suffix}`
-    : `FineShell_${version}_${suffix}`;
+  const [major, minor] = version.split(".").map(Number);
+  const prefix = major > 0 || minor >= 11 ? "ZhanDu" : "FineShell";
+  return `${prefix}_${version}_${suffix}`;
 }
 
 export function expectedPlatforms(scope) {
@@ -49,18 +48,17 @@ export function expectedPlatforms(scope) {
   );
 }
 
-export function signedPackageNames(tag, scope, windowsPrefix = "FineShell") {
+export function signedPackageNames(tag, scope) {
   assert.ok(RELEASE_SCOPES.includes(scope), "Invalid release platform scope");
   return Object.entries(CANONICAL_PLATFORMS)
     .filter(([key]) => scope === "all" || key.startsWith("windows-"))
-    .map(([, suffix]) => releaseAssetName(tag, suffix, windowsPrefix));
+    .map(([, suffix]) => releaseAssetName(tag, suffix));
 }
 
-export function expectedAssetNames(tag, scope, windowsPrefix = "FineShell") {
-  const version = releaseVersion(tag);
-  const signed = signedPackageNames(tag, scope, windowsPrefix);
+export function expectedAssetNames(tag, scope) {
+  const signed = signedPackageNames(tag, scope);
   const diskImages =
-    scope === "all" ? DISK_IMAGES.map((filename) => `FineShell_${version}_${filename}`) : [];
+    scope === "all" ? DISK_IMAGES.map((suffix) => releaseAssetName(tag, suffix)) : [];
   return ["latest.json", ...signed.flatMap((name) => [name, name + ".sig"]), ...diskImages].sort();
 }
 
@@ -85,14 +83,11 @@ export function validateReleaseAssetList(release, expectedAssets) {
   }
 }
 
-export function validateUpdaterManifest(
-  manifest,
-  { repository, tag, platforms, windowsPrefix = "FineShell", signatureFor },
-) {
+export function validateUpdaterManifest(manifest, { repository, tag, platforms, signatureFor }) {
   assert.equal(manifest.version, releaseVersion(tag));
   assert.deepEqual(Object.keys(manifest.platforms).sort(), platforms.map(([key]) => key).sort());
   for (const [platform, suffix] of platforms) {
-    const name = releaseAssetName(tag, suffix, windowsPrefix);
+    const name = releaseAssetName(tag, suffix);
     const { url, signature } = manifest.platforms[platform];
     assert.equal(url, manifestAssetUrl(repository, tag, name));
     assert.equal(signature, signatureFor(name).trim());
