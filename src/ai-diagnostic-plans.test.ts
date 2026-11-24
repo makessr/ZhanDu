@@ -32,16 +32,12 @@ describe("AI diagnostic plans", () => {
         status: "cancelled",
       },
     ];
-    expect(completeAiDiagnosticPlan(plan, completedRuns).status).toBe(
-      "completed",
-    );
+    expect(completeAiDiagnosticPlan(plan, completedRuns).status).toBe("completed");
     const failedRuns = [
       completedRuns[0]!,
       { ...completedRuns[1]!, error: "失败", status: "failed" as const },
     ];
-    expect(completeAiDiagnosticPlan(plan, failedRuns).status).toBe(
-      "partial",
-    );
+    expect(completeAiDiagnosticPlan(plan, failedRuns).status).toBe("partial");
   });
 
   test("persists only bounded terminal plan metadata", () => {

@@ -11,10 +11,7 @@ import {
   type ExternalEditPayload,
   type ExternalEditResult,
 } from "../../tauri-protocol";
-import type {
-  RemoteTextFile,
-  TextEditorState,
-} from "./SftpDialogs";
+import type { RemoteTextFile, TextEditorState } from "./SftpDialogs";
 
 export const REMOTE_TEXT_MAX_BYTES = 2 * 1024 * 1024;
 const REMOTE_TEXT_CONFLICT_ERROR = "远程文件已被其他程序修改";
@@ -31,13 +28,11 @@ export default function useSftpTextEditing({
   sessionId,
 }: SftpTextEditingOptions) {
   const [textEditor, setTextEditor] = useState<TextEditorState | null>(null);
-  const [externalEdits, setExternalEdits] = useState<
-    Record<string, ExternalEditPayload>
-  >({});
-  const [externalEditConflict, setExternalEditConflict] =
-    useState<ExternalEditPayload | null>(null);
-  const [externalEditActionLoading, setExternalEditActionLoading] =
-    useState(false);
+  const [externalEdits, setExternalEdits] = useState<Record<string, ExternalEditPayload>>({});
+  const [externalEditConflict, setExternalEditConflict] = useState<ExternalEditPayload | null>(
+    null,
+  );
+  const [externalEditActionLoading, setExternalEditActionLoading] = useState(false);
   const requestRef = useRef(0);
   const sessionIdRef = useRef(sessionId);
   const onOperationErrorRef = useRef(onOperationError);
@@ -75,9 +70,7 @@ export default function useSftpTextEditing({
           setExternalEditConflict(record);
         }
       } else if (payload.status === "synced" || payload.status === "closed") {
-        setExternalEditConflict((current) =>
-          current?.editId === payload.editId ? null : current,
-        );
+        setExternalEditConflict((current) => (current?.editId === payload.editId ? null : current));
       } else if (
         payload.status === "failed" &&
         payload.sessionId === sessionIdRef.current &&
@@ -113,8 +106,7 @@ export default function useSftpTextEditing({
   );
 
   const textEditorByteLength = useMemo(
-    () =>
-      textEditor ? new TextEncoder().encode(textEditor.content).byteLength : 0,
+    () => (textEditor ? new TextEncoder().encode(textEditor.content).byteLength : 0),
     [textEditor],
   );
 
@@ -125,10 +117,7 @@ export default function useSftpTextEditing({
 
   const requestCloseTextEditor = useCallback(() => {
     if (!textEditor || textEditor.saving) return;
-    if (
-      textEditor.document &&
-      textEditor.content !== textEditor.document.content
-    ) {
+    if (textEditor.document && textEditor.content !== textEditor.document.content) {
       Modal.confirm({
         cancelText: "继续编辑",
         content: "当前修改尚未保存，关闭后将丢失这些内容。",
@@ -178,12 +167,7 @@ export default function useSftpTextEditing({
 
   const saveTextEditor = useCallback(
     async (overwrite = false) => {
-      if (
-        !sessionId ||
-        !textEditor ||
-        textEditor.loading ||
-        textEditor.saving
-      ) {
+      if (!sessionId || !textEditor || textEditor.loading || textEditor.saving) {
         return;
       }
       const document = textEditor.document;
@@ -195,9 +179,7 @@ export default function useSftpTextEditing({
       if (textEditor.content === document.content) return;
 
       const editor = textEditor;
-      setTextEditor((current) =>
-        current ? { ...current, saving: true } : current,
-      );
+      setTextEditor((current) => (current ? { ...current, saving: true } : current));
       try {
         await invoke<RemoteTextFile>("sftp_write_text_file", {
           sessionId,
@@ -211,9 +193,7 @@ export default function useSftpTextEditing({
         await onRefreshDirectoryRef.current();
       } catch (error) {
         const message = commandErrorMessage(error);
-        setTextEditor((current) =>
-          current ? { ...current, saving: false } : current,
-        );
+        setTextEditor((current) => (current ? { ...current, saving: false } : current));
         if (!overwrite && message.includes(REMOTE_TEXT_CONFLICT_ERROR)) {
           Modal.confirm({
             cancelText: "取消",
@@ -232,9 +212,7 @@ export default function useSftpTextEditing({
   );
 
   const updateTextContent = useCallback((content: string) => {
-    setTextEditor((current) =>
-      current ? { ...current, content } : current,
-    );
+    setTextEditor((current) => (current ? { ...current, content } : current));
   }, []);
 
   const externalEditForEntry = useCallback(
@@ -252,10 +230,10 @@ export default function useSftpTextEditing({
     async (entry: SftpEntry, editorPath?: string) => {
       if (!sessionId || entry.kind !== "file") return;
       try {
-        const edit = await invoke<ExternalEditResult>(
-          "sftp_start_external_edit",
-          { sessionId, path: entry.path },
-        );
+        const edit = await invoke<ExternalEditResult>("sftp_start_external_edit", {
+          sessionId,
+          path: entry.path,
+        });
         if (editorPath) {
           await invoke("sftp_launch_external_editor", {
             editId: edit.editId,
@@ -300,9 +278,7 @@ export default function useSftpTextEditing({
           action,
         });
         Message.success(
-          action === "overwrite"
-            ? "本地内容已覆盖远端文件"
-            : "已用远端内容更新本地文件",
+          action === "overwrite" ? "本地内容已覆盖远端文件" : "已用远端内容更新本地文件",
         );
         setExternalEditConflict(null);
         await onRefreshDirectoryRef.current();
@@ -315,16 +291,13 @@ export default function useSftpTextEditing({
     [externalEditConflict, sessionId],
   );
 
-  const reopenExternalEditLocalFile = useCallback(
-    async (edit: ExternalEditPayload) => {
-      try {
-        await openPath(edit.localPath);
-      } catch (error) {
-        Message.error(`无法打开本地编辑副本：${commandErrorMessage(error)}`);
-      }
-    },
-    [],
-  );
+  const reopenExternalEditLocalFile = useCallback(async (edit: ExternalEditPayload) => {
+    try {
+      await openPath(edit.localPath);
+    } catch (error) {
+      Message.error(`无法打开本地编辑副本：${commandErrorMessage(error)}`);
+    }
+  }, []);
 
   return {
     chooseExternalEditor,

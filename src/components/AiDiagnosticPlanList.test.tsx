@@ -78,10 +78,7 @@ describe("AiDiagnosticPlanList", () => {
       await Promise.resolve();
     });
 
-    expect(view.onConfirm).toHaveBeenCalledWith("plan-1", [
-      "call-status",
-      "call-ping",
-    ]);
+    expect(view.onConfirm).toHaveBeenCalledWith("plan-1", ["call-status", "call-ping"]);
   });
 
   test("cancels a pending plan", async () => {
@@ -97,9 +94,7 @@ describe("AiDiagnosticPlanList", () => {
     const view = renderPlans();
     fireEvent.click(screen.getByRole("button", { name: "其他" }));
     fireEvent.change(
-      screen.getByPlaceholderText(
-        "输入其他处理要求，例如：不要探测公网，只读取本机连接",
-      ),
+      screen.getByPlaceholderText("输入其他处理要求，例如：不要探测公网，只读取本机连接"),
       { target: { value: "只读取本机连接" } },
     );
     await act(async () => {

@@ -1,3 +1,4 @@
+import { randomIdSuffix } from "../random-id";
 import { isTauri } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
@@ -12,79 +13,58 @@ import { confirmHostFingerprint, persistHostFingerprint } from "../app-window-ac
 import { recordDiagnostic, diagnosticInvoke as invoke } from "../diagnostics";
 import { withHostDefaults } from "../host-storage";
 import { knownHostTargetKey } from "../known-hosts";
-import {
-  commandErrorMessage,
-  listenProtocolEvent,
-  type SshConnectResult,
-} from "../tauri-protocol";
-import {
-  jumpHostRequest,
-  reconnectDelaySeconds,
-  sshCredentialId,
-} from "../terminal-utils";
+import { commandErrorMessage, listenProtocolEvent, type SshConnectResult } from "../tauri-protocol";
+import { jumpHostRequest, reconnectDelaySeconds, sshCredentialId } from "../terminal-utils";
 
 interface UseTerminalSessionsOptions {
   onSessionsClosed?: (sessionIds: Set<string>) => void;
 }
 
 function createSessionId() {
-  return `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `session-${Date.now()}-${randomIdSuffix()}`;
 }
 
-export function useTerminalSessions({
-  onSessionsClosed,
-}: UseTerminalSessionsOptions = {}) {
+export function useTerminalSessions({ onSessionsClosed }: UseTerminalSessionsOptions = {}) {
   const [sessions, setSessions] = useState<TerminalSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const sessionsRef = useRef<TerminalSession[]>([]);
-  const reconnectTimersRef = useRef(
-    new Map<string, ReturnType<typeof setTimeout>>(),
-  );
+  const reconnectTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const manualReconnectsRef = useRef(new Set<string>());
   const intentionallyDisconnectedRef = useRef(new Set<string>());
   const onSessionsClosedRef = useRef(onSessionsClosed);
   onSessionsClosedRef.current = onSessionsClosed;
 
-  const updateSession = useCallback(
-    (sessionId: string, values: Partial<TerminalSession>) => {
-      setSessions((current) => {
-        const next = current.map((session) =>
-          session.id === sessionId ? { ...session, ...values } : session,
-        );
-        sessionsRef.current = next;
-        return next;
-      });
-    },
-    [],
-  );
+  const updateSession = useCallback((sessionId: string, values: Partial<TerminalSession>) => {
+    setSessions((current) => {
+      const next = current.map((session) =>
+        session.id === sessionId ? { ...session, ...values } : session,
+      );
+      sessionsRef.current = next;
+      return next;
+    });
+  }, []);
 
-  const updatePortForwardStatus = useCallback(
-    (sessionId: string, status: PortForwardStatus) => {
-      setSessions((current) => {
-        const next = current.map((session) => {
-          if (session.id !== sessionId) return session;
-          const statuses = session.portForwardStatuses ?? [];
-          const exists = statuses.some(
-            (item) =>
-              item.ruleId === status.ruleId && item.kind === status.kind,
-          );
-          return {
-            ...session,
-            portForwardStatuses: exists
-              ? statuses.map((item) =>
-                  item.ruleId === status.ruleId && item.kind === status.kind
-                    ? status
-                    : item,
-                )
-              : [...statuses, status],
-          };
-        });
-        sessionsRef.current = next;
-        return next;
+  const updatePortForwardStatus = useCallback((sessionId: string, status: PortForwardStatus) => {
+    setSessions((current) => {
+      const next = current.map((session) => {
+        if (session.id !== sessionId) return session;
+        const statuses = session.portForwardStatuses ?? [];
+        const exists = statuses.some(
+          (item) => item.ruleId === status.ruleId && item.kind === status.kind,
+        );
+        return {
+          ...session,
+          portForwardStatuses: exists
+            ? statuses.map((item) =>
+                item.ruleId === status.ruleId && item.kind === status.kind ? status : item,
+              )
+            : [...statuses, status],
+        };
       });
-    },
-    [],
-  );
+      sessionsRef.current = next;
+      return next;
+    });
+  }, []);
 
   const clearReconnectTimer = useCallback((sessionId: string) => {
     const timer = reconnectTimersRef.current.get(sessionId);
@@ -122,9 +102,7 @@ export function useTerminalSessions({
           },
         });
         if (intentionallyDisconnectedRef.current.has(session.id)) {
-          void invoke("ssh_disconnect", { sessionId: session.id }).catch(
-            () => undefined,
-          );
+          void invoke("ssh_disconnect", { sessionId: session.id }).catch(() => undefined);
           return;
         }
         if (result.status === "hostKeyVerificationRequired") {
@@ -199,9 +177,7 @@ export function useTerminalSessions({
           clearReconnectTimer(session.id);
           const timer = setTimeout(() => {
             reconnectTimersRef.current.delete(session.id);
-            const latest = sessionsRef.current.find(
-              (item) => item.id === session.id,
-            );
+            const latest = sessionsRef.current.find((item) => item.id === session.id);
             if (latest) void connect(latest, nextAttempt);
           }, delaySeconds * 1000);
           reconnectTimersRef.current.set(session.id, timer);
@@ -243,12 +219,8 @@ export function useTerminalSessions({
   const reconnectSession = useCallback(
     (requestedSession: TerminalSession) => {
       const session =
-        sessionsRef.current.find((item) => item.id === requestedSession.id) ??
-        requestedSession;
-      if (
-        session.status === "connecting" ||
-        session.status === "reconnecting"
-      ) {
+        sessionsRef.current.find((item) => item.id === requestedSession.id) ?? requestedSession;
+      if (session.status === "connecting" || session.status === "reconnecting") {
         return;
       }
 
@@ -264,14 +236,10 @@ export function useTerminalSessions({
         manualReconnectsRef.current.add(session.id);
         void invoke("ssh_disconnect", { sessionId: session.id }).catch(() => {
           if (!manualReconnectsRef.current.delete(session.id)) return;
-          const latest = sessionsRef.current.find(
-            (item) => item.id === session.id,
-          );
+          const latest = sessionsRef.current.find((item) => item.id === session.id);
           if (latest) void connectSession(latest, 0);
         });
-        void invoke("sftp_disconnect", { sessionId: session.id }).catch(
-          () => undefined,
-        );
+        void invoke("sftp_disconnect", { sessionId: session.id }).catch(() => undefined);
         return;
       }
 
@@ -298,8 +266,7 @@ export function useTerminalSessions({
         error: undefined,
         reconnectAttempt: 0,
         portForwardStatuses: (
-          sessionsRef.current.find((session) => session.id === sessionId)
-            ?.portForwardStatuses ?? []
+          sessionsRef.current.find((session) => session.id === sessionId)?.portForwardStatuses ?? []
         ).map((status) => ({
           ...status,
           status: "stopped" as const,
@@ -322,15 +289,11 @@ export function useTerminalSessions({
         clearReconnectTimer(sessionId);
         manualReconnectsRef.current.delete(sessionId);
         intentionallyDisconnectedRef.current.delete(sessionId);
-        void invoke("sftp_close_external_edits", { sessionId }).catch(
-          () => undefined,
-        );
+        void invoke("sftp_close_external_edits", { sessionId }).catch(() => undefined);
         void invoke("ssh_disconnect", { sessionId }).catch(() => undefined);
         void invoke("sftp_disconnect", { sessionId }).catch(() => undefined);
       });
-      const remaining = current.filter(
-        (session) => !closingIds.has(session.id),
-      );
+      const remaining = current.filter((session) => !closingIds.has(session.id));
       sessionsRef.current = remaining;
       setSessions(remaining);
       onSessionsClosedRef.current?.(closingIds);
@@ -339,15 +302,9 @@ export function useTerminalSessions({
         if (!currentActiveId || !closingIds.has(currentActiveId)) {
           return currentActiveId;
         }
-        const currentIndex = current.findIndex(
-          (session) => session.id === currentActiveId,
-        );
+        const currentIndex = current.findIndex((session) => session.id === currentActiveId);
         const nextIndex = Math.max(0, currentIndex - 1);
-        return (
-          remaining[nextIndex]?.id ??
-          remaining[remaining.length - 1]?.id ??
-          null
-        );
+        return remaining[nextIndex]?.id ?? remaining[remaining.length - 1]?.id ?? null;
       });
     },
     [clearReconnectTimer],
@@ -358,32 +315,25 @@ export function useTerminalSessions({
     [closeSessions],
   );
 
-  const syncKnownHostFingerprints = useCallback(
-    (knownHosts: KnownHostRecord[]) => {
-      setSessions((current) => {
-        const next = current.map((session) => {
-          const targetKey = knownHostTargetKey(
-            session.host.address,
-            session.host.port,
-          );
-          const knownHost = knownHosts.find(
-            (record) =>
-              knownHostTargetKey(record.address, record.port) === targetKey,
-          );
-          return {
-            ...session,
-            host: {
-              ...session.host,
-              hostFingerprint: knownHost?.fingerprint,
-            },
-          };
-        });
-        sessionsRef.current = next;
-        return next;
+  const syncKnownHostFingerprints = useCallback((knownHosts: KnownHostRecord[]) => {
+    setSessions((current) => {
+      const next = current.map((session) => {
+        const targetKey = knownHostTargetKey(session.host.address, session.host.port);
+        const knownHost = knownHosts.find(
+          (record) => knownHostTargetKey(record.address, record.port) === targetKey,
+        );
+        return {
+          ...session,
+          host: {
+            ...session.host,
+            hostFingerprint: knownHost?.fingerprint,
+          },
+        };
       });
-    },
-    [],
-  );
+      sessionsRef.current = next;
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (!isTauri()) return;
@@ -392,9 +342,7 @@ export function useTerminalSessions({
     let unlistenStatus: (() => void) | undefined;
     let unlistenPortForward: (() => void) | undefined;
     void listenProtocolEvent("ssh-status", ({ payload }) => {
-      const session = sessionsRef.current.find(
-        (item) => item.id === payload.sessionId,
-      );
+      const session = sessionsRef.current.find((item) => item.id === payload.sessionId);
       if (!session) return;
       if (payload.error) {
         recordDiagnostic(
@@ -453,13 +401,11 @@ export function useTerminalSessions({
           status: "disconnected",
           error: undefined,
           reconnectAttempt: 0,
-          portForwardStatuses: (session.portForwardStatuses ?? []).map(
-            (status) => ({
-              ...status,
-              status: "stopped" as const,
-              error: undefined,
-            }),
-          ),
+          portForwardStatuses: (session.portForwardStatuses ?? []).map((status) => ({
+            ...status,
+            status: "stopped" as const,
+            error: undefined,
+          })),
         });
         return;
       }
@@ -474,9 +420,7 @@ export function useTerminalSessions({
         });
         const timer = setTimeout(() => {
           reconnectTimersRef.current.delete(session.id);
-          const latest = sessionsRef.current.find(
-            (item) => item.id === session.id,
-          );
+          const latest = sessionsRef.current.find((item) => item.id === session.id);
           if (latest) void connectSession(latest, attempt);
         }, delaySeconds * 1000);
         reconnectTimersRef.current.set(session.id, timer);
@@ -486,13 +430,11 @@ export function useTerminalSessions({
         status: payload.status,
         error: payload.error,
         reconnectAttempt: 0,
-        portForwardStatuses: (session.portForwardStatuses ?? []).map(
-          (status) => ({
-            ...status,
-            status: "stopped" as const,
-            error: undefined,
-          }),
-        ),
+        portForwardStatuses: (session.portForwardStatuses ?? []).map((status) => ({
+          ...status,
+          status: "stopped" as const,
+          error: undefined,
+        })),
       });
     }).then((stopListening) => {
       if (disposed) stopListening();
@@ -512,12 +454,7 @@ export function useTerminalSessions({
       unlistenStatus?.();
       unlistenPortForward?.();
     };
-  }, [
-    clearReconnectTimer,
-    connectSession,
-    updatePortForwardStatus,
-    updateSession,
-  ]);
+  }, [clearReconnectTimer, connectSession, updatePortForwardStatus, updateSession]);
 
   useEffect(
     () => () => {
@@ -526,20 +463,15 @@ export function useTerminalSessions({
       manualReconnectsRef.current.clear();
       intentionallyDisconnectedRef.current.clear();
       sessionsRef.current.forEach((session) => {
-        void invoke("ssh_disconnect", { sessionId: session.id }).catch(
-          () => undefined,
-        );
-        void invoke("sftp_disconnect", { sessionId: session.id }).catch(
-          () => undefined,
-        );
+        void invoke("ssh_disconnect", { sessionId: session.id }).catch(() => undefined);
+        void invoke("sftp_disconnect", { sessionId: session.id }).catch(() => undefined);
       });
     },
     [],
   );
 
   const activeSession = useMemo(
-    () =>
-      sessions.find((session) => session.id === activeSessionId) ?? null,
+    () => sessions.find((session) => session.id === activeSessionId) ?? null,
     [activeSessionId, sessions],
   );
 

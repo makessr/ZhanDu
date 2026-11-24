@@ -34,10 +34,7 @@ interface UseAiProposalStateOptions {
   onActionTransition: AiActionTransitionHandler;
   onActionTransitionError: (error: unknown) => void;
   onCommandLifecycleObserved: ObserveCommandLifecycle;
-  onCommandLifecycleProcessed?: (
-    proposalId: string,
-    submission: TerminalCommandSubmission,
-  ) => void;
+  onCommandLifecycleProcessed?: (proposalId: string, submission: TerminalCommandSubmission) => void;
   persistConversation: (conversation?: AiConversation) => Promise<void>;
   updateMessages: UpdateMessages;
 }
@@ -64,11 +61,7 @@ export function useAiProposalState({
       targetConversationId: string,
       update: (messages: AiMessage[]) => AiMessage[],
     ) => {
-      const updated = updateMessages(
-        targetHostId,
-        targetConversationId,
-        update,
-      );
+      const updated = updateMessages(targetHostId, targetConversationId, update);
       void persistConversation(updated);
       return updated;
     },
@@ -151,9 +144,8 @@ export function useAiProposalState({
           message.id === messageId
             ? {
                 ...message,
-                fileOperationProposals: message.fileOperationProposals?.map(
-                  (proposal) =>
-                    proposal.id === proposalId ? update(proposal) : proposal,
+                fileOperationProposals: message.fileOperationProposals?.map((proposal) =>
+                  proposal.id === proposalId ? update(proposal) : proposal,
                 ),
               }
             : message,
@@ -278,11 +270,7 @@ export function useAiProposalState({
         if (!proposal) continue;
         void (async () => {
           try {
-            await onCommandLifecycleObserved(
-              message.id,
-              proposal.id,
-              submission,
-            );
+            await onCommandLifecycleObserved(message.id, proposal.id, submission);
             updateCommandProposalInConversation(
               submission.hostId,
               conversation.id,

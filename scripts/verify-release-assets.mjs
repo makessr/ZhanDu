@@ -4,57 +4,44 @@ import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
+import {
+  expectedAssetNames,
+  expectedPlatforms,
+  releaseVersion,
+  signedPackageNames,
+  validateReleaseAssetList,
+  validateReleaseMetadata,
+  validateUpdaterManifest,
+  WINDOWS_ASSET_PREFIXES,
+  RELEASE_SCOPES,
+  RELEASE_VISIBILITIES,
+} from "./release-assets.mjs";
 
-const [assetDir, releaseFile, previousConfig, verifier, repository, tag, commit, scope, visibility] =
-  process.argv.slice(2);
-assert.match(tag ?? "", /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/);
-assert.match(commit ?? "", /^[0-9a-f]{40}$/);
-assert.ok(["all", "windows"].includes(scope), "Invalid release platform scope");
-assert.ok(["draft", "public"].includes(visibility), "Invalid release visibility");
+const [
+  assetDir,
+  releaseFile,
+  previousConfig,
+  verifier,
+  repository,
+  tag,
+  commit,
+  scope,
+  visibility,
+  windowsPrefix = "FineShell",
+] = process.argv.slice(2);
+assert.ok(RELEASE_SCOPES.includes(scope), "Invalid release platform scope");
+assert.ok(RELEASE_VISIBILITIES.includes(visibility), "Invalid release visibility");
+assert.ok(WINDOWS_ASSET_PREFIXES.includes(windowsPrefix), "Invalid Windows asset prefix");
+releaseVersion(tag);
+
 const release = JSON.parse(await readFile(releaseFile, "utf8"));
-assert.equal(release.tag_name, tag);
-assert.equal(release.target_commitish, commit);
-assert.equal(release.draft, visibility === "draft");
-assert.equal(release.prerelease, tag.includes("-"));
+validateReleaseMetadata(release, { tag, commit, visibility });
 
-const version = release.tag_name.slice(1);
-const packagePrefix = "FineShell_" + version + "_";
-const canonicalPlatforms = {
-  "darwin-aarch64-app": "darwin_aarch64.app.tar.gz",
-  "darwin-x86_64-app": "darwin_x64.app.tar.gz",
-  "linux-x86_64-deb": "linux_amd64.deb",
-  "linux-aarch64-deb": "linux_arm64.deb",
-  "windows-x86_64-nsis": "windows_x64-setup.exe",
-  "windows-x86_64-msi": "windows_x64.msi",
-  "windows-aarch64-nsis": "windows_arm64-setup.exe",
-};
-const platformPackages = {
-  ...canonicalPlatforms,
-  "darwin-aarch64": canonicalPlatforms["darwin-aarch64-app"],
-  "darwin-x86_64": canonicalPlatforms["darwin-x86_64-app"],
-  "linux-x86_64": canonicalPlatforms["linux-x86_64-deb"],
-  "linux-aarch64": canonicalPlatforms["linux-aarch64-deb"],
-  "windows-x86_64": canonicalPlatforms["windows-x86_64-nsis"],
-  "windows-aarch64": canonicalPlatforms["windows-aarch64-nsis"],
-};
-const includesPlatform = (key) => scope === "all" || key.startsWith("windows-");
-const expectedPlatforms = Object.entries(platformPackages).filter(([key]) => includesPlatform(key));
-const signedPackages = Object.entries(canonicalPlatforms)
-  .filter(([key]) => includesPlatform(key))
-  .map(([, filename]) => packagePrefix + filename);
-const diskImages = scope === "all"
-  ? ["darwin_aarch64.dmg", "darwin_x64.dmg"].map((filename) => packagePrefix + filename)
-  : [];
-const expectedAssets = [
-  "latest.json",
-  ...signedPackages.flatMap((name) => [name, name + ".sig"]),
-  ...diskImages,
-].sort();
-
-assert.deepEqual(release.assets.map(({ name }) => name).sort(), expectedAssets);
+const version = releaseVersion(tag);
+const expectedAssets = expectedAssetNames(tag, scope, windowsPrefix);
+validateReleaseAssetList(release, expectedAssets);
 assert.deepEqual((await readdir(assetDir)).sort(), expectedAssets);
-for (const { name, digest, state } of release.assets) {
-  assert.equal(state, "uploaded", name);
+for (const { name, digest } of release.assets) {
   const hash = createHash("sha256");
   for await (const chunk of createReadStream(join(assetDir, name))) hash.update(chunk);
   assert.equal("sha256:" + hash.digest("hex"), digest, name);
@@ -64,17 +51,35 @@ const config = JSON.parse(await readFile(previousConfig, "utf8"));
 const { pubkey, endpoints } = config.plugins.updater;
 assert.ok(typeof pubkey === "string" && pubkey.length > 0, "Missing updater public key");
 assert.equal(endpoints[0], `https://github.com/${repository}/releases/latest/download/latest.json`);
+
+const platforms = expectedPlatforms(scope);
+const signedPackages = signedPackageNames(tag, scope, windowsPrefix);
 for (const name of signedPackages) {
-  execFileSync(verifier, [pubkey, join(assetDir, name), join(assetDir, name + ".sig")], { stdio: "inherit" });
+  execFileSync(verifier, [pubkey, join(assetDir, name), join(assetDir, name + ".sig")], {
+    stdio: "inherit",
+  });
 }
 
 const manifest = JSON.parse(await readFile(join(assetDir, "latest.json"), "utf8"));
-assert.equal(manifest.version, version);
-assert.deepEqual(Object.keys(manifest.platforms).sort(), expectedPlatforms.map(([key]) => key).sort());
-for (const [platform, suffix] of expectedPlatforms) {
-  const name = packagePrefix + suffix;
-  const { url, signature } = manifest.platforms[platform];
-  assert.equal(url, `https://github.com/${repository}/releases/download/${release.tag_name}/${name}`);
-  assert.equal(signature, (await readFile(join(assetDir, name + ".sig"), "utf8")).trim());
-}
-console.log(`Verified ${expectedAssets.length} asset digests, ${signedPackages.length} signatures, and ${expectedPlatforms.length} updater entries for ${repository} ${release.tag_name}.`);
+const signatureFiles = new Map(
+  await Promise.all(
+    signedPackages.map(async (name) => [
+      name,
+      await readFile(join(assetDir, name + ".sig"), "utf8"),
+    ]),
+  ),
+);
+validateUpdaterManifest(manifest, {
+  repository,
+  tag,
+  platforms,
+  windowsPrefix,
+  signatureFor: (name) => {
+    const signature = signatureFiles.get(name);
+    assert.ok(signature !== undefined, `Missing signature for ${name}`);
+    return signature;
+  },
+});
+console.log(
+  `Verified ${expectedAssets.length} asset digests, ${signedPackages.length} signatures, and ${platforms.length} updater entries for ${repository} ${release.tag_name} (${version}).`,
+);

@@ -44,17 +44,10 @@ export function remotePathBreadcrumbs(path: string): RemotePathBreadcrumb[] {
   ];
 }
 
-export function addRemotePathHistory(
-  history: string[],
-  path: string,
-  limit: number,
-) {
+export function addRemotePathHistory(history: string[], path: string, limit: number) {
   const normalized = normalizeRemoteDirectoryPath(path);
   if (!normalized) return history;
-  return [normalized, ...history.filter((item) => item !== normalized)].slice(
-    0,
-    limit,
-  );
+  return [normalized, ...history.filter((item) => item !== normalized)].slice(0, limit);
 }
 
 export function setRemotePathBookmark(
@@ -80,35 +73,28 @@ export function matchRemoteDirectoryPaths(
     .filter(
       (path, index, paths) =>
         paths.indexOf(path) === index &&
-        (!normalizedQuery ||
-          path.toLocaleLowerCase().includes(normalizedQuery)),
+        (!normalizedQuery || path.toLocaleLowerCase().includes(normalizedQuery)),
     )
     .slice(0, limit);
 }
 
 export function remoteJoinPath(directory: string, name: string) {
   const normalizedDirectory =
-    normalizeRemoteDirectoryPath(directory) ??
-    directory.replace(/\\/g, "/").replace(/\/+/g, "/");
+    normalizeRemoteDirectoryPath(directory) ?? directory.replace(/\\/g, "/").replace(/\/+/g, "/");
   if (normalizedDirectory === "/") return `/${name}`;
   return `${normalizedDirectory.replace(/\/+$/, "")}/${name}`;
 }
 
 export function isRemotePathDescendant(parent: string, candidate: string) {
-  const normalizedParent =
-    parent.replace(/\\/g, "/").replace(/\/+$/, "") || "/";
-  const normalizedCandidate =
-    candidate.replace(/\\/g, "/").replace(/\/+$/, "") || "/";
+  const normalizedParent = parent.replace(/\\/g, "/").replace(/\/+$/, "") || "/";
+  const normalizedCandidate = candidate.replace(/\\/g, "/").replace(/\/+$/, "") || "/";
   if (normalizedParent === "/") {
     return normalizedCandidate !== "/" && normalizedCandidate.startsWith("/");
   }
   return normalizedCandidate.startsWith(`${normalizedParent}/`);
 }
 
-export function nextAvailableRemoteName(
-  name: string,
-  unavailableNames: ReadonlySet<string>,
-) {
+export function nextAvailableRemoteName(name: string, unavailableNames: ReadonlySet<string>) {
   if (!unavailableNames.has(name)) return name;
   const extensionIndex = name.lastIndexOf(".");
   const hasExtension = extensionIndex > 0 && extensionIndex < name.length - 1;
@@ -146,10 +132,7 @@ interface NativeDropBounds {
   bottom: number;
 }
 
-function isPointInsideBounds(
-  point: NativeDropPosition,
-  bounds: NativeDropBounds,
-) {
+function isPointInsideBounds(point: NativeDropPosition, bounds: NativeDropBounds) {
   return (
     point.x >= bounds.left &&
     point.x <= bounds.right &&
@@ -164,8 +147,7 @@ export function resolveNativeDropPoint(
   bounds: NativeDropBounds,
   preferLogicalCoordinates: boolean,
 ): NativeDropPoint {
-  const normalizedScaleFactor =
-    Number.isFinite(scaleFactor) && scaleFactor > 0 ? scaleFactor : 1;
+  const normalizedScaleFactor = Number.isFinite(scaleFactor) && scaleFactor > 0 ? scaleFactor : 1;
   const logical = { x: position.x, y: position.y };
   const physical = {
     x: position.x / normalizedScaleFactor,
@@ -180,9 +162,7 @@ export function resolveNativeDropPoint(
         { point: physical, coordinateMode: "physical" as const },
         { point: logical, coordinateMode: "logical" as const },
       ];
-  const matched = candidates.find(({ point }) =>
-    isPointInsideBounds(point, bounds),
-  );
+  const matched = candidates.find(({ point }) => isPointInsideBounds(point, bounds));
   const resolved = matched ?? candidates[0];
   return {
     ...resolved.point,
@@ -204,21 +184,10 @@ export function invertSftpEntryKeys(
 }
 
 export type SftpTransferStatus =
-  | "queued"
-  | "running"
-  | "waiting"
-  | "paused"
-  | "completed"
-  | "failed"
-  | "cancelled";
+  "queued" | "running" | "waiting" | "paused" | "completed" | "failed" | "cancelled";
 
 export function isActiveSftpTransfer(status: SftpTransferStatus) {
-  return (
-    status === "queued" ||
-    status === "running" ||
-    status === "waiting" ||
-    status === "paused"
-  );
+  return status === "queued" || status === "running" || status === "waiting" || status === "paused";
 }
 
 export interface SftpTransferBatchSummary {
@@ -321,25 +290,17 @@ export function remoteArchiveExtension(format: RemoteArchiveFormat) {
 
 export function remoteArchiveFormatFromName(name: string) {
   const normalized = name.toLocaleLowerCase();
-  return (
-    REMOTE_ARCHIVE_SUFFIXES.find(({ suffix }) => normalized.endsWith(suffix))
-      ?.format ?? null
-  );
+  return REMOTE_ARCHIVE_SUFFIXES.find(({ suffix }) => normalized.endsWith(suffix))?.format ?? null;
 }
 
 export function remoteArchiveBaseName(name: string) {
   const normalized = name.toLocaleLowerCase();
-  const suffix = REMOTE_ARCHIVE_SUFFIXES.find(({ suffix }) =>
-    normalized.endsWith(suffix),
-  )?.suffix;
+  const suffix = REMOTE_ARCHIVE_SUFFIXES.find(({ suffix }) => normalized.endsWith(suffix))?.suffix;
   if (!suffix) return name;
   return name.slice(0, -suffix.length) || "archive";
 }
 
-export function remoteArchiveFileName(
-  baseName: string,
-  format: RemoteArchiveFormat,
-) {
+export function remoteArchiveFileName(baseName: string, format: RemoteArchiveFormat) {
   return `${remoteArchiveBaseName(baseName)}${remoteArchiveExtension(format)}`;
 }
 
@@ -373,19 +334,15 @@ export const PERMISSION_FLAGS = [
 export type PermissionFlag = (typeof PERMISSION_FLAGS)[number]["value"];
 
 export function permissionFlagsFromValue(permissions: number) {
-  return PERMISSION_FLAGS.filter(
-    ({ mask }) => (permissions & mask) === mask,
-  ).map(({ value }) => value);
+  return PERMISSION_FLAGS.filter(({ mask }) => (permissions & mask) === mask).map(
+    ({ value }) => value,
+  );
 }
 
-export function permissionValueFromFlags(
-  flags: readonly PermissionFlag[],
-  currentPermissions = 0,
-) {
+export function permissionValueFromFlags(flags: readonly PermissionFlag[], currentPermissions = 0) {
   const selectedFlags = new Set<PermissionFlag>(flags);
   const standardPermissions = PERMISSION_FLAGS.reduce(
-    (permissions, { mask, value }) =>
-      selectedFlags.has(value) ? permissions | mask : permissions,
+    (permissions, { mask, value }) => (selectedFlags.has(value) ? permissions | mask : permissions),
     0,
   );
   return (currentPermissions & 0o7000) | standardPermissions;

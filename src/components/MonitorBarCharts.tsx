@@ -25,8 +25,14 @@ export function NetworkTrendChart({
             key={time}
             title={`${new Date(time).toLocaleTimeString("zh-CN")}  ↑ ${formatMonitorRate(transmit)}  ↓ ${formatMonitorRate(receive)}`}
           >
-            <span className="monitor-network-upload" style={{ height: `${transmit / maxRate * 100}%` }} />
-            <span className="monitor-network-download" style={{ height: `${receive / maxRate * 100}%` }} />
+            <span
+              className="monitor-network-upload"
+              style={{ height: `${(transmit / maxRate) * 100}%` }}
+            />
+            <span
+              className="monitor-network-download"
+              style={{ height: `${(receive / maxRate) * 100}%` }}
+            />
           </div>
         ))}
       </div>
@@ -39,11 +45,22 @@ export function MonitorLatencyChart({ history }: { history: ServerMonitorHistory
   if (!samples.length) return null;
   const peak = Math.max(1, ...samples.map((point) => point.sshLatencyMs ?? 0));
   return (
-    <div aria-label="SSH 延迟趋势" className="monitor-network-chart monitor-latency-chart" role="img">
+    <div
+      aria-label="SSH 延迟趋势"
+      className="monitor-network-chart monitor-latency-chart"
+      role="img"
+    >
       <div className="monitor-network-bars">
         {samples.map(({ collectedAt, sshLatencyMs }) => (
-          <div className="monitor-network-sample" key={collectedAt} title={formatLatency(sshLatencyMs)}>
-            <span className="monitor-latency-bar" style={{ height: `${(sshLatencyMs ?? 0) / peak * 100}%` }} />
+          <div
+            className="monitor-network-sample"
+            key={collectedAt}
+            title={formatLatency(sshLatencyMs)}
+          >
+            <span
+              className="monitor-latency-bar"
+              style={{ height: `${((sshLatencyMs ?? 0) / peak) * 100}%` }}
+            />
           </div>
         ))}
       </div>

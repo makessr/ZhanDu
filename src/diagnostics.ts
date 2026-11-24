@@ -41,20 +41,14 @@ function redactText(value: string) {
     )
     .replace(/([a-z][a-z0-9+.-]*:\/\/)[^/\s@]+@/gi, "$1[CREDENTIALS]@")
     .replace(/\b[a-z_][\w.-]*@(?:[a-z0-9-]+\.)+[a-z]{2,}\b/gi, "[USER]@[HOST]")
-    .replace(
-      /\b[a-z_][\w.-]*@(?:(?:\d{1,3}\.){3}\d{1,3}|\[[0-9a-f:]+\])/gi,
-      "[USER]@[HOST]",
-    )
+    .replace(/\b[a-z_][\w.-]*@(?:(?:\d{1,3}\.){3}\d{1,3}|\[[0-9a-f:]+\])/gi, "[USER]@[HOST]")
     .replace(
       /(password|passphrase|api[_-]?key|token|authorization|secret)\s*[:=]\s*[^\s,;]+/gi,
       "$1=[REDACTED]",
     )
     .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, "[HOST]")
     .replace(/\[[0-9a-f:]*:[0-9a-f:]*\]/gi, "[HOST]")
-    .replace(
-      /(^|[^0-9a-f:])(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}($|[^0-9a-f:])/gi,
-      "$1[HOST]$2",
-    )
+    .replace(/(^|[^0-9a-f:])(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}($|[^0-9a-f:])/gi, "$1[HOST]$2")
     .replace(/\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b/gi, "[HOST]")
     .replace(/(^|[\s(])\/(?:[^\s):]+\/?)+/g, "$1[PATH]")
     .replace(/\b[a-z]:\\[^\s]+/gi, "[PATH]");
@@ -126,10 +120,7 @@ export async function diagnosticInvoke<T>(
     return result;
   } catch (error) {
     recordDiagnostic("error", "tauri.command", "桌面命令调用失败", {
-      error:
-        error instanceof FineShellCommandError
-          ? error.toJSON()
-          : commandErrorMessage(error),
+      error: error instanceof FineShellCommandError ? error.toJSON() : commandErrorMessage(error),
       operation: command,
     });
     throw error;

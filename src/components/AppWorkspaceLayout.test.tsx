@@ -28,12 +28,8 @@ describe("AppWorkspaceLayout", () => {
     const { container } = renderWorkspace({ opening: true });
     const sidebar = container.querySelector(".ai-assistant-sidebar");
 
-    expect(sidebar?.classList.contains("ai-assistant-sidebar-opening")).toBe(
-      true,
-    );
-    expect(sidebar?.classList.contains("ai-assistant-sidebar-hidden")).toBe(
-      false,
-    );
+    expect(sidebar?.classList.contains("ai-assistant-sidebar-opening")).toBe(true);
+    expect(sidebar?.classList.contains("ai-assistant-sidebar-hidden")).toBe(false);
     expect(sidebar?.getAttribute("aria-hidden")).toBe("true");
   });
 
@@ -41,9 +37,7 @@ describe("AppWorkspaceLayout", () => {
     const { container } = renderWorkspace();
     const sidebar = container.querySelector(".ai-assistant-sidebar");
 
-    expect(sidebar?.classList.contains("ai-assistant-sidebar-opening")).toBe(
-      false,
-    );
+    expect(sidebar?.classList.contains("ai-assistant-sidebar-opening")).toBe(false);
     expect(sidebar?.getAttribute("aria-hidden")).toBe("false");
   });
 });

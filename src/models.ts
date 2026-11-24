@@ -1,10 +1,5 @@
 export type HostAuthMethod = "password" | "privateKey" | "agent";
-export type HostSortMode =
-  | "manual"
-  | "nameAsc"
-  | "nameDesc"
-  | "addressAsc"
-  | "recentDesc";
+export type HostSortMode = "manual" | "nameAsc" | "nameDesc" | "addressAsc" | "recentDesc";
 
 export type ProxyType = "socks5" | "http";
 
@@ -180,12 +175,7 @@ export interface JumpHostConnection {
 }
 
 export type TerminalSessionStatus =
-  | "connecting"
-  | "connected"
-  | "suspect"
-  | "failed"
-  | "disconnected"
-  | "reconnecting";
+  "connecting" | "connected" | "suspect" | "failed" | "disconnected" | "reconnecting";
 
 export interface TerminalSession {
   id: string;

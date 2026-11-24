@@ -20,10 +20,7 @@ import {
   aiCapabilityStateLabel,
 } from "../ai-capabilities";
 import type { AppSettings, AiProvider } from "../app-settings";
-import {
-  AI_READ_ONLY_TOOL_OPTIONS,
-  type AiReadOnlyToolName,
-} from "../ai-permissions";
+import { AI_READ_ONLY_TOOL_OPTIONS, type AiReadOnlyToolName } from "../ai-permissions";
 import {
   AI_PROVIDER_PRESETS,
   aiModelFetchSignature,
@@ -46,19 +43,12 @@ export type AiSettingsInvoke = <T = void>(
 interface AiSettingsProps {
   invokeCommand?: AiSettingsInvoke;
   settings: AppSettings;
-  updateSetting: <Key extends keyof AppSettings>(
-    key: Key,
-    value: AppSettings[Key],
-  ) => void;
+  updateSetting: <Key extends keyof AppSettings>(key: Key, value: AppSettings[Key]) => void;
 }
 
 type ConnectionState = "success" | "failed" | null;
 
-function AiSettings({
-  invokeCommand = invoke,
-  settings,
-  updateSetting,
-}: AiSettingsProps) {
+function AiSettings({ invokeCommand = invoke, settings, updateSetting }: AiSettingsProps) {
   const [apiKey, setApiKey] = useState("");
   const [hasApiKey, setHasApiKey] = useState(false);
   const [loadingKeyStatus, setLoadingKeyStatus] = useState(true);
@@ -69,12 +59,8 @@ function AiSettings({
   const [credentialRevision, setCredentialRevision] = useState(0);
   const [testing, setTesting] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>(null);
-  const [capabilities, setCapabilities] =
-    useState<AiServiceCapabilities | null>(null);
-  const localService = useMemo(
-    () => isLocalAiBaseUrl(settings.aiBaseUrl),
-    [settings.aiBaseUrl],
-  );
+  const [capabilities, setCapabilities] = useState<AiServiceCapabilities | null>(null);
+  const localService = useMemo(() => isLocalAiBaseUrl(settings.aiBaseUrl), [settings.aiBaseUrl]);
   const canAuthenticate = localService || hasApiKey;
   const modelRequestRef = useRef(0);
   const capabilityRequestRef = useRef(0);
@@ -260,15 +246,12 @@ function AiSettings({
     setConnectionState(null);
     setCapabilities(null);
     try {
-      const result = await invokeCommand<AiServiceCapabilities>(
-        "ai_probe_capabilities",
-        {
-          request: {
-            baseUrl: settings.aiBaseUrl,
-            model: settings.aiModel,
-          },
+      const result = await invokeCommand<AiServiceCapabilities>("ai_probe_capabilities", {
+        request: {
+          baseUrl: settings.aiBaseUrl,
+          model: settings.aiModel,
         },
-      );
+      });
       if (capabilityRequestRef.current !== requestId) return;
       setCapabilities(result);
       setConnectionState("success");
@@ -358,11 +341,7 @@ function AiSettings({
               }
               value={apiKey}
             />
-            <Button
-              disabled={!apiKey.trim()}
-              loading={savingKey}
-              onClick={() => void saveApiKey()}
-            >
+            <Button disabled={!apiKey.trim()} loading={savingKey} onClick={() => void saveApiKey()}>
               保存
             </Button>
             {hasApiKey && (
@@ -394,16 +373,12 @@ function AiSettings({
       <div className="settings-row">
         <span className="settings-label-with-description">
           <Typography.Text>只读工具权限</Typography.Text>
-          <Typography.Text type="secondary">
-            仅向模型提供已勾选的工具
-          </Typography.Text>
+          <Typography.Text type="secondary">仅向模型提供已勾选的工具</Typography.Text>
         </span>
         <div className="settings-control ai-permission-control">
           <Checkbox.Group
             aria-label="AI 只读工具权限"
-            onChange={(values) =>
-              updateSetting("aiReadOnlyTools", values as AiReadOnlyToolName[])
-            }
+            onChange={(values) => updateSetting("aiReadOnlyTools", values as AiReadOnlyToolName[])}
             value={settings.aiReadOnlyTools}
           >
             {AI_READ_ONLY_TOOL_OPTIONS.map((option) => (
@@ -425,9 +400,7 @@ function AiSettings({
           <Switch
             aria-label="允许 AI 生成文件变更提案"
             checked={settings.aiFileProposalsEnabled}
-            onChange={(checked) =>
-              updateSetting("aiFileProposalsEnabled", checked)
-            }
+            onChange={(checked) => updateSetting("aiFileProposalsEnabled", checked)}
           />
         </div>
       </div>
@@ -442,18 +415,14 @@ function AiSettings({
           <Switch
             aria-label="允许 AI 生成终端命令提案"
             checked={settings.aiCommandProposalsEnabled}
-            onChange={(checked) =>
-              updateSetting("aiCommandProposalsEnabled", checked)
-            }
+            onChange={(checked) => updateSetting("aiCommandProposalsEnabled", checked)}
           />
         </div>
       </div>
       <div className="settings-row">
         <span className="settings-label-with-description">
           <Typography.Text>服务能力</Typography.Text>
-          <Typography.Text type="secondary">
-            会发起少量测试请求，不执行服务器操作
-          </Typography.Text>
+          <Typography.Text type="secondary">会发起少量测试请求，不执行服务器操作</Typography.Text>
         </span>
         <div className="settings-control ai-capability-setting">
           {connectionState === "failed" && <Tag color="red">失败</Tag>}

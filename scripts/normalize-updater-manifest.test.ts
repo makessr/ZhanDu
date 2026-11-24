@@ -1,10 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { normalizeUpdaterManifestUrls } from "./normalize-updater-manifest";
 
-const apiUrl =
-  "https://api.github.com/repos/example/app/releases/assets/123";
-const publicUrl =
-  "https://github.com/example/app/releases/download/v1.2.3/app.tar.gz";
+const apiUrl = "https://api.github.com/repos/example/app/releases/assets/123";
+const publicUrl = "https://github.com/example/app/releases/download/v1.2.3/app.tar.gz";
 
 describe("updater manifest URL normalization", () => {
   test("maps GitHub API asset URLs to public release downloads", () => {
@@ -53,9 +51,9 @@ describe("updater manifest URL normalization", () => {
   });
 
   test("rejects malformed release metadata", () => {
-    expect(() =>
-      normalizeUpdaterManifestUrls({ platforms: {} }, {}, "v1.2.3"),
-    ).toThrow("缺少 assets 数组");
+    expect(() => normalizeUpdaterManifestUrls({ platforms: {} }, {}, "v1.2.3")).toThrow(
+      "缺少 assets 数组",
+    );
   });
 
   test("replaces draft release paths with the intended tag", () => {

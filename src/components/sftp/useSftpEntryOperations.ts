@@ -31,8 +31,7 @@ export default function useSftpEntryOperations({
   onRefreshDirectory,
   sessionId,
 }: SftpEntryOperationsOptions) {
-  const [creatingEntryKind, setCreatingEntryKind] =
-    useState<CreateEntryKind | null>(null);
+  const [creatingEntryKind, setCreatingEntryKind] = useState<CreateEntryKind | null>(null);
   const [newEntryName, setNewEntryName] = useState("");
   const [renamingEntry, setRenamingEntry] = useState<SftpEntry | null>(null);
   const [renameName, setRenameName] = useState("");
@@ -40,10 +39,7 @@ export default function useSftpEntryOperations({
   const [permissionValue, setPermissionValue] = useState("");
   const [permissionOwner, setPermissionOwner] = useState("");
   const [permissionGroup, setPermissionGroup] = useState("");
-  const parsedPermissionValue = useMemo(
-    () => parsePermissions(permissionValue),
-    [permissionValue],
-  );
+  const parsedPermissionValue = useMemo(() => parsePermissions(permissionValue), [permissionValue]);
 
   function openCreateDialog(kind: CreateEntryKind) {
     setCreatingEntryKind(kind);
@@ -61,17 +57,13 @@ export default function useSftpEntryOperations({
     onLoadingChange(true);
     try {
       await invoke(
-        creatingEntryKind === "directory"
-          ? "sftp_create_directory"
-          : "sftp_create_file",
+        creatingEntryKind === "directory" ? "sftp_create_directory" : "sftp_create_file",
         {
           sessionId,
           path: remoteJoinPath(currentDirectory, name),
         },
       );
-      Message.success(
-        `已新建${creatingEntryKind === "directory" ? "目录" : "文件"} ${name}`,
-      );
+      Message.success(`已新建${creatingEntryKind === "directory" ? "目录" : "文件"} ${name}`);
       setCreatingEntryKind(null);
       setNewEntryName("");
       await onRefreshDirectory();
@@ -167,9 +159,7 @@ export default function useSftpEntryOperations({
       return;
     }
 
-    const containsDirectory = targetEntries.some(
-      (entry) => entry.kind === "directory",
-    );
+    const containsDirectory = targetEntries.some((entry) => entry.kind === "directory");
     Modal.confirm({
       cancelText: "取消",
       content:
@@ -221,14 +211,10 @@ export default function useSftpEntryOperations({
 
   function openPermissionsDialog(targetEntries: SftpEntry[]) {
     const firstPermissions = targetEntries[0]?.permissions;
-    const samePermissions = targetEntries.every(
-      (entry) => entry.permissions === firstPermissions,
-    );
+    const samePermissions = targetEntries.every((entry) => entry.permissions === firstPermissions);
     setPermissionEntries(targetEntries);
     setPermissionValue(
-      samePermissions && firstPermissions !== undefined
-        ? formatPermissions(firstPermissions)
-        : "",
+      samePermissions && firstPermissions !== undefined ? formatPermissions(firstPermissions) : "",
     );
     setPermissionOwner(
       targetEntries.every((entry) => entry.owner === targetEntries[0]?.owner)
@@ -244,9 +230,7 @@ export default function useSftpEntryOperations({
 
   async function updatePermissions() {
     if (!sessionId || permissionEntries.length === 0) return;
-    const permissions = permissionValue.trim()
-      ? parsePermissions(permissionValue)
-      : null;
+    const permissions = permissionValue.trim() ? parsePermissions(permissionValue) : null;
     if (permissionValue.trim() && permissions === null) {
       Message.warning("请输入 3 到 4 位八进制权限");
       return;

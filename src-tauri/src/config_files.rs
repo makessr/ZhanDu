@@ -4,7 +4,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::protocol::{CommandError, CommandResult};
+use crate::{
+    local_paths::{self, PathOperation},
+    protocol::{CommandError, CommandResult},
+};
 
 const MAX_CONFIG_FILE_BYTES: u64 = 5 * 1024 * 1024;
 const MAX_THEME_FILE_BYTES: u64 = 64 * 1024;
@@ -15,19 +18,26 @@ pub(crate) struct GhosttyThemeFile {
     contents: String,
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SshIncludeFile {
+    path: String,
+    token: String,
+}
+
 #[tauri::command]
 pub(crate) async fn read_ghostty_themes(
     window: tauri::WebviewWindow,
 ) -> CommandResult<Vec<GhosttyThemeFile>> {
     if window.label() != "settings" {
-        return Err(CommandError::from_message(
+        return Err(CommandError::permission_denied(
             "read_ghostty_themes",
             "仅设置窗口可读取终端主题",
         ));
     }
     tauri::async_runtime::spawn_blocking(|| collect_ghostty_themes(ghostty_theme_directories()))
         .await
-        .map_err(|error| CommandError::from_message("read_ghostty_themes", error.to_string()))
+        .map_err(|error| CommandError::internal("read_ghostty_themes", error.to_string()))
 }
 
 fn ghostty_theme_directories() -> Vec<PathBuf> {
@@ -104,29 +114,57 @@ fn collect_ghostty_themes(roots: Vec<PathBuf>) -> Vec<GhosttyThemeFile> {
 }
 
 #[tauri::command]
-pub fn read_config_file(path: String) -> CommandResult<String> {
-    read_config_file_inner(path)
-        .map_err(|error| CommandError::from_message("read_config_file", error))
+pub fn read_config_file(window: tauri::WebviewWindow, token: String) -> CommandResult<String> {
+    local_paths::ensure_allowed_window(window.label())
+        .map_err(|error| CommandError::permission_denied("read_config_file", error))?;
+    let path = local_paths::consume(&token, PathOperation::Read)
+        .map_err(|error| CommandError::invalid_request("read_config_file", error))?;
+    read_config_file_inner(&path)
 }
 
-fn read_config_file_inner(path: String) -> Result<String, String> {
-    let metadata = fs::metadata(&path).map_err(|error| format!("无法读取配置文件: {error}"))?;
+fn read_config_file_inner(path: &Path) -> CommandResult<String> {
+    let metadata = fs::metadata(path).map_err(|error| {
+        let message = format!("无法读取配置文件: {error}");
+        if error.kind() == std::io::ErrorKind::NotFound {
+            CommandError::not_found("read_config_file", message)
+        } else {
+            CommandError::io("read_config_file", message)
+        }
+    })?;
     if metadata.len() > MAX_CONFIG_FILE_BYTES {
-        return Err("配置文件超过 5 MB 限制".to_string());
+        return Err(CommandError::invalid_request(
+            "read_config_file",
+            "配置文件超过 5 MB 限制",
+        ));
     }
 
-    fs::read_to_string(path).map_err(|error| format!("无法读取配置文件: {error}"))
+    fs::read_to_string(path)
+        .map_err(|error| CommandError::io("read_config_file", format!("无法读取配置文件: {error}")))
 }
 
 #[tauri::command]
-pub fn ssh_config_include_files(root: String, pattern: String) -> CommandResult<Vec<String>> {
-    resolve_ssh_config_include(&root, &pattern)
-        .map_err(|error| CommandError::from_message("ssh_config_include_files", error))
+pub fn ssh_config_include_files(
+    root: String,
+    pattern: String,
+) -> CommandResult<Vec<SshIncludeFile>> {
+    resolve_ssh_config_include(&root, &pattern).map(|files| {
+        files
+            .into_iter()
+            .map(|path| SshIncludeFile {
+                token: local_paths::grant(PathBuf::from(&path), PathOperation::Read),
+                path,
+            })
+            .collect()
+    })
 }
 
-fn resolve_ssh_config_include(root: &str, pattern: &str) -> Result<Vec<String>, String> {
+fn resolve_ssh_config_include(root: &str, pattern: &str) -> CommandResult<Vec<String>> {
+    const OPERATION: &str = "ssh_config_include_files";
     if pattern.is_empty() || pattern.contains(['%', '$']) {
-        return Err("Include 路径包含不支持的占位符".into());
+        return Err(CommandError::invalid_request(
+            OPERATION,
+            "Include 路径包含不支持的占位符",
+        ));
     }
     let path = Path::new(pattern);
     let expanded = if let Some(relative) = pattern
@@ -134,59 +172,84 @@ fn resolve_ssh_config_include(root: &str, pattern: &str) -> Result<Vec<String>, 
         .or_else(|| pattern.strip_prefix("~\\"))
     {
         let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-            .ok_or("无法确定用户的主目录")?;
+            .ok_or_else(|| CommandError::internal(OPERATION, "无法确定用户的主目录"))?;
         PathBuf::from(home).join(relative)
     } else if path.is_absolute() {
         path.to_path_buf()
     } else {
         if pattern.starts_with('~') {
-            return Err("Include 仅支持当前用户的 ~/ 路径".into());
+            return Err(CommandError::invalid_request(
+                OPERATION,
+                "Include 仅支持当前用户的 ~/ 路径",
+            ));
         }
         Path::new(root)
             .parent()
-            .ok_or("无法确定配置文件目录")?
+            .ok_or_else(|| CommandError::internal(OPERATION, "无法确定配置文件目录"))?
             .join(path)
     };
     let mut files = Vec::new();
-    let pattern = expanded.to_str().ok_or("Include 路径不是 UTF-8")?;
-    for result in glob::glob(pattern).map_err(|error| format!("Include 路径无效: {error}"))? {
-        let path = result.map_err(|error| format!("无法读取 Include 路径: {error}"))?;
+    let pattern = expanded
+        .to_str()
+        .ok_or_else(|| CommandError::invalid_request(OPERATION, "Include 路径不是 UTF-8"))?;
+    for result in glob::glob(pattern).map_err(|error| {
+        CommandError::invalid_request(OPERATION, format!("Include 路径无效: {error}"))
+    })? {
+        let path = result.map_err(|error| {
+            CommandError::io(OPERATION, format!("无法读取 Include 路径: {error}"))
+        })?;
         if !path.is_file() {
             continue;
         }
         if files.len() >= 128 {
-            return Err("Include 匹配的文件过多".into());
+            return Err(CommandError::invalid_request(
+                OPERATION,
+                "Include 匹配的文件过多",
+            ));
         }
-        let path = path
-            .canonicalize()
-            .map_err(|error| format!("无法读取 Include 路径: {error}"))?;
+        let path = path.canonicalize().map_err(|error| {
+            CommandError::io(OPERATION, format!("无法读取 Include 路径: {error}"))
+        })?;
         files.push(
             path.into_os_string()
                 .into_string()
-                .map_err(|_| "Include 路径不是 UTF-8")?,
+                .map_err(|_| CommandError::invalid_request(OPERATION, "Include 路径不是 UTF-8"))?,
         );
     }
     Ok(files)
 }
 
 #[tauri::command]
-pub fn write_config_file(path: String, contents: String) -> CommandResult<()> {
-    write_config_file_inner(path, contents)
-        .map_err(|error| CommandError::from_message("write_config_file", error))
+pub fn write_config_file(
+    window: tauri::WebviewWindow,
+    token: String,
+    contents: String,
+) -> CommandResult<()> {
+    local_paths::ensure_allowed_window(window.label())
+        .map_err(|error| CommandError::permission_denied("write_config_file", error))?;
+    let path = local_paths::consume(&token, PathOperation::Write)
+        .map_err(|error| CommandError::invalid_request("write_config_file", error))?;
+    write_config_file_inner(&path, contents)
 }
 
-fn write_config_file_inner(path: String, contents: String) -> Result<(), String> {
+fn write_config_file_inner(path: &Path, contents: String) -> CommandResult<()> {
     if contents.len() as u64 > MAX_CONFIG_FILE_BYTES {
-        return Err("配置文件超过 5 MB 限制".to_string());
+        return Err(CommandError::invalid_request(
+            "write_config_file",
+            "配置文件超过 5 MB 限制",
+        ));
     }
-    let path = Path::new(&path);
     if let Some(parent) = path.parent() {
         if !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent).map_err(|error| format!("无法创建配置目录: {error}"))?;
+            fs::create_dir_all(parent).map_err(|error| {
+                CommandError::io("write_config_file", format!("无法创建配置目录: {error}"))
+            })?;
         }
     }
 
-    fs::write(path, contents).map_err(|error| format!("无法写入配置文件: {error}"))
+    fs::write(path, contents).map_err(|error| {
+        CommandError::io("write_config_file", format!("无法写入配置文件: {error}"))
+    })
 }
 
 #[cfg(test)]
@@ -194,8 +257,8 @@ mod tests {
     use std::{fs, time::SystemTime};
 
     use super::{
-        collect_ghostty_themes, read_config_file, resolve_ssh_config_include, write_config_file,
-        MAX_CONFIG_FILE_BYTES, MAX_THEME_FILE_BYTES,
+        collect_ghostty_themes, read_config_file_inner, resolve_ssh_config_include,
+        write_config_file_inner, MAX_CONFIG_FILE_BYTES, MAX_THEME_FILE_BYTES,
     };
 
     fn temporary_directory(name: &str) -> std::path::PathBuf {
@@ -271,10 +334,9 @@ mod tests {
     fn command_boundary_writes_and_reads_nested_configuration() {
         let directory = temporary_directory("round-trip");
         let path = directory.join("nested/config.json");
-        let path_value = path.to_string_lossy().into_owned();
 
-        write_config_file(path_value.clone(), "{\"version\":1}".to_string()).unwrap();
-        assert_eq!(read_config_file(path_value).unwrap(), "{\"version\":1}");
+        write_config_file_inner(&path, "{\"version\":1}".to_string()).unwrap();
+        assert_eq!(read_config_file_inner(&path).unwrap(), "{\"version\":1}");
 
         fs::remove_dir_all(directory).unwrap();
     }
@@ -282,7 +344,7 @@ mod tests {
     #[test]
     fn command_boundary_returns_structured_not_found_errors() {
         let path = temporary_directory("missing").join("config.json");
-        let error = read_config_file(path.to_string_lossy().into_owned()).unwrap_err();
+        let error = read_config_file_inner(&path).unwrap_err();
         let serialized = serde_json::to_value(error).unwrap();
 
         assert_eq!(serialized["code"], "not_found");
@@ -297,11 +359,8 @@ mod tests {
     #[test]
     fn command_boundary_rejects_oversized_configuration_before_writing() {
         let path = temporary_directory("oversized").join("config.json");
-        let error = write_config_file(
-            path.to_string_lossy().into_owned(),
-            "x".repeat(MAX_CONFIG_FILE_BYTES as usize + 1),
-        )
-        .unwrap_err();
+        let error = write_config_file_inner(&path, "x".repeat(MAX_CONFIG_FILE_BYTES as usize + 1))
+            .unwrap_err();
         let serialized = serde_json::to_value(error).unwrap();
 
         assert_eq!(serialized["code"], "invalid_request");

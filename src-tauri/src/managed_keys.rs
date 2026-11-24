@@ -1,3 +1,5 @@
+#![allow(deprecated)] // from_message 兼容层，待内部模块改为结构化错误后移除。
+
 use std::{
     fs::{self, OpenOptions},
     io::Write,
@@ -47,7 +49,10 @@ pub(crate) fn ssh_private_key_identity(reference: String) -> CommandResult<SshPr
             .map_err(|_| "仅支持识别 OpenSSH 格式的私钥".to_string())?;
         Ok::<_, String>(SshPrivateKeyIdentity {
             public_key: encode_public_key(&private)?,
-            fingerprint: private.public_key().fingerprint(HashAlg::Sha256).to_string(),
+            fingerprint: private
+                .public_key()
+                .fingerprint(HashAlg::Sha256)
+                .to_string(),
         })
     };
     read().map_err(|error| CommandError::from_message("ssh_private_key_identity", error))
@@ -296,7 +301,12 @@ fn import_private_key(root: &Path, key_id: &str, private_key: &str) -> Result<St
     write_private_key(root, key_id, private_key, false)
 }
 
-fn write_private_key(root: &Path, key_id: &str, private_key: &str, replace: bool) -> Result<String, String> {
+fn write_private_key(
+    root: &Path,
+    key_id: &str,
+    private_key: &str,
+    replace: bool,
+) -> Result<String, String> {
     validate_key_id(key_id)?;
     let (normalized, key_type) = validate_private_key(private_key)?;
     prepare_directory(root)?;
@@ -454,7 +464,10 @@ mod tests {
         assert_eq!(generated.reference, "managed://example");
         assert_eq!(generated.public_key, encode_public_key(&private).unwrap());
         assert!(generate_key(&root, "example").is_err());
-        assert_eq!(read_key_file(&key_path(&root, "example")).unwrap(), contents);
+        assert_eq!(
+            read_key_file(&key_path(&root, "example")).unwrap(),
+            contents
+        );
         fs::remove_dir_all(root).unwrap();
     }
 }

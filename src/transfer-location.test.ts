@@ -10,20 +10,14 @@ import {
 
 describe("transfer location", () => {
   test("resolves local parent directories on POSIX and Windows", () => {
-    expect(localParentPath("/Users/max/Downloads/a.txt")).toBe(
-      "/Users/max/Downloads",
-    );
+    expect(localParentPath("/Users/max/Downloads/a.txt")).toBe("/Users/max/Downloads");
     expect(localParentPath("/a.txt")).toBe("/");
-    expect(localParentPath("C:\\Users\\max\\Downloads\\a.txt")).toBe(
-      "C:\\Users\\max\\Downloads",
-    );
+    expect(localParentPath("C:\\Users\\max\\Downloads\\a.txt")).toBe("C:\\Users\\max\\Downloads");
     expect(localParentPath("C:\\a.txt")).toBe("C:\\");
   });
 
   test("abbreviates the home directory only on path boundaries", () => {
-    expect(abbreviateHomePath("/Users/max/Downloads", "/Users/max")).toBe(
-      "~/Downloads",
-    );
+    expect(abbreviateHomePath("/Users/max/Downloads", "/Users/max")).toBe("~/Downloads");
     expect(abbreviateHomePath("/Users/max", "/Users/max/")).toBe("~");
     expect(abbreviateHomePath("/Users/maxwell/Downloads", "/Users/max")).toBe(
       "/Users/maxwell/Downloads",
@@ -33,10 +27,7 @@ describe("transfer location", () => {
 
   test("truncates long paths in the middle", () => {
     expect(middleTruncatePath("/srv/app", 20)).toBe("/srv/app");
-    const truncated = middleTruncatePath(
-      "/srv/projects/very/deep/nested/release/uploads",
-      20,
-    );
+    const truncated = middleTruncatePath("/srv/projects/very/deep/nested/release/uploads", 20);
     expect(Array.from(truncated)).toHaveLength(20);
     expect(truncated.startsWith("/srv/pr")).toBe(true);
     expect(truncated.endsWith("se/uploads")).toBe(true);
@@ -70,15 +61,9 @@ describe("transfer location", () => {
   });
 
   test("only reveals completed downloads", () => {
-    expect(
-      canRevealLocalTransfer({ direction: "download", status: "completed" }),
-    ).toBe(true);
-    expect(
-      canRevealLocalTransfer({ direction: "download", status: "running" }),
-    ).toBe(false);
-    expect(
-      canRevealLocalTransfer({ direction: "upload", status: "completed" }),
-    ).toBe(false);
+    expect(canRevealLocalTransfer({ direction: "download", status: "completed" })).toBe(true);
+    expect(canRevealLocalTransfer({ direction: "download", status: "running" })).toBe(false);
+    expect(canRevealLocalTransfer({ direction: "upload", status: "completed" })).toBe(false);
   });
 
   test("names the file manager by platform", () => {

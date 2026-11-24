@@ -7,10 +7,7 @@ import type { AiRemoteFileContext } from "../ai-utils";
 import type { AiActionExecutionHandler } from "../ai-action-lifecycle";
 import type { AgentActionExecutionResult } from "../tauri-protocol";
 import type { AiMessage } from "./useAiConversations";
-import {
-  useAiFileChangeWorkflow,
-  type AiFileChangeConfirmation,
-} from "./useAiFileChangeWorkflow";
+import { useAiFileChangeWorkflow, type AiFileChangeConfirmation } from "./useAiFileChangeWorkflow";
 
 function remoteFile(path: string, content: string): AiRemoteFileContext {
   return {
@@ -21,10 +18,7 @@ function remoteFile(path: string, content: string): AiRemoteFileContext {
   };
 }
 
-function fileEditProposal(
-  id = "edit-1",
-  path = "/srv/app.conf",
-): AiFileEditProposal {
+function fileEditProposal(id = "edit-1", path = "/srv/app.conf"): AiFileEditProposal {
   return {
     content: "updated\n",
     id,
@@ -34,10 +28,7 @@ function fileEditProposal(
   };
 }
 
-function appliedCreateOperation(
-  id: string,
-  path: string,
-): AiFileOperationProposal {
+function appliedCreateOperation(id: string, path: string): AiFileOperationProposal {
   return {
     appliedAt: "2026-07-28T08:00:00.000Z",
     appliedFile: remoteFile(path, `${id}\n`),
@@ -51,9 +42,7 @@ function appliedCreateOperation(
   };
 }
 
-function pendingCreateOperation(
-  content: string,
-): AiFileOperationProposal {
+function pendingCreateOperation(content: string): AiFileOperationProposal {
   return {
     content,
     id: "operation-pending",
@@ -111,9 +100,8 @@ function useWorkflowHarness(options: HarnessOptions) {
           message.id === messageId
             ? {
                 ...message,
-                fileOperationProposals: message.fileOperationProposals?.map(
-                  (proposal) =>
-                    proposal.id === proposalId ? update(proposal) : proposal,
+                fileOperationProposals: message.fileOperationProposals?.map((proposal) =>
+                  proposal.id === proposalId ? update(proposal) : proposal,
                 ),
               }
             : message,
@@ -141,19 +129,11 @@ describe("useAiFileChangeWorkflow", () => {
   test("does not claim user confirmation for an automatically allowed edit", async () => {
     const proposal = fileEditProposal();
     const executeAction = mock(
-      async (
-        _messageId: string,
-        actionId: string,
-        _rollback?: boolean,
-        contentOverride?: string,
-      ) =>
+      async (_messageId: string, actionId: string, _rollback?: boolean, contentOverride?: string) =>
         executionResult(
           actionId,
           "file_edit",
-          remoteFile(
-            proposal.originalFile.path,
-            contentOverride ?? proposal.content,
-          ),
+          remoteFile(proposal.originalFile.path, contentOverride ?? proposal.content),
         ),
     );
     const { result } = renderHook(() =>
@@ -166,11 +146,7 @@ describe("useAiFileChangeWorkflow", () => {
     );
 
     await act(async () => {
-      await result.current.workflow.approveFileEditProposal(
-        "assistant-1",
-        proposal,
-        false,
-      );
+      await result.current.workflow.approveFileEditProposal("assistant-1", proposal, false);
     });
 
     expect(executeAction).toHaveBeenCalledWith(
@@ -185,19 +161,11 @@ describe("useAiFileChangeWorkflow", () => {
   test("applies a reviewed file edit and records the returned snapshot", async () => {
     const proposal = fileEditProposal();
     const executeAction = mock(
-      async (
-        _messageId: string,
-        actionId: string,
-        _rollback?: boolean,
-        contentOverride?: string,
-      ) =>
+      async (_messageId: string, actionId: string, _rollback?: boolean, contentOverride?: string) =>
         executionResult(
           actionId,
           "file_edit",
-          remoteFile(
-            proposal.originalFile.path,
-            contentOverride ?? proposal.content,
-          ),
+          remoteFile(proposal.originalFile.path, contentOverride ?? proposal.content),
         ),
     );
     const onNotice = mock(() => undefined);
@@ -215,9 +183,7 @@ describe("useAiFileChangeWorkflow", () => {
       result.current.workflow.setFileEditReviewContent("reviewed update\n");
     });
     await waitFor(() =>
-      expect(result.current.workflow.reviewedFileEditProposal?.reviewed).toBe(
-        true,
-      ),
+      expect(result.current.workflow.reviewedFileEditProposal?.reviewed).toBe(true),
     );
     await act(async () => {
       await result.current.workflow.applyReviewedFileEdit();
@@ -245,9 +211,7 @@ describe("useAiFileChangeWorkflow", () => {
       content: "password=[已隐藏]\n",
     };
     const create = pendingCreateOperation("token=[已隐藏密钥]\n");
-    const executeAction = mock(async () =>
-      executionResult("unexpected", "file_edit", null)
-    );
+    const executeAction = mock(async () => executionResult("unexpected", "file_edit", null));
     const { result } = renderHook(() =>
       useWorkflowHarness({
         initialMessages: [assistantMessage([edit], [create])],
@@ -258,14 +222,8 @@ describe("useAiFileChangeWorkflow", () => {
     );
 
     await act(async () => {
-      await result.current.workflow.approveFileEditProposal(
-        "assistant-1",
-        edit,
-      );
-      await result.current.workflow.approveFileOperationProposal(
-        "assistant-1",
-        create,
-      );
+      await result.current.workflow.approveFileEditProposal("assistant-1", edit);
+      await result.current.workflow.approveFileOperationProposal("assistant-1", create);
     });
 
     expect(executeAction).not.toHaveBeenCalled();
@@ -297,20 +255,13 @@ describe("useAiFileChangeWorkflow", () => {
     act(() => {
       result.current.workflow.openFileEditReview("assistant-1", proposal);
     });
-    await waitFor(() =>
-      expect(result.current.workflow.reviewedFileEditProposal).toBeDefined(),
-    );
+    await waitFor(() => expect(result.current.workflow.reviewedFileEditProposal).toBeDefined());
     await act(async () => {
       await result.current.workflow.applyReviewedFileEdit();
     });
 
-    expect(result.current.messages[0]?.fileEditProposals?.[0]?.status).toBe(
-      "conflict",
-    );
-    expect(onNotice).toHaveBeenCalledWith(
-      "error",
-      "远程文件已变化，请重新发送给 AI",
-    );
+    expect(result.current.messages[0]?.fileEditProposals?.[0]?.status).toBe("conflict");
+    expect(onNotice).toHaveBeenCalledWith("error", "远程文件已变化，请重新发送给 AI");
     expect(result.current.workflow.fileChangeReview?.activeKey).toBe("edit:edit-1");
   });
 
@@ -347,9 +298,7 @@ describe("useAiFileChangeWorkflow", () => {
 
     expect(result.current.workflow.reviewedFileEditContent).toBe("first draft\n");
     expect(
-      result.current.messages[0]?.fileEditProposals?.map(
-        (proposal) => proposal.reviewed,
-      ),
+      result.current.messages[0]?.fileEditProposals?.map((proposal) => proposal.reviewed),
     ).toEqual([true, true]);
   });
 
@@ -389,9 +338,8 @@ describe("useAiFileChangeWorkflow", () => {
     const first = appliedCreateOperation("operation-1", "/srv/one.conf");
     const second = appliedCreateOperation("operation-2", "/srv/two.conf");
     let confirmation: AiFileChangeConfirmation | undefined;
-    const executeAction = mock(
-      async (_messageId: string, actionId: string, _rollback?: boolean) =>
-        executionResult(actionId, "file_operation", null),
+    const executeAction = mock(async (_messageId: string, actionId: string, _rollback?: boolean) =>
+      executionResult(actionId, "file_operation", null),
     );
     const onNotice = mock(() => undefined);
     const { result } = renderHook(() =>
@@ -406,10 +354,7 @@ describe("useAiFileChangeWorkflow", () => {
     );
 
     act(() => {
-      result.current.workflow.confirmRollbackAllFileOperations(
-        "assistant-1",
-        [first, second],
-      );
+      result.current.workflow.confirmRollbackAllFileOperations("assistant-1", [first, second]);
     });
     expect(confirmation?.title).toBe("回滚这组文件操作？");
     await act(async () => {
@@ -421,9 +366,7 @@ describe("useAiFileChangeWorkflow", () => {
       ["operation-1", true],
     ]);
     expect(
-      result.current.messages[0]?.fileOperationProposals?.map(
-        (proposal) => proposal.status,
-      ),
+      result.current.messages[0]?.fileOperationProposals?.map((proposal) => proposal.status),
     ).toEqual(["rolled-back", "rolled-back"]);
     expect(onNotice).toHaveBeenCalledWith("success", "已回滚 2 个文件操作");
   });

@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { renderHook, waitFor } from "@testing-library/react";
-import {
-  isScrolledNearBottom,
-  useAiTimelineAutoScroll,
-} from "./useAiTimelineAutoScroll";
+import { isScrolledNearBottom, useAiTimelineAutoScroll } from "./useAiTimelineAutoScroll";
 
 function scrollContainer(scrollHeight: number, clientHeight = 300) {
   const element = document.createElement("div");
@@ -42,12 +39,12 @@ function render(element: HTMLElement) {
 
 describe("useAiTimelineAutoScroll", () => {
   test("detects whether the view is near the bottom", () => {
-    expect(
-      isScrolledNearBottom({ clientHeight: 300, scrollHeight: 1000, scrollTop: 700 }),
-    ).toBe(true);
-    expect(
-      isScrolledNearBottom({ clientHeight: 300, scrollHeight: 1000, scrollTop: 600 }),
-    ).toBe(false);
+    expect(isScrolledNearBottom({ clientHeight: 300, scrollHeight: 1000, scrollTop: 700 })).toBe(
+      true,
+    );
+    expect(isScrolledNearBottom({ clientHeight: 300, scrollHeight: 1000, scrollTop: 600 })).toBe(
+      false,
+    );
   });
 
   test("follows streamed content while the user stays at the bottom", async () => {

@@ -7,13 +7,10 @@ export interface ReleaseVersions {
   tauri: string;
 }
 
-const RELEASE_TAG_PATTERN =
-  /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+const RELEASE_TAG_PATTERN = /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 
 export function cargoPackageVersion(contents: string) {
-  const packageSection = contents.match(
-    /\[package\]([\s\S]*?)(?=\n\[[^\]]+\]|$)/,
-  )?.[1];
+  const packageSection = contents.match(/\[package\]([\s\S]*?)(?=\n\[[^\]]+\]|$)/)?.[1];
   const version = packageSection?.match(/^\s*version\s*=\s*"([^"]+)"/m)?.[1];
 
   if (!version) {
@@ -23,14 +20,9 @@ export function cargoPackageVersion(contents: string) {
   return version;
 }
 
-export function validateReleaseVersion(
-  releaseTag: string,
-  versions: ReleaseVersions,
-) {
+export function validateReleaseVersion(releaseTag: string, versions: ReleaseVersions) {
   if (!RELEASE_TAG_PATTERN.test(releaseTag)) {
-    throw new Error(
-      `版本标签“${releaseTag}”格式无效，应使用 v1.2.3 或 v1.2.3-beta.1`,
-    );
+    throw new Error(`版本标签“${releaseTag}”格式无效，应使用 v1.2.3 或 v1.2.3-beta.1`);
   }
 
   const configuredVersions = new Set(Object.values(versions));
@@ -42,27 +34,22 @@ export function validateReleaseVersion(
 
   const version = versions.tauri;
   if (releaseTag !== `v${version}`) {
-    throw new Error(
-      `版本标签“${releaseTag}”与应用版本“${version}”不一致，应使用 v${version}`,
-    );
+    throw new Error(`版本标签“${releaseTag}”与应用版本“${version}”不一致，应使用 v${version}`);
   }
 
   return version;
 }
 
-export function validateReleaseRepository(
-  endpoints: unknown,
-  repository: string,
-) {
+export function validateReleaseRepository(endpoints: unknown, repository: string) {
   const expected = `https://github.com/${repository}/releases/latest/download/latest.json`;
   const endpoint = Array.isArray(endpoints) ? endpoints[0] : undefined;
-  const match = typeof endpoint === "string"
-    ? endpoint.match(/^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/releases\/latest\/download\/latest\.json$/)
-    : null;
-  if (
-    !match ||
-    match[1].toLowerCase() !== repository.toLowerCase()
-  ) {
+  const match =
+    typeof endpoint === "string"
+      ? endpoint.match(
+          /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/releases\/latest\/download\/latest\.json$/,
+        )
+      : null;
+  if (!match || match[1].toLowerCase() !== repository.toLowerCase()) {
     throw new Error(
       `应用更新渠道与发布仓库不一致：当前地址为 ${String(endpoint)}，${repository} 的更新地址应为 ${expected}`,
     );
@@ -71,16 +58,13 @@ export function validateReleaseRepository(
 
 function readReleaseVersions(repository?: string): ReleaseVersions {
   const projectRoot = resolve(import.meta.dir, "..");
-  const packageJson = JSON.parse(
-    readFileSync(resolve(projectRoot, "package.json"), "utf8"),
-  ) as { version?: string };
+  const packageJson = JSON.parse(readFileSync(resolve(projectRoot, "package.json"), "utf8")) as {
+    version?: string;
+  };
   const tauriConfig = JSON.parse(
     readFileSync(resolve(projectRoot, "src-tauri/tauri.conf.json"), "utf8"),
   ) as { version?: string; plugins?: { updater?: { endpoints?: unknown } } };
-  const cargoToml = readFileSync(
-    resolve(projectRoot, "src-tauri/Cargo.toml"),
-    "utf8",
-  );
+  const cargoToml = readFileSync(resolve(projectRoot, "src-tauri/Cargo.toml"), "utf8");
 
   if (!packageJson.version || !tauriConfig.version) {
     throw new Error("package.json 或 tauri.conf.json 缺少 version");

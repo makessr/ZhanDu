@@ -77,12 +77,12 @@ function AiApprovalActions({
             autoFocus
             disabled={disabled}
             maxLength={1_000}
-          onChange={setFeedback}
-          onPressEnter={submitRevision}
-          placeholder={feedbackPlaceholder}
-          size={buttonSize}
-          value={feedback}
-        />
+            onChange={setFeedback}
+            onPressEnter={submitRevision}
+            placeholder={feedbackPlaceholder}
+            size={buttonSize}
+            value={feedback}
+          />
           <Button
             disabled={disabled || !feedback.trim()}
             loading={processing}

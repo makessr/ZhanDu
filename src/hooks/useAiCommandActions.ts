@@ -65,23 +65,18 @@ export function useAiCommandActions({
   updateCommandProposal,
   updateCommandProposalInConversation,
 }: UseAiCommandActionsOptions) {
-  const [verificationTarget, setVerificationTarget] =
-    useState<CommandVerificationTarget | null>(null);
+  const [verificationTarget, setVerificationTarget] = useState<CommandVerificationTarget | null>(
+    null,
+  );
 
   useEffect(() => {
     setVerificationTarget(null);
   }, [sessionId]);
 
-  const updateDraft = (
-    value: string,
-    targetConversationId = conversationId,
-  ) => {
+  const updateDraft = (value: string, targetConversationId = conversationId) => {
     if (!targetConversationId) return;
     setVerificationTarget((current) =>
-      current?.conversationId === targetConversationId &&
-      current.draft !== value
-        ? null
-        : current,
+      current?.conversationId === targetConversationId && current.draft !== value ? null : current,
     );
     setDraft(targetConversationId, value);
   };
@@ -96,11 +91,7 @@ export function useAiCommandActions({
       markAiCommandProposalApproved(current),
     );
     try {
-      const submission = await onPrepareCommand(
-        messageId,
-        proposal,
-        userConfirmed,
-      );
+      const submission = await onPrepareCommand(messageId, proposal, userConfirmed);
       updateCommandProposal(messageId, proposal.id, (current) =>
         reconcileAiCommandProposalExecution(current, {
           submissionId: submission.id,
@@ -126,23 +117,15 @@ export function useAiCommandActions({
           durationMs: submission.durationMs ?? null,
           reason: submission.reason ?? null,
           submittedAt: Date.parse(submission.submittedAt),
-          updatedAt: submission.completedAt
-            ? Date.parse(submission.completedAt)
-            : Date.now(),
-          completedAt: submission.completedAt
-            ? Date.parse(submission.completedAt)
-            : Date.now(),
+          updatedAt: submission.completedAt ? Date.parse(submission.completedAt) : Date.now(),
+          completedAt: submission.completedAt ? Date.parse(submission.completedAt) : Date.now(),
         }),
       );
       return submission;
     } catch (error) {
       const reason = commandErrorMessage(error);
       if (!userConfirmed) {
-        updateCommandProposal(
-          messageId,
-          proposal.id,
-          revertAiCommandProposalApproval,
-        );
+        updateCommandProposal(messageId, proposal.id, revertAiCommandProposalApproval);
         onNotice("warning", `自动执行未完成，请手动确认：${reason}`);
       } else {
         updateCommandProposal(messageId, proposal.id, (current) =>
@@ -165,19 +148,14 @@ export function useAiCommandActions({
 
   const copyAllCommandProposals = async (proposals: AiCommandProposal[]) => {
     try {
-      await onCopyText(
-        proposals.map((proposal) => proposal.command).join("\n"),
-      );
+      await onCopyText(proposals.map((proposal) => proposal.command).join("\n"));
       onNotice("success", `已复制 ${proposals.length} 条命令`);
     } catch (error) {
       onNotice("error", commandErrorMessage(error));
     }
   };
 
-  const prepareCommandVerification = (
-    messageId: string,
-    proposal: AiCommandProposal,
-  ) => {
+  const prepareCommandVerification = (messageId: string, proposal: AiCommandProposal) => {
     if (
       !conversationId ||
       (proposal.status !== "executed" &&
@@ -231,10 +209,7 @@ export function useAiCommandActions({
     return verificationTarget;
   };
 
-  const completeVerification = (
-    completed: boolean,
-    target: CommandVerificationTarget | null,
-  ) => {
+  const completeVerification = (completed: boolean, target: CommandVerificationTarget | null) => {
     if (!completed || !hostId || !target) return;
     updateCommandProposalInConversation(
       hostId,

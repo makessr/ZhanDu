@@ -1,10 +1,7 @@
 import type { AiContextSource, AiContextSourceId } from "./ai-utils";
 
 export type AiPromptPresetId =
-  | "explain-output"
-  | "analyze-server"
-  | "diagnose-network"
-  | "generate-command";
+  "explain-output" | "analyze-server" | "diagnose-network" | "generate-command";
 
 export interface AiPromptPreset {
   contextIds: AiContextSourceId[];
@@ -40,14 +37,9 @@ export const AI_PROMPT_PRESETS: readonly AiPromptPreset[] = [
   },
 ];
 
-export function availablePresetContextIds(
-  preset: AiPromptPreset,
-  sources: AiContextSource[],
-) {
+export function availablePresetContextIds(preset: AiPromptPreset, sources: AiContextSource[]) {
   const available = new Set(
-    sources
-      .filter((source) => source.content.trim())
-      .map((source) => source.id),
+    sources.filter((source) => source.content.trim()).map((source) => source.id),
   );
   return preset.contextIds.filter((id) => available.has(id));
 }

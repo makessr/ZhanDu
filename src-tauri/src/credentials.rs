@@ -1,3 +1,5 @@
+#![allow(deprecated)] // from_message 兼容层，待内部模块改为结构化错误后移除。
+
 const SSH_PASSWORD_SERVICE: &str = "com.fineshell.app.ssh";
 const SSH_PRIVATE_KEY_PASSPHRASE_SERVICE: &str = "com.fineshell.app.ssh-key-passphrase";
 const PROXY_PASSWORD_SERVICE: &str = "com.fineshell.app.proxy";
@@ -68,16 +70,20 @@ pub(crate) fn restore_backup_credential(
         return Err("凭据归属标识和值不能为空".to_string());
     }
     let entry = backup_credential_entry(kind, owner_id)?;
-    changed_for_sync(entry
-        .set_password(value)
-        .map_err(|error| format!("恢复系统凭据失败：{error}")))
+    changed_for_sync(
+        entry
+            .set_password(value)
+            .map_err(|error| format!("恢复系统凭据失败：{error}")),
+    )
 }
 
 pub(crate) fn delete_backup_credential(kind: &str, owner_id: &str) -> Result<(), String> {
-    changed_for_sync(match backup_credential_entry(kind, owner_id)?.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(error) => Err(format!("删除系统凭据失败：{error}")),
-    })
+    changed_for_sync(
+        match backup_credential_entry(kind, owner_id)?.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(error) => Err(format!("删除系统凭据失败：{error}")),
+        },
+    )
 }
 
 fn ai_api_key_entry() -> Result<keyring::Entry, String> {
@@ -342,7 +348,10 @@ pub(crate) fn store_host_password(
 
 #[tauri::command]
 pub(crate) fn delete_host_password(host_id: String) -> crate::protocol::CommandResult<()> {
-    structured("delete_host_password", changed_for_sync(delete_host_password_inner(host_id)))
+    structured(
+        "delete_host_password",
+        changed_for_sync(delete_host_password_inner(host_id)),
+    )
 }
 
 #[tauri::command]

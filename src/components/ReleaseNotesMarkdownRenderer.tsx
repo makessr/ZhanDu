@@ -8,10 +8,7 @@ interface ReleaseNotesMarkdownRendererProps {
   className: string;
 }
 
-function ReleaseNotesMarkdownRenderer({
-  children,
-  className,
-}: ReleaseNotesMarkdownRendererProps) {
+function ReleaseNotesMarkdownRenderer({ children, className }: ReleaseNotesMarkdownRendererProps) {
   const openLink = (event: MouseEvent<HTMLAnchorElement>, href?: string) => {
     if (!href) return;
     event.preventDefault();

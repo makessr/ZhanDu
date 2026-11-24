@@ -37,9 +37,7 @@ describe("AI conversation summaries", () => {
     );
 
     expect(plan.throughMessageId).toBe("message-10");
-    expect(source.messages.length - throughIndex - 1).toBe(
-      AI_SUMMARY_RECENT_MESSAGES,
-    );
+    expect(source.messages.length - throughIndex - 1).toBe(AI_SUMMARY_RECENT_MESSAGES);
     expect(plan.prompt).toContain("第 1 条消息");
     expect(plan.prompt).not.toContain("第 11 条消息");
   });
@@ -69,12 +67,8 @@ describe("AI conversation summaries", () => {
     const messages = buildAiConversationRequestMessages(source.messages, summary);
 
     expect(messages[0]?.content).toContain("较早对话摘要");
-    expect(messages.some((message) => message.content === "第 4 条消息")).toBe(
-      false,
-    );
-    expect(messages.some((message) => message.content === "第 5 条消息")).toBe(
-      true,
-    );
+    expect(messages.some((message) => message.content === "第 4 条消息")).toBe(false);
+    expect(messages.some((message) => message.content === "第 5 条消息")).toBe(true);
     expect(messagesAfterAiSummary(source.messages, summary)).toHaveLength(8);
   });
 

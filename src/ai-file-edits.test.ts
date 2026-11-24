@@ -30,24 +30,16 @@ describe("AI file edit proposals", () => {
     const source = aiRemoteFileContextSource(FILE);
     const context = buildAiContextPayload([source], [source.id], 4_000);
     expect(aiFileEditEligibilityError(FILE, context, 4_000)).toBeNull();
-    expect(aiFileEditEligibilityError(FILE, context.slice(0, -1), 4_000)).toContain(
-      "未完整加入",
-    );
+    expect(aiFileEditEligibilityError(FILE, context.slice(0, -1), 4_000)).toContain("未完整加入");
     const longFile = { ...FILE, content: "x".repeat(2_000), size: 2_000 };
     const truncatedContext = buildAiContextPayload(
       [aiRemoteFileContextSource(longFile)],
       [aiRemoteFileContextSource(longFile).id],
       400,
     );
-    expect(aiFileEditEligibilityError(longFile, truncatedContext, 400)).toContain(
-      "未完整加入",
-    );
+    expect(aiFileEditEligibilityError(longFile, truncatedContext, 400)).toContain("未完整加入");
     expect(
-      aiFileEditEligibilityError(
-        { ...FILE, content: "password=secret\n" },
-        context,
-        4_000,
-      ),
+      aiFileEditEligibilityError({ ...FILE, content: "password=secret\n" }, context, 4_000),
     ).toContain("只能分析");
   });
 
@@ -138,32 +130,21 @@ describe("AI file edit proposals", () => {
       path: "/etc/small.conf",
       size: 13,
     };
-    const sources = [
-      aiRemoteFileContextSource(longFile),
-      aiRemoteFileContextSource(smallFile),
-    ];
+    const sources = [aiRemoteFileContextSource(longFile), aiRemoteFileContextSource(smallFile)];
     const context = buildAiContextPayload(
       sources,
       sources.map((source) => source.id),
       500,
     );
-    expect(aiFileEditEligibilityError(longFile, context, 500)).toContain(
-      "未完整加入",
-    );
+    expect(aiFileEditEligibilityError(longFile, context, 500)).toContain("未完整加入");
     expect(aiFileEditEligibilityError(smallFile, context, 500)).toBeNull();
   });
 
   test("rejects unchanged, binary, and oversized replacement content", () => {
-    expect(proposedFileContentError(FILE.content, FILE.content)).toContain(
-      "相同",
-    );
+    expect(proposedFileContentError(FILE.content, FILE.content)).toContain("相同");
     expect(proposedFileContentError("a\0b", FILE.content)).toContain("二进制");
-    expect(
-      proposedFileContentError("password=[已隐藏]\n", FILE.content),
-    ).toContain("脱敏占位符");
-    expect(proposedFileContentError("x".repeat(60_001), FILE.content)).toContain(
-      "60000",
-    );
+    expect(proposedFileContentError("password=[已隐藏]\n", FILE.content)).toContain("脱敏占位符");
+    expect(proposedFileContentError("x".repeat(60_001), FILE.content)).toContain("60000");
   });
 
   test("creates bounded diff parts and a result that never claims a write", () => {
@@ -180,12 +161,7 @@ describe("AI file edit proposals", () => {
   });
 
   test("assigns stable old and new line numbers without a trailing phantom line", () => {
-    expect(
-      aiFileEditDiffLines(
-        "first\nold\nkeep\n",
-        "first\nnew\nkeep\nadded\n",
-      ),
-    ).toEqual([
+    expect(aiFileEditDiffLines("first\nold\nkeep\n", "first\nnew\nkeep\nadded\n")).toEqual([
       {
         content: "first",
         kind: "unchanged",
@@ -205,21 +181,20 @@ describe("AI file edit proposals", () => {
   });
 
   test("aligns uneven replacement blocks in the side-by-side view", () => {
-    expect(aiFileEditSideBySideRows("one\ntwo\n", "first\nsecond\nthree\n"))
-      .toEqual([
-        {
-          left: { content: "one", kind: "removed", oldLineNumber: 1 },
-          right: { content: "first", kind: "added", newLineNumber: 1 },
-        },
-        {
-          left: { content: "two", kind: "removed", oldLineNumber: 2 },
-          right: { content: "second", kind: "added", newLineNumber: 2 },
-        },
-        {
-          left: undefined,
-          right: { content: "three", kind: "added", newLineNumber: 3 },
-        },
-      ]);
+    expect(aiFileEditSideBySideRows("one\ntwo\n", "first\nsecond\nthree\n")).toEqual([
+      {
+        left: { content: "one", kind: "removed", oldLineNumber: 1 },
+        right: { content: "first", kind: "added", newLineNumber: 1 },
+      },
+      {
+        left: { content: "two", kind: "removed", oldLineNumber: 2 },
+        right: { content: "second", kind: "added", newLineNumber: 2 },
+      },
+      {
+        left: undefined,
+        right: { content: "three", kind: "added", newLineNumber: 3 },
+      },
+    ]);
   });
 
   test("keeps both snapshots so applied changes can be rolled back safely", () => {
@@ -245,10 +220,7 @@ describe("AI file edit proposals", () => {
     expect(applied.appliedFile?.content).toBe("port=8080\n");
     expect(aiFileEditRollbackEligibilityError(applied)).toBeNull();
 
-    const rolledBack = markAiFileEditRolledBack(
-      applied,
-      "2026-07-28T02:00:00.000Z",
-    );
+    const rolledBack = markAiFileEditRolledBack(applied, "2026-07-28T02:00:00.000Z");
     expect(rolledBack.status).toBe("rolled-back");
     expect(rolledBack.originalFile.content).toBe("port=80\n");
     expect(aiFileEditRollbackEligibilityError(rolledBack)).toContain("没有可回滚");
@@ -263,11 +235,9 @@ describe("AI file edit proposals", () => {
   });
 
   test("summarizes changed lines without persisting file contents", () => {
-    expect(
-      aiFileEditLineSummary(
-        "port=80\nenabled=false\n",
-        "port=8080\nenabled=true\n",
-      ),
-    ).toEqual({ addedLines: 2, removedLines: 2 });
+    expect(aiFileEditLineSummary("port=80\nenabled=false\n", "port=8080\nenabled=true\n")).toEqual({
+      addedLines: 2,
+      removedLines: 2,
+    });
   });
 });

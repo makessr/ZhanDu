@@ -1,28 +1,16 @@
 import { useState } from "react";
-import {
-  Button,
-  Message,
-  Select,
-  Space,
-  Tooltip,
-  Typography,
-} from "@arco-design/web-react";
+import { Button, Message, Select, Space, Tooltip, Typography } from "@arco-design/web-react";
 import { IconEye, IconFolder } from "@arco-design/web-react/icon";
 import type { AppSettings } from "../app-settings";
 import { openDiagnosticLog, openDiagnosticLogDirectory } from "../diagnostics";
 
 interface AdvancedSettingsProps {
   settings: AppSettings;
-  updateSetting: <Key extends keyof AppSettings>(
-    key: Key,
-    value: AppSettings[Key],
-  ) => void;
+  updateSetting: <Key extends keyof AppSettings>(key: Key, value: AppSettings[Key]) => void;
 }
 
 function AdvancedSettings({ settings, updateSetting }: AdvancedSettingsProps) {
-  const [openingLog, setOpeningLog] = useState<"file" | "directory" | null>(
-    null,
-  );
+  const [openingLog, setOpeningLog] = useState<"file" | "directory" | null>(null);
 
   const openLog = async (target: "file" | "directory") => {
     setOpeningLog(target);
@@ -77,10 +65,7 @@ function AdvancedSettings({ settings, updateSetting }: AdvancedSettingsProps) {
               <Select
                 aria-label="诊断日志级别"
                 onChange={(value) =>
-                  updateSetting(
-                    "diagnosticLogLevel",
-                    value as AppSettings["diagnosticLogLevel"],
-                  )
+                  updateSetting("diagnosticLogLevel", value as AppSettings["diagnosticLogLevel"])
                 }
                 options={[
                   { label: "调试", value: "debug" },

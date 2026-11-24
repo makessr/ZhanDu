@@ -1,20 +1,9 @@
 import { describe, expect, mock, test } from "bun:test";
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
-import type {
-  AiCommandProposal,
-  AiCommandRecord,
-} from "../ai-command-proposals";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { AiCommandProposal, AiCommandRecord } from "../ai-command-proposals";
 import AiCommandProposalList from "./AiCommandProposalList";
 
-function proposal(
-  status: AiCommandProposal["status"] = "pending",
-): AiCommandProposal {
+function proposal(status: AiCommandProposal["status"] = "pending"): AiCommandProposal {
   return {
     assessment: { canInsert: true, label: "低风险", risk: "safe" },
     command: "uname -a",
@@ -88,10 +77,9 @@ describe("AiCommandProposalList", () => {
       await Promise.resolve();
     });
     await waitFor(() =>
-      expect(
-        (screen.getByRole("button", { name: "拒绝" }) as HTMLButtonElement)
-          .disabled,
-      ).toBe(false),
+      expect((screen.getByRole("button", { name: "拒绝" }) as HTMLButtonElement).disabled).toBe(
+        false,
+      ),
     );
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "拒绝" }));
@@ -99,9 +87,7 @@ describe("AiCommandProposalList", () => {
     });
 
     expect(view.onCopy).toHaveBeenCalledWith("uname -a");
-    expect(view.onApprove).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "command-1" }),
-    );
+    expect(view.onApprove).toHaveBeenCalledWith(expect.objectContaining({ id: "command-1" }));
     expect(view.onReject).toHaveBeenCalledWith("command-1");
   });
 
@@ -139,9 +125,7 @@ describe("AiCommandProposalList", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "其他" }));
     fireEvent.change(
-      screen.getByPlaceholderText(
-        "输入其他处理要求，例如：改为只检查状态，不重启服务",
-      ),
+      screen.getByPlaceholderText("输入其他处理要求，例如：改为只检查状态，不重启服务"),
       { target: { value: "只检查状态，不要重启" } },
     );
     await act(async () => {
@@ -158,14 +142,12 @@ describe("AiCommandProposalList", () => {
   test("keeps approval controls available while the model turn is paused", () => {
     renderList([proposal()], [], true, "approval");
 
-    expect(
-      (screen.getByRole("button", { name: "同意" }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(false);
-    expect(
-      (screen.getByRole("button", { name: "拒绝" }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(false);
+    expect((screen.getByRole("button", { name: "同意" }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+    expect((screen.getByRole("button", { name: "拒绝" }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
   });
 
   test("keeps completed commands as passive conversation history", () => {
@@ -193,9 +175,7 @@ describe("AiCommandProposalList", () => {
   });
 
   test("distinguishes command runtime phases", () => {
-    const view = renderList([
-      { ...proposal("executed"), executionPhase: "connecting" },
-    ]);
+    const view = renderList([{ ...proposal("executed"), executionPhase: "connecting" }]);
     expect(screen.getByText("连接中")).not.toBeNull();
     expect(screen.queryByText("正在建立后台 SSH 执行通道")).toBeNull();
 
@@ -229,9 +209,7 @@ describe("AiCommandProposalList", () => {
         onCopyAll={() => undefined}
         onReject={() => undefined}
         onRevise={() => undefined}
-        proposals={[
-          { ...proposal("unavailable"), executionPhase: "interrupted" },
-        ]}
+        proposals={[{ ...proposal("unavailable"), executionPhase: "interrupted" }]}
         records={[]}
         sending={false}
         sessionId="session-1"

@@ -3,7 +3,12 @@ import { Button } from "@arco-design/web-react";
 import { diagnosticInvoke as invoke } from "../diagnostics";
 import type { SftpListResult, TerminalCommandHistoryRecord } from "../models";
 import type { AppSettings } from "../app-settings";
-import { isSingleTerminalCommand, remoteCompletionDirectory, shellCompletionWord, terminalCommandCompletion } from "../terminal-command-bar";
+import {
+  isSingleTerminalCommand,
+  remoteCompletionDirectory,
+  shellCompletionWord,
+  terminalCommandCompletion,
+} from "../terminal-command-bar";
 import { commandErrorMessage } from "../tauri-protocol";
 
 const SHELL_BUILTINS = ["cd", "export", "pwd", "read", "set", "type", "umask", "unset"];
@@ -66,8 +71,8 @@ export default function TerminalCommandBar({
     const history = getHistory()
       .filter((item) => item.hostId === hostId && isSingleTerminalCommand(item.command))
       .map((item) => item.command);
-    const matches = [...new Set(history)].filter((command) =>
-      !draft.trim() || command.toLowerCase().includes(draft.trim().toLowerCase()),
+    const matches = [...new Set(history)].filter(
+      (command) => !draft.trim() || command.toLowerCase().includes(draft.trim().toLowerCase()),
     );
     setChoices((matches.length ? matches : history).slice(0, MAX_CHOICES));
     if (!history.length) setNotice("当前主机还没有本地命令历史");
@@ -101,10 +106,17 @@ export default function TerminalCommandBar({
         const home = token.startsWith("~/") ? (await loadRemoteCommands())[0] : "";
         const path = remoteCompletionDirectory(token, getDirectory(), home);
         if (!path) throw new Error("等待终端报告当前目录，或输入绝对路径");
-        const result = await invoke<SftpListResult>("sftp_list", { sessionId, path: path.directory });
+        const result = await invoke<SftpListResult>("sftp_list", {
+          sessionId,
+          path: path.directory,
+        });
         matches = result.entries
-          .filter(({ name }) => name.startsWith(path.fragment) &&
-            (path.fragment.startsWith(".") || !name.startsWith(".")) && !/[\x00-\x1f\x7f]/.test(name))
+          .filter(
+            ({ name }) =>
+              name.startsWith(path.fragment) &&
+              (path.fragment.startsWith(".") || !name.startsWith(".")) &&
+              !/[\x00-\x1f\x7f]/.test(name),
+          )
           .slice(0, MAX_CHOICES)
           .map(({ name, kind }) => {
             const directory = kind === "directory";
@@ -145,7 +157,9 @@ export default function TerminalCommandBar({
 
   return (
     <div className="terminal-command-bar">
-      <span aria-hidden className="terminal-command-prompt">›_</span>
+      <span aria-hidden className="terminal-command-prompt">
+        ›_
+      </span>
       <input
         aria-label="命令输入框"
         className="terminal-command-input"
@@ -173,25 +187,39 @@ export default function TerminalCommandBar({
             event.preventDefault();
             if (choices.length) pasteChoice(choices[selected]);
             else void send();
-          } else if (event.key === "Tab" && !event.shiftKey &&
-            (settings.terminalCommandBarPaths || settings.terminalCommandBarNames)) {
+          } else if (
+            event.key === "Tab" &&
+            !event.shiftKey &&
+            (settings.terminalCommandBarPaths || settings.terminalCommandBarNames)
+          ) {
             event.preventDefault();
             if (choices.length) pasteChoice(choices[selected]);
             else void complete();
           } else if (choices.length && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
             event.preventDefault();
-            setSelected((index) => (index + (event.key === "ArrowDown" ? 1 : -1) + choices.length) % choices.length);
-          } else if (settings.terminalCommandBarHistory &&
-            (event.key === "ArrowUp" || (event.altKey && event.key.toLowerCase() === "h"))) {
+            setSelected(
+              (index) =>
+                (index + (event.key === "ArrowDown" ? 1 : -1) + choices.length) % choices.length,
+            );
+          } else if (
+            settings.terminalCommandBarHistory &&
+            (event.key === "ArrowUp" || (event.altKey && event.key.toLowerCase() === "h"))
+          ) {
             event.preventDefault();
             showHistory();
           }
         }}
       />
       {settings.terminalCommandBarHistory && (
-        <Button size="mini" disabled={!connected || sending} onClick={showHistory}>历史</Button>
+        <Button size="mini" disabled={!connected || sending} onClick={showHistory}>
+          历史
+        </Button>
       )}
-      <Button size="mini" disabled={!connected || sending || !isSingleTerminalCommand(draft)} onClick={() => void send()}>
+      <Button
+        size="mini"
+        disabled={!connected || sending || !isSingleTerminalCommand(draft)}
+        onClick={() => void send()}
+      >
         发送
       </Button>
       {choices.length > 0 && (
@@ -202,11 +230,17 @@ export default function TerminalCommandBar({
               key={choice}
               onClick={() => pasteChoice(choice)}
               type="button"
-            >{choice}</button>
+            >
+              {choice}
+            </button>
           ))}
         </div>
       )}
-      {notice && <div className="terminal-command-notice" role="status">{notice}</div>}
+      {notice && (
+        <div className="terminal-command-notice" role="status">
+          {notice}
+        </div>
+      )}
     </div>
   );
 }

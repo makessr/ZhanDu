@@ -7,9 +7,7 @@ export function isScrolledNearBottom(
   element: Pick<HTMLElement, "clientHeight" | "scrollHeight" | "scrollTop">,
   threshold = AI_TIMELINE_STICK_THRESHOLD,
 ) {
-  return (
-    element.scrollHeight - element.scrollTop - element.clientHeight <= threshold
-  );
+  return element.scrollHeight - element.scrollTop - element.clientHeight <= threshold;
 }
 
 /**

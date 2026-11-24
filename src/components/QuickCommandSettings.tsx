@@ -11,33 +11,19 @@ import {
   Typography,
 } from "@arco-design/web-react";
 import type { TableColumnProps } from "@arco-design/web-react";
-import {
-  IconDelete,
-  IconEdit,
-  IconPlus,
-} from "@arco-design/web-react/icon";
+import { IconDelete, IconEdit, IconPlus } from "@arco-design/web-react/icon";
 import { isTauri } from "@tauri-apps/api/core";
 import { loadConfiguration } from "../config-database";
-import {
-  deleteQuickCommand,
-  upsertQuickCommand,
-} from "../configuration-mutations";
-import type {
-  QuickCommandFormValues,
-  QuickCommandRecord,
-} from "../models";
-import {
-  emitProtocolEventTo,
-  listenProtocolEvent,
-} from "../tauri-protocol";
+import { deleteQuickCommand, upsertQuickCommand } from "../configuration-mutations";
+import type { QuickCommandFormValues, QuickCommandRecord } from "../models";
+import { emitProtocolEventTo, listenProtocolEvent } from "../tauri-protocol";
 
 function QuickCommandSettings() {
   const [commands, setCommands] = useState<QuickCommandRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [editorVisible, setEditorVisible] = useState(false);
-  const [editingCommand, setEditingCommand] =
-    useState<QuickCommandRecord | null>(null);
+  const [editingCommand, setEditingCommand] = useState<QuickCommandRecord | null>(null);
 
   const refresh = useCallback(async () => {
     const configuration = await loadConfiguration();
@@ -76,9 +62,7 @@ function QuickCommandSettings() {
 
   const notifyMainWindow = async () => {
     if (!isTauri()) return;
-    await emitProtocolEventTo("main", "configuration:changed").catch(
-      () => undefined,
-    );
+    await emitProtocolEventTo("main", "configuration:changed").catch(() => undefined);
   };
 
   const saveCommand = async (values: QuickCommandFormValues) => {
@@ -121,9 +105,7 @@ function QuickCommandSettings() {
           <div className="quick-command-name-cell">
             <Typography.Text bold>{command.name}</Typography.Text>
             {command.description && (
-              <Typography.Text type="secondary">
-                {command.description}
-              </Typography.Text>
+              <Typography.Text type="secondary">{command.description}</Typography.Text>
             )}
           </div>
         ),

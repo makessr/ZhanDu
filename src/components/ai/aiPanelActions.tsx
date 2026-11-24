@@ -1,16 +1,13 @@
 import { Input, Message, Modal } from "@arco-design/web-react";
 import { isTauri } from "@tauri-apps/api/core";
 import { writeText as writeClipboardText } from "@tauri-apps/plugin-clipboard-manager";
-import { save } from "@tauri-apps/plugin-dialog";
 import {
   aiConversationExportFilename,
   serializeAiConversationMarkdown,
 } from "../../ai-conversations";
-import {
-  isAiRemoteFileContextSourceId,
-  type AiContextSource,
-} from "../../ai-utils";
+import { isAiRemoteFileContextSourceId, type AiContextSource } from "../../ai-utils";
 import { diagnosticInvoke as invoke } from "../../diagnostics";
+import { pickLocalPath } from "../../local-path-picker";
 import type { AiCommandNotice } from "../../hooks/useAiCommandActions";
 import type { AiConversation } from "../../hooks/useAiConversations";
 import type {
@@ -26,7 +23,10 @@ import type {
 export function contextSourceDisplayLabel(source: AiContextSource) {
   return isAiRemoteFileContextSourceId(source.id)
     ? `文件:${
-        source.label.replace(/^文件:/, "").split("/").pop() || "远程文件"
+        source.label
+          .replace(/^文件:/, "")
+          .split("/")
+          .pop() || "远程文件"
       }`
     : source.label;
 }
@@ -40,10 +40,7 @@ export function confirmAiFileChange(confirmation: AiFileChangeConfirmation) {
   });
 }
 
-export function showAiFileChangeNotice(
-  type: AiFileChangeNotice,
-  content: string,
-) {
+export function showAiFileChangeNotice(type: AiFileChangeNotice, content: string) {
   if (type === "success") Message.success(content);
   else if (type === "warning") Message.warning(content);
   else Message.error(content);
@@ -60,9 +57,7 @@ export function showAiDraftNotice(content: string) {
   Message.success(content);
 }
 
-export function confirmAiConversationDelete(
-  confirmation: AiConversationDeleteConfirmation,
-) {
+export function confirmAiConversationDelete(confirmation: AiConversationDeleteConfirmation) {
   Modal.confirm({
     content: confirmation.content,
     okButtonProps: { status: "danger" },
@@ -91,10 +86,7 @@ export function requestAiConversationRename(request: AiConversationRenameRequest
   });
 }
 
-export function showAiConversationNotice(
-  type: AiConversationNotice,
-  content: string,
-) {
+export function showAiConversationNotice(type: AiConversationNotice, content: string) {
   if (type === "success") Message.success(content);
   else if (type === "warning") Message.warning(content);
   else Message.error(content);
@@ -107,9 +99,7 @@ export async function copyCode(value: string) {
 }
 
 function downloadMarkdownInBrowser(filename: string, contents: string) {
-  const url = URL.createObjectURL(
-    new Blob([contents], { type: "text/markdown;charset=utf-8" }),
-  );
+  const url = URL.createObjectURL(new Blob([contents], { type: "text/markdown;charset=utf-8" }));
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
@@ -121,13 +111,15 @@ export async function exportAiConversationFile(conversation: AiConversation) {
   const contents = serializeAiConversationMarkdown(conversation);
   const filename = aiConversationExportFilename(conversation);
   if (isTauri()) {
-    const path = await save({
+    const picked = await pickLocalPath({
       defaultPath: filename,
-      filters: [{ extensions: ["md"], name: "Markdown" }],
+      extensions: ["md"],
+      filterName: "Markdown",
+      mode: "save",
       title: "导出 AI 对话",
     });
-    if (!path) return false;
-    await invoke("write_config_file", { path, contents });
+    if (!picked) return false;
+    await invoke("write_config_file", { token: picked.token, contents });
     return true;
   }
   downloadMarkdownInBrowser(filename, contents);

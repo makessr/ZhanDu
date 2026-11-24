@@ -12,42 +12,32 @@ import {
 
 describe("shell integration", () => {
   test("accepts only scoped OSC lifecycle messages", () => {
+    expect(parseShellIntegrationMessage("FineShell;nonce;ready;bash", "nonce")).toEqual({
+      kind: "ready",
+      shell: "bash",
+    });
+    expect(parseShellIntegrationMessage("FineShell;nonce;ready;fish", "nonce")).toEqual({
+      kind: "ready",
+      shell: "fish",
+    });
+    expect(parseShellIntegrationMessage("FineShell;nonce;end;17", "nonce")).toEqual({
+      kind: "end",
+      exitCode: 17,
+    });
     expect(
-      parseShellIntegrationMessage("FineShell;nonce;ready;bash", "nonce"),
-    ).toEqual({ kind: "ready", shell: "bash" });
-    expect(
-      parseShellIntegrationMessage("FineShell;nonce;ready;fish", "nonce"),
-    ).toEqual({ kind: "ready", shell: "fish" });
-    expect(
-      parseShellIntegrationMessage("FineShell;nonce;end;17", "nonce"),
-    ).toEqual({ kind: "end", exitCode: 17 });
-    expect(
-      parseShellIntegrationMessage(
-        "FineShell;nonce;unavailable;unsupported-shell",
-        "nonce",
-      ),
+      parseShellIntegrationMessage("FineShell;nonce;unavailable;unsupported-shell", "nonce"),
     ).toEqual({ kind: "unavailable", reason: "unsupported-shell" });
-    expect(
-      parseShellIntegrationMessage("FineShell;nonce;disabled;tty", "nonce"),
-    ).toEqual({ kind: "disabled" });
-    expect(
-      parseShellIntegrationMessage(
-        "FineShell;nonce;cwd;/srv/apps;preview",
-        "nonce",
-      ),
-    ).toEqual({ kind: "cwd", path: "/srv/apps;preview" });
-    expect(
-      parseShellIntegrationMessage("FineShell;nonce;cwd;relative", "nonce"),
-    ).toBeNull();
-    expect(
-      parseShellIntegrationMessage("FineShell;nonce;cwd;/tmp\nunsafe", "nonce"),
-    ).toBeNull();
-    expect(
-      parseShellIntegrationMessage("FineShell;other;end;0", "nonce"),
-    ).toBeNull();
-    expect(
-      parseShellIntegrationMessage("FineShell;nonce;end;999", "nonce"),
-    ).toBeNull();
+    expect(parseShellIntegrationMessage("FineShell;nonce;disabled;tty", "nonce")).toEqual({
+      kind: "disabled",
+    });
+    expect(parseShellIntegrationMessage("FineShell;nonce;cwd;/srv/apps;preview", "nonce")).toEqual({
+      kind: "cwd",
+      path: "/srv/apps;preview",
+    });
+    expect(parseShellIntegrationMessage("FineShell;nonce;cwd;relative", "nonce")).toBeNull();
+    expect(parseShellIntegrationMessage("FineShell;nonce;cwd;/tmp\nunsafe", "nonce")).toBeNull();
+    expect(parseShellIntegrationMessage("FineShell;other;end;0", "nonce")).toBeNull();
+    expect(parseShellIntegrationMessage("FineShell;nonce;end;999", "nonce")).toBeNull();
   });
 
   test("builds session-only bash, zsh and fish hooks with a removable marker", () => {
@@ -70,7 +60,7 @@ describe("shell integration", () => {
 
   test("dispatches to a fish branch without foreign if/then syntax", () => {
     const install = buildShellIntegrationInstallCommand("safe-nonce");
-    expect(install).toContain('ready;fish');
+    expect(install).toContain("ready;fish");
     expect(install).toContain("functions -c fish_prompt");
     expect(install).toContain("__fineshell_original_fish_prompt");
     expect(install).toContain('test -n "$version"');
@@ -82,9 +72,7 @@ describe("shell integration", () => {
     // The cwd guard inside `function fish_prompt ... end` must use fish's own
     // `string match`; the POSIX `case ... esac` form only parses inside fish's
     // `switch`, so it would break the prompt hook.
-    const fishBranch = install.slice(
-      install.indexOf("__fineshell_original_fish_prompt"),
-    );
+    const fishBranch = install.slice(install.indexOf("__fineshell_original_fish_prompt"));
     expect(fishBranch).toContain("if string match -q");
     expect(fishBranch).not.toContain("esac");
 
@@ -110,16 +98,12 @@ describe("shell integration", () => {
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
     const marker = `\r\u001b[2K\u001b]${FINESHELL_OSC_ID};FineShell;stream-nonce;ready;zsh\u0007`;
-    const redrawnEcho =
-      "ubuntu@server:~$ stty -ec\r<server:~$ stty -echo\b\b\b\b\b";
+    const redrawnEcho = "ubuntu@server:~$ stty -ec\r<server:~$ stty -echo\b\b\b\b\b";
     const combined = encoder.encode(`${redrawnEcho}\r\n${marker}next prompt`);
     const splitAt = redrawnEcho.length + Math.floor(marker.length / 2);
     let filter = createShellIntegrationEchoFilter("stream-nonce", "install");
 
-    const first = filterShellIntegrationEcho(
-      filter,
-      combined.slice(0, splitAt),
-    );
+    const first = filterShellIntegrationEcho(filter, combined.slice(0, splitAt));
     expect(first.data).toHaveLength(0);
     expect(first.filter).toBeDefined();
     filter = first.filter!;
@@ -131,10 +115,7 @@ describe("shell integration", () => {
 
   test("does not accept a marker created for another session", () => {
     const encoder = new TextEncoder();
-    const filter = createShellIntegrationEchoFilter(
-      "expected-nonce",
-      "install",
-    );
+    const filter = createShellIntegrationEchoFilter("expected-nonce", "install");
     const result = filterShellIntegrationEcho(
       filter,
       encoder.encode(
@@ -149,10 +130,7 @@ describe("shell integration", () => {
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
     const marker = `\r\u001b[2K\u001b]${FINESHELL_OSC_ID};FineShell;disable-nonce;disabled;tty\u0007`;
-    const filter = createShellIntegrationEchoFilter(
-      "disable-nonce",
-      "uninstall",
-    );
+    const filter = createShellIntegrationEchoFilter("disable-nonce", "uninstall");
     const result = filterShellIntegrationEcho(
       filter,
       encoder.encode(`internal uninstall command${marker}prompt`),
@@ -166,9 +144,7 @@ describe("shell integration", () => {
       output: "ok",
       truncated: false,
     });
-    const result = boundedShellCommandOutput(
-      `prefix${"x".repeat(MAX_SHELL_COMMAND_RESULT_CHARS)}`,
-    );
+    const result = boundedShellCommandOutput(`prefix${"x".repeat(MAX_SHELL_COMMAND_RESULT_CHARS)}`);
     expect(result.output).toHaveLength(MAX_SHELL_COMMAND_RESULT_CHARS);
     expect(result.output.startsWith("x")).toBe(true);
     expect(result.truncated).toBe(true);

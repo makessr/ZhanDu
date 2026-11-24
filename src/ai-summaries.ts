@@ -21,9 +21,9 @@ export interface AiConversationSummaryPlan {
 function messageHasSummaryValue(message: AiConversationMessageRecord) {
   return Boolean(
     message.content.trim() ||
-      message.toolRuns?.length ||
-      message.fileChanges?.length ||
-      message.commandRecords?.length,
+    message.toolRuns?.length ||
+    message.fileChanges?.length ||
+    message.commandRecords?.length,
   );
 }
 
@@ -42,9 +42,7 @@ function messageMetadata(message: AiConversationMessageRecord) {
             ? "失败"
             : "进行中";
     const detail = run.summary ?? run.error;
-    lines.push(
-      `诊断：${run.label}（${status}）${detail ? `\n${detail}` : ""}`,
-    );
+    lines.push(`诊断：${run.label}（${status}）${detail ? `\n${detail}` : ""}`);
   }
   for (const change of message.fileChanges ?? []) {
     lines.push(
@@ -52,9 +50,7 @@ function messageMetadata(message: AiConversationMessageRecord) {
     );
   }
   for (const record of message.commandRecords ?? []) {
-    lines.push(
-      `命令提案：${record.purpose}（${record.risk}，${record.status}）`,
-    );
+    lines.push(`命令提案：${record.purpose}（${record.risk}，${record.status}）`);
   }
   return lines.join("\n");
 }
@@ -62,11 +58,7 @@ function messageMetadata(message: AiConversationMessageRecord) {
 function summaryEntry(message: AiConversationMessageRecord) {
   const metadata = messageMetadata(message);
   return redactAiContext(
-    [
-      message.role === "user" ? "用户" : "AI",
-      message.content.trim(),
-      metadata,
-    ]
+    [message.role === "user" ? "用户" : "AI", message.content.trim(), metadata]
       .filter(Boolean)
       .join("\n"),
   );
@@ -86,8 +78,7 @@ function boundedSummarySource(messages: AiConversationMessageRecord[]) {
   const available = Math.max(
     120,
     Math.floor(
-      (MAX_AI_SUMMARY_SOURCE_CHARS - separator.length * (messages.length - 1)) /
-        messages.length,
+      (MAX_AI_SUMMARY_SOURCE_CHARS - separator.length * (messages.length - 1)) / messages.length,
     ),
   );
   return messages
@@ -101,9 +92,7 @@ export function messagesAfterAiSummary<T extends { id: string }>(
   summary?: AiConversationSummaryRecord,
 ) {
   if (!summary) return messages;
-  const throughIndex = messages.findIndex(
-    (message) => message.id === summary.throughMessageId,
-  );
+  const throughIndex = messages.findIndex((message) => message.id === summary.throughMessageId);
   return throughIndex >= 0 ? messages.slice(throughIndex + 1) : messages;
 }
 
@@ -128,25 +117,18 @@ export function buildAiConversationRequestMessages(
     19,
     Math.max(1, 18_000 - summaryContent.length),
   );
-  return [
-    { role: "user" as const, content: summaryContent },
-    ...recent,
-  ];
+  return [{ role: "user" as const, content: summaryContent }, ...recent];
 }
 
 export function createAiConversationSummaryPlan(
   conversation: AiConversationRecord,
 ): AiConversationSummaryPlan | undefined {
   const allMessages = conversation.messages.filter(messageHasSummaryValue);
-  const unsummarized = messagesAfterAiSummary(
-    allMessages,
-    conversation.summary,
-  );
+  const unsummarized = messagesAfterAiSummary(allMessages, conversation.summary);
   const requestChars =
     (conversation.summary?.content.length ?? 0) +
     unsummarized.reduce(
-      (total, message) =>
-        total + message.content.length + messageMetadata(message).length,
+      (total, message) => total + message.content.length + messageMetadata(message).length,
       0,
     );
   if (
@@ -156,10 +138,7 @@ export function createAiConversationSummaryPlan(
     return undefined;
   }
 
-  const latestProtectedIndex = Math.max(
-    0,
-    unsummarized.length - AI_SUMMARY_RECENT_MESSAGES,
-  );
+  const latestProtectedIndex = Math.max(0, unsummarized.length - AI_SUMMARY_RECENT_MESSAGES);
   let throughIndex = latestProtectedIndex - 1;
   while (throughIndex >= 0 && unsummarized[throughIndex]?.role !== "assistant") {
     throughIndex -= 1;

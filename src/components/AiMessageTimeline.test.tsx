@@ -19,6 +19,35 @@ function renderTimeline(
     onSelectPreset,
     ...render(
       <AiMessageTimeline
+        actions={{
+          addToolRunToDraft: () => undefined,
+          analyzeCommand: () => undefined,
+          applyAllFileEdits: () => undefined,
+          applyAllFileOperations: () => undefined,
+          approveCommandProposal: () => undefined,
+          cancelDiagnosticPlan: () => undefined,
+          confirmDiagnosticPlan: () => undefined,
+          copyCode: async () => undefined,
+          copyCommand: () => undefined,
+          copyCommands: () => undefined,
+          openFileEditReview: () => undefined,
+          openFileOperationReview: () => undefined,
+          rejectCommand: () => undefined,
+          rejectFileEdit: () => undefined,
+          rejectFileOperation: () => undefined,
+          retryFileEdit: () => undefined,
+          retryFileOperation: () => undefined,
+          retryMessage: onRetryMessage,
+          reviseCommand: () => undefined,
+          reviseDiagnosticPlan: () => undefined,
+          rollbackAllFileEdits: () => undefined,
+          rollbackAllFileOperations: () => undefined,
+          rollbackFileEdit: () => undefined,
+          rollbackFileOperation: () => undefined,
+          selectPreset: onSelectPreset,
+          stopDiagnosticPlan: () => undefined,
+          toggleToolRun: () => undefined,
+        }}
         activeConversationAvailable
         applyingFileChanges={false}
         canInsertCommand
@@ -31,33 +60,6 @@ function renderTimeline(
         hostName="生产服务器"
         loading={false}
         messages={messages}
-        onAddToolRunToDraft={() => undefined}
-        onApproveCommandProposal={() => undefined}
-        onAnalyzeCommand={() => undefined}
-        onApplyAllFileEdits={() => undefined}
-        onApplyAllFileOperations={() => undefined}
-        onCopyCode={async () => undefined}
-        onCopyCommand={() => undefined}
-        onCopyCommands={() => undefined}
-        onCancelDiagnosticPlan={() => undefined}
-        onConfirmDiagnosticPlan={() => undefined}
-        onReviseDiagnosticPlan={() => undefined}
-        onOpenFileEditReview={() => undefined}
-        onOpenFileOperationReview={() => undefined}
-        onRejectCommand={() => undefined}
-        onReviseCommand={() => undefined}
-        onRejectFileEdit={() => undefined}
-        onRejectFileOperation={() => undefined}
-        onRetryFileEdit={() => undefined}
-        onRetryFileOperation={() => undefined}
-        onRetryMessage={onRetryMessage}
-        onRollbackAllFileEdits={() => undefined}
-        onRollbackAllFileOperations={() => undefined}
-        onRollbackFileEdit={() => undefined}
-        onRollbackFileOperation={() => undefined}
-        onSelectPreset={onSelectPreset}
-        onStopDiagnosticPlan={() => undefined}
-        onToggleToolRun={() => undefined}
         scrollRef={createRef<HTMLDivElement>()}
         sending={sending}
         sessionId="session-1"

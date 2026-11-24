@@ -65,11 +65,7 @@ export function terminalFontZoomWheelAction(
   event: TerminalFontZoomWheelEvent,
   platform: string = navigator.platform,
 ): TerminalFontZoomAction | undefined {
-  if (
-    event.altKey ||
-    !hasPrimaryModifier(event, platform) ||
-    event.deltaY === 0
-  ) {
+  if (event.altKey || !hasPrimaryModifier(event, platform) || event.deltaY === 0) {
     return undefined;
   }
   return event.deltaY < 0 ? "increase" : "decrease";

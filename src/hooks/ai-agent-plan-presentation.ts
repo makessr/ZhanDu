@@ -53,10 +53,7 @@ function agentPlanPresentation(plan: AgentPlan): {
   };
 }
 
-export function mergeAgentPlanIntoMessage(
-  message: AiMessage,
-  plan: AgentPlan,
-): AiMessage {
+export function mergeAgentPlanIntoMessage(message: AiMessage, plan: AgentPlan): AiMessage {
   const presentation = agentPlanPresentation(plan);
   const diagnosticPlans = message.diagnosticPlans ?? [];
   const toolRuns = message.toolRuns ?? [];
@@ -66,13 +63,8 @@ export function mergeAgentPlanIntoMessage(
   return {
     ...message,
     diagnosticPlans: planExists
-      ? diagnosticPlans.map((item) =>
-          item.id === plan.id ? presentation.plan : item,
-        )
+      ? diagnosticPlans.map((item) => (item.id === plan.id ? presentation.plan : item))
       : [...diagnosticPlans, presentation.plan],
-    toolRuns: [
-      ...toolRuns.filter((run) => !nextPlanCallIds.has(run.callId)),
-      ...presentation.runs,
-    ],
+    toolRuns: [...toolRuns.filter((run) => !nextPlanCallIds.has(run.callId)), ...presentation.runs],
   };
 }

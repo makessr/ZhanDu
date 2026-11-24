@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ComponentProps,
 } from "react";
 import { Button, Message, Typography } from "@arco-design/web-react";
 import { isTauri } from "@tauri-apps/api/core";
@@ -18,10 +19,7 @@ import {
   IconPoweroff,
   IconRefresh,
 } from "@arco-design/web-react/icon";
-import type {
-  ServerMonitorSnapshot,
-  TerminalSession,
-} from "./models";
+import type { ServerMonitorSnapshot, TerminalSession } from "./models";
 import type { ContextMenuItem } from "./components/ContextMenu";
 import HostManagerPanel from "./components/HostManagerPanel";
 import QuickCommandDrawer from "./components/QuickCommandDrawer";
@@ -29,23 +27,25 @@ import SftpPanel from "./components/SftpPanel";
 import SessionTabs from "./components/SessionTabs";
 import { resolveWorkspaceConnection } from "./terminal-workspaces";
 import AppWorkspaceLayout from "./components/AppWorkspaceLayout";
+import AiContextSourcesBridge from "./components/AiContextSourcesBridge";
 import ApplicationTitleBar from "./components/ApplicationTitleBar";
+import LocalDataUnlock from "./components/LocalDataUnlock";
+import { LocalDataLockedError, unlockLocalData } from "./local-encryption";
 export { default as CollapsibleSplitTrigger } from "./components/CollapsibleSplitTrigger";
 import { loadConfiguration, type FineShellConfiguration } from "./config-database";
-import {
-  DEFAULT_APP_SETTINGS,
-  sanitizeAppSettings,
-  type AppSettings,
-} from "./app-settings";
+import { DEFAULT_APP_SETTINGS, sanitizeAppSettings, type AppSettings } from "./app-settings";
 import { readAppearanceModeHint, setAppearanceMode } from "./appearance";
 import {
   type AiContextSource,
   type AiContextSourceId,
   type AiRemoteFileContext,
-  aiRemoteFileContextSource,
   mergeAiRemoteFileContexts,
-  formatAiServerContext,
 } from "./ai-utils";
+import {
+  createSessionStoreRegistry,
+  useSessionField,
+  type SessionStoreRegistry,
+} from "./session-store";
 import { createSftpSelectionAiHandoff } from "./ai-handoff";
 import { AI_SIDEBAR_DEFAULT_WIDTH } from "./ai-sidebar";
 import { useAiSidebarController } from "./hooks/useAiSidebarController";
@@ -74,15 +74,10 @@ import {
   type AgentActionExecutionResult,
   verifyProtocolVersion,
 } from "./tauri-protocol";
-import {
-  openAuxiliaryWindow,
-  promptStartupApplicationUpdate,
-} from "./app-window-actions";
+import { openAuxiliaryWindow, promptStartupApplicationUpdate } from "./app-window-actions";
 import { useTerminalSessions } from "./hooks/useTerminalSessions";
 const QuickCommandSettings = lazy(() => import("./components/QuickCommandSettings"));
-const ServerMonitorPanel = lazy(
-  () => import("./components/ServerMonitorPanel"),
-);
+const ServerMonitorPanel = lazy(() => import("./components/ServerMonitorPanel"));
 const loadAiAssistantPanel = () => import("./components/AiAssistantPanel");
 const AiAssistantPanel = lazy(loadAiAssistantPanel);
 const TerminalView = lazy(() => import("./components/TerminalView"));
@@ -90,14 +85,24 @@ const SERVER_MONITOR_COLLAPSED_KEY = "fineshell:server-monitor-collapsed";
 
 function App() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
+  const [localDataState, setLocalDataState] = useState<"checking" | "locked" | "unlocked">(
+    "checking",
+  );
+  const [localDataError, setLocalDataError] = useState<string>();
+  const [configurationLoadAttempt, setConfigurationLoadAttempt] = useState(0);
   const savedAppearanceRef = useRef<AppSettings["appearanceMode"]>();
-  const [commandLibrary, setCommandLibrary] = useState<Pick<FineShellConfiguration, "quickCommands" | "quickCommandGroups">>({
+  const [commandLibrary, setCommandLibrary] = useState<
+    Pick<FineShellConfiguration, "quickCommands" | "quickCommandGroups">
+  >({
     quickCommands: [],
     quickCommandGroups: [],
   });
-  const applyCommandLibrary = useCallback(({ quickCommands, quickCommandGroups }: FineShellConfiguration) => {
-    setCommandLibrary({ quickCommands, quickCommandGroups });
-  }, []);
+  const applyCommandLibrary = useCallback(
+    ({ quickCommands, quickCommandGroups }: FineShellConfiguration) => {
+      setCommandLibrary({ quickCommands, quickCommandGroups });
+    },
+    [],
+  );
   const [workspaceTool, setWorkspaceTool] = useState<WorkspaceTool>("files");
   const [workspaceToolTarget, setWorkspaceToolTarget] = useState<HTMLDivElement | null>(null);
   const [editingQuickCommands, setEditingQuickCommands] = useState(false);
@@ -105,69 +110,39 @@ function App() {
     () => localStorage.getItem(SERVER_MONITOR_COLLAPSED_KEY) === "true",
   );
   const [sftpCollapsed, setSftpCollapsed] = useState(false);
-  const [aiSidebarWidth, setAiSidebarWidth] = useState(
-    AI_SIDEBAR_DEFAULT_WIDTH,
-  );
+  const [aiSidebarWidth, setAiSidebarWidth] = useState(AI_SIDEBAR_DEFAULT_WIDTH);
   const [aiInitialPrompt, setAiInitialPrompt] = useState("");
-  const [aiInitialContextIds, setAiInitialContextIds] = useState<
-    AiContextSourceId[]
-  >([]);
+  const [aiInitialContextIds, setAiInitialContextIds] = useState<AiContextSourceId[]>([]);
   const [aiInitialPromptRequest, setAiInitialPromptRequest] = useState(0);
-  const [terminalSelections, setTerminalSelections] = useState<
-    Record<string, string>
-  >({});
-  const [terminalRecentOutputs, setTerminalRecentOutputs] = useState<
-    Record<string, string>
-  >({});
-  const [monitorSnapshots, setMonitorSnapshots] = useState<
-    Record<string, ServerMonitorSnapshot>
-  >({});
-  const [sftpCurrentPaths, setSftpCurrentPaths] = useState<
-    Record<string, string>
-  >({});
-  const [terminalCurrentDirectories, setTerminalCurrentDirectories] = useState<
-    Record<string, { path: string; revision: number }>
-  >({});
+  const [terminalSelections, setTerminalSelections] = useState<Record<string, string>>({});
+  const sessionStoresRef = useRef<SessionStoreRegistry | null>(null);
+  if (!sessionStoresRef.current) sessionStoresRef.current = createSessionStoreRegistry();
+  const sessionStores = sessionStoresRef.current;
   const [aiRemoteFileContexts, setAiRemoteFileContexts] = useState<
     Record<string, AiRemoteFileContext[]>
   >({});
-  const [aiBusinessContexts, setAiBusinessContexts] = useState<
-    Record<string, AiContextSource[]>
-  >({});
-  const [sftpRefreshRequests, setSftpRefreshRequests] = useState<
-    Record<string, number>
-  >({});
+  const [aiBusinessContexts, setAiBusinessContexts] = useState<Record<string, AiContextSource[]>>(
+    {},
+  );
   const [terminalFocusRequest, setTerminalFocusRequest] = useState(0);
   const [terminalFontSizeOffset, setTerminalFontSizeOffset] = useState(0);
   const mainSplitRef = useRef<HTMLElement | null>(null);
-  const handleSessionsClosed = useCallback((closingIds: Set<string>) => {
-    setTerminalRecentOutputs((current) =>
-      Object.fromEntries(
-        Object.entries(current).filter(([sessionId]) => !closingIds.has(sessionId)),
-      ),
-    );
-    setAiRemoteFileContexts((currentContexts) =>
-      Object.fromEntries(
-        Object.entries(currentContexts).filter(
-          ([sessionId]) => !closingIds.has(sessionId),
+  const handleSessionsClosed = useCallback(
+    (closingIds: Set<string>) => {
+      for (const sessionId of closingIds) sessionStores.delete(sessionId);
+      setAiRemoteFileContexts((currentContexts) =>
+        Object.fromEntries(
+          Object.entries(currentContexts).filter(([sessionId]) => !closingIds.has(sessionId)),
         ),
-      ),
-    );
-    setTerminalCurrentDirectories((currentDirectories) =>
-      Object.fromEntries(
-        Object.entries(currentDirectories).filter(
-          ([sessionId]) => !closingIds.has(sessionId),
+      );
+      setAiBusinessContexts((currentContexts) =>
+        Object.fromEntries(
+          Object.entries(currentContexts).filter(([sessionId]) => !closingIds.has(sessionId)),
         ),
-      ),
-    );
-    setAiBusinessContexts((currentContexts) =>
-      Object.fromEntries(
-        Object.entries(currentContexts).filter(
-          ([sessionId]) => !closingIds.has(sessionId),
-        ),
-      ),
-    );
-  }, []);
+      );
+    },
+    [sessionStores],
+  );
   const {
     activeSession,
     activeSessionId,
@@ -183,6 +158,20 @@ function App() {
   } = useTerminalSessions({ onSessionsClosed: handleSessionsClosed });
   const activeSessionIdRef = useRef(activeSessionId);
   activeSessionIdRef.current = activeSessionId;
+  const activeSessionStore = useMemo(
+    () => (activeSessionId ? sessionStores.get(activeSessionId) : null),
+    [activeSessionId, sessionStores],
+  );
+  const sftpRefreshRequest = useSessionField(
+    activeSessionStore,
+    (slice) => slice.sftpRefreshRequest,
+    0,
+  );
+  const terminalCurrentDirectory = useSessionField(
+    activeSessionStore,
+    (slice) => slice.terminalCurrentDirectory,
+    null,
+  );
   const {
     active: aiAssistantActive,
     close: closeAiSidebar,
@@ -192,8 +181,7 @@ function App() {
     phase: aiSidebarPhase,
     visible: aiAssistantVisible,
   } = useAiSidebarController({
-    getWorkspaceWidth: () =>
-      mainSplitRef.current?.getBoundingClientRect().width,
+    getWorkspaceWidth: () => mainSplitRef.current?.getBoundingClientRect().width,
     onResizeFailure: (error, operation) => {
       recordDiagnostic(
         "warn",
@@ -210,11 +198,7 @@ function App() {
     sidebarWidth: aiSidebarWidth,
   });
   const openAiAssistant = useCallback(
-    async (
-      sessionId: string,
-      prompt = "",
-      contextIds: AiContextSourceId[] = [],
-    ) => {
+    async (sessionId: string, prompt = "", contextIds: AiContextSourceId[] = []) => {
       if (activeSessionIdRef.current !== sessionId) return false;
       await loadAiAssistantPanel();
       if (activeSessionIdRef.current !== sessionId) return false;
@@ -226,24 +210,20 @@ function App() {
     },
     [openAiSidebar],
   );
-  const showAiHandoffNotice = useCallback(
-    (type: "error" | "warning", content: string) => {
-      Message[type](content);
-    },
-    [],
-  );
-  const { handoffContext, handoffRemoteFiles, handoffTerminalSelection } =
-    useAiHandoffController({
-      activeSession,
-      businessContexts: aiBusinessContexts,
-      onNotice: showAiHandoffNotice,
-      openAssistant: openAiAssistant,
-      remoteFileContexts: aiRemoteFileContexts,
-      setBusinessContexts: setAiBusinessContexts,
-      setRemoteFileContexts: setAiRemoteFileContexts,
-      setTerminalSelections,
-      terminalSelections,
-    });
+  const showAiHandoffNotice = useCallback((type: "error" | "warning", content: string) => {
+    Message[type](content);
+  }, []);
+  const { handoffContext, handoffRemoteFiles, handoffTerminalSelection } = useAiHandoffController({
+    activeSession,
+    businessContexts: aiBusinessContexts,
+    onNotice: showAiHandoffNotice,
+    openAssistant: openAiAssistant,
+    remoteFileContexts: aiRemoteFileContexts,
+    setBusinessContexts: setAiBusinessContexts,
+    setRemoteFileContexts: setAiRemoteFileContexts,
+    setTerminalSelections,
+    terminalSelections,
+  });
   const previousAiSidebarPhaseRef = useRef(aiSidebarPhase);
 
   const runtimeTerminalFontSize = terminalFontSize(
@@ -253,11 +233,7 @@ function App() {
   const zoomTerminalFont = useCallback(
     (action: TerminalFontZoomAction) => {
       setTerminalFontSizeOffset((currentOffset) =>
-        nextTerminalFontSizeOffset(
-          settings.terminalFontSize,
-          currentOffset,
-          action,
-        ),
+        nextTerminalFontSizeOffset(settings.terminalFontSize, currentOffset, action),
       );
     },
     [settings.terminalFontSize],
@@ -268,10 +244,7 @@ function App() {
   }, [settings.terminalFontSize]);
 
   useEffect(() => {
-    if (
-      aiSidebarPhase === "closed" &&
-      previousAiSidebarPhaseRef.current !== "closed"
-    ) {
+    if (aiSidebarPhase === "closed" && previousAiSidebarPhaseRef.current !== "closed") {
       setTerminalFocusRequest((current) => current + 1);
     }
     previousAiSidebarPhaseRef.current = aiSidebarPhase;
@@ -280,62 +253,29 @@ function App() {
   const updateMonitorSnapshot = useCallback(
     (sessionId: string | null, snapshot: ServerMonitorSnapshot | null) => {
       if (!sessionId) return;
-      setMonitorSnapshots((current) => {
-        if (!snapshot) {
-          if (!(sessionId in current)) return current;
-          const next = { ...current };
-          delete next[sessionId];
-          return next;
-        }
-        return { ...current, [sessionId]: snapshot };
-      });
+      sessionStores.get(sessionId).dispatch({ type: "monitor-snapshot", snapshot });
     },
-    [],
+    [sessionStores],
   );
 
   const updateSftpCurrentPath = useCallback(
     (sessionId: string | null, path: string) => {
       if (!sessionId) return;
-      setSftpCurrentPaths((current) => {
-        if (!path) {
-          if (!(sessionId in current)) return current;
-          const next = { ...current };
-          delete next[sessionId];
-          return next;
-        }
-        return current[sessionId] === path
-          ? current
-          : { ...current, [sessionId]: path };
-      });
+      sessionStores.get(sessionId).dispatch({ type: "sftp-path", path });
     },
-    [],
+    [sessionStores],
   );
 
   const updateTerminalCurrentDirectory = useCallback(
     (sessionId: string, path: string) => {
-      setTerminalCurrentDirectories((current) => {
-        if (!path) {
-          if (!(sessionId in current)) return current;
-          const next = { ...current };
-          delete next[sessionId];
-          return next;
-        }
-        // Prompt hooks report the current directory even when it hasn't changed.
-        if (current[sessionId]?.path === path) return current;
-        return {
-          ...current,
-          [sessionId]: {
-            path,
-            revision: (current[sessionId]?.revision ?? 0) + 1,
-          },
-        };
-      });
+      sessionStores.get(sessionId).dispatch({ type: "terminal-directory", path });
     },
-    [],
+    [sessionStores],
   );
 
   useEffect(() => {
     let disposed = false;
+    setLocalDataState("checking");
     const protocolReady = isTauri()
       ? verifyProtocolVersion().then(() => undefined)
       : Promise.resolve();
@@ -349,21 +289,23 @@ function App() {
           persist: true,
         });
         applyCommandLibrary(configuration);
+        setLocalDataState("unlocked");
       })
       .catch((error) => {
-        if (!disposed) {
-          const message = commandErrorMessage(error);
-          recordDiagnostic("warn", "configuration", "应用设置读取失败", {
-            error: message,
-          });
-          if (
-            error instanceof FineShellCommandError &&
-            error.operation === "protocol_version"
-          ) {
-            Message.error(message);
-          } else {
-            Message.warning("设置读取失败，已使用默认值");
-          }
+        if (disposed) return;
+        if (error instanceof LocalDataLockedError) {
+          setLocalDataState("locked");
+          return;
+        }
+        setLocalDataState("unlocked");
+        const message = commandErrorMessage(error);
+        recordDiagnostic("warn", "configuration", "应用设置读取失败", {
+          error: message,
+        });
+        if (error instanceof FineShellCommandError && error.operation === "protocol_version") {
+          Message.error(message);
+        } else {
+          Message.warning("设置读取失败，已使用默认值");
         }
       })
       .finally(() => {
@@ -374,20 +316,13 @@ function App() {
               void restoreApplicationFocusAfterUpdateRelaunch()
                 .then((focused) => {
                   if (focused) {
-                    recordDiagnostic(
-                      "info",
-                      "application.update",
-                      "更新重启后主窗口已恢复前台",
-                    );
+                    recordDiagnostic("info", "application.update", "更新重启后主窗口已恢复前台");
                   }
                 })
                 .catch((error) => {
-                  recordDiagnostic(
-                    "warn",
-                    "application.update",
-                    "更新重启后主窗口聚焦失败",
-                    { error: commandErrorMessage(error) },
-                  );
+                  recordDiagnostic("warn", "application.update", "更新重启后主窗口聚焦失败", {
+                    error: commandErrorMessage(error),
+                  });
                 });
             }
           });
@@ -396,12 +331,9 @@ function App() {
     return () => {
       disposed = true;
     };
-  }, []);
+  }, [applyCommandLibrary, configurationLoadAttempt]);
 
-  useEffect(
-    () => () => document.body.classList.remove("ai-sidebar-resizing"),
-    [],
-  );
+  useEffect(() => () => document.body.classList.remove("ai-sidebar-resizing"), []);
 
   useEffect(() => {
     if (!applicationUpdater.canInstallUpdates) return;
@@ -418,13 +350,11 @@ function App() {
   }, []);
 
   useEffect(() => {
-    void configureDiagnosticLogging(settings.diagnosticLogLevel).catch(
-      (error) => {
-        recordDiagnostic("warn", "diagnostics", "日志级别同步失败", {
-          error: commandErrorMessage(error),
-        });
-      },
-    );
+    void configureDiagnosticLogging(settings.diagnosticLogLevel).catch((error) => {
+      recordDiagnostic("warn", "diagnostics", "日志级别同步失败", {
+        error: commandErrorMessage(error),
+      });
+    });
   }, [settings.diagnosticLogLevel]);
 
   useEffect(() => {
@@ -473,50 +403,15 @@ function App() {
       savedAppearanceRef.current = nextSettings.appearanceMode;
       setAppearanceMode(nextSettings.appearanceMode, { persist: true });
     }).then(keepListener);
+    void listenProtocolEvent("local-encryption:changed", () => {
+      setLocalDataState("checking");
+      setConfigurationLoadAttempt((attempt) => attempt + 1);
+    }).then(keepListener);
     return () => {
       disposed = true;
       listeners.forEach((stop) => stop());
     };
   }, []);
-
-  const aiContextSources = useMemo<AiContextSource[]>(() => {
-    if (!activeSessionId) return [];
-    const snapshot = monitorSnapshots[activeSessionId];
-    const remoteFiles = aiRemoteFileContexts[activeSessionId] ?? [];
-    const sources: AiContextSource[] = [
-      {
-        id: "terminal-selection",
-        label: "终端选区",
-        content: terminalSelections[activeSessionId] ?? "",
-      },
-      {
-        id: "terminal-output",
-        label: "最近终端输出",
-        content: terminalRecentOutputs[activeSessionId] ?? "",
-      },
-      {
-        id: "server-monitor",
-        label: "服务器状态",
-        content: snapshot ? formatAiServerContext(snapshot) : "",
-      },
-      {
-        id: "sftp-path",
-        label: "当前远程目录",
-        content: sftpCurrentPaths[activeSessionId] ?? "",
-      },
-    ];
-    sources.push(...(aiBusinessContexts[activeSessionId] ?? []));
-    sources.push(...remoteFiles.map(aiRemoteFileContextSource));
-    return sources;
-  }, [
-    activeSessionId,
-    aiBusinessContexts,
-    aiRemoteFileContexts,
-    monitorSnapshots,
-    sftpCurrentPaths,
-    terminalRecentOutputs,
-    terminalSelections,
-  ]);
 
   const openWorkspaceTool = useCallback((tool: WorkspaceTool) => {
     setWorkspaceTool(tool);
@@ -542,8 +437,7 @@ function App() {
       }
     };
     window.addEventListener("keydown", handleQuickCommandShortcut, true);
-    return () =>
-      window.removeEventListener("keydown", handleQuickCommandShortcut, true);
+    return () => window.removeEventListener("keydown", handleQuickCommandShortcut, true);
   }, [activeSessionId, closeAiSidebar, openWorkspaceTool]);
 
   async function sendQuickCommand(command: string, execute: boolean, sessionId?: string) {
@@ -557,13 +451,12 @@ function App() {
       data: Array.from(new TextEncoder().encode(input)),
     });
     if (target.id === activeSessionId) setTerminalFocusRequest((current) => current + 1);
-    Message.success(execute ? `命令已发送到 ${target.host.name}` : `命令已填入 ${target.host.name} 的终端`);
+    Message.success(
+      execute ? `命令已发送到 ${target.host.name}` : `命令已填入 ${target.host.name} 的终端`,
+    );
   }
 
-  function handleAiAgentActionExecuted(
-    sessionId: string,
-    result: AgentActionExecutionResult,
-  ) {
+  function handleAiAgentActionExecuted(sessionId: string, result: AgentActionExecutionResult) {
     if (result.actionType === "terminal_command") return;
     const updatedFile: AiRemoteFileContext | null = result.file
       ? {
@@ -592,10 +485,7 @@ function App() {
         [sessionId]: nextFiles,
       };
     });
-    setSftpRefreshRequests((current) => ({
-      ...current,
-      [sessionId]: (current[sessionId] ?? 0) + 1,
-    }));
+    sessionStores.get(sessionId).dispatch({ type: "sftp-refresh" });
   }
 
   async function toggleAiAssistant() {
@@ -611,23 +501,19 @@ function App() {
     await openAiSidebar();
   }
 
-  function sessionContextMenuItems(
-    session: TerminalSession,
-  ): ContextMenuItem[] {
+  function sessionContextMenuItems(session: TerminalSession): ContextMenuItem[] {
     const canDisconnect =
       session.status === "connecting" ||
       isTerminalSessionOperational(session.status) ||
       session.status === "reconnecting";
-    const canReconnect =
-      session.status !== "connecting" && session.status !== "reconnecting";
+    const canReconnect = session.status !== "connecting" && session.status !== "reconnecting";
 
     return [
       {
         key: "open-new-session",
         label: "新开会话",
         icon: <IconPlus />,
-        onClick: () =>
-          openSession(session.host, session.proxy, session.jumpHost),
+        onClick: () => openSession(session.host, session.proxy, session.jumpHost),
       },
       {
         key: "disconnect",
@@ -657,11 +543,7 @@ function App() {
         icon: <IconCloseCircle />,
         disabled: sessions.length <= 1,
         onClick: () =>
-          closeSessions(
-            sessions
-              .filter((item) => item.id !== session.id)
-              .map((item) => item.id),
-          ),
+          closeSessions(sessions.filter((item) => item.id !== session.id).map((item) => item.id)),
       },
       {
         key: "close-all",
@@ -691,9 +573,7 @@ function App() {
               onOpenSettings={() => openAuxiliaryWindow("settings")}
               onSelectTool={openWorkspaceTool}
               onReconnect={() => reconnectSession(activeSession)}
-              onSendToAi={(sessionId, request) =>
-                void handoffContext(sessionId, request)
-              }
+              onSendToAi={(sessionId, request) => void handoffContext(sessionId, request)}
               onSnapshotChange={updateMonitorSnapshot}
               onPortForwardStatusChange={(status) =>
                 updatePortForwardStatus(activeSession.id, status)
@@ -718,9 +598,7 @@ function App() {
         activeSessionId={activeSessionId}
         aiAssistantVisible={aiAssistantActive}
         hasActiveSession={Boolean(activeSession)}
-        homeContent={
-          <HostManagerPanel onConnect={openSession} settings={settings} />
-        }
+        homeContent={<HostManagerPanel onConnect={openSession} settings={settings} />}
         onActiveSessionChange={setActiveSessionId}
         onCloseSession={closeSession}
         onOpenWorkspace={async (hostIds) => {
@@ -737,12 +615,8 @@ function App() {
           <Suspense fallback={null}>
             <TerminalView
               active={session.id === activeSessionId}
-              collectRecentOutput={
-                session.id === activeSessionId && aiAssistantVisible
-              }
-              focusRequest={
-                session.id === activeSessionId ? terminalFocusRequest : 0
-              }
+              collectRecentOutput={session.id === activeSessionId && aiAssistantVisible}
+              focusRequest={session.id === activeSessionId ? terminalFocusRequest : 0}
               onFontZoom={zoomTerminalFont}
               settings={settings}
               session={session}
@@ -753,24 +627,18 @@ function App() {
               onCurrentDirectoryChange={updateTerminalCurrentDirectory}
               onReconnect={() => reconnectSession(session)}
               onRecentOutputChange={(output) =>
-                setTerminalRecentOutputs((current) => {
-                  const next = output.slice(-settings.aiContextMaxChars);
-                  return current[session.id] === next
-                    ? current
-                    : { ...current, [session.id]: next };
+                sessionStores.get(session.id).dispatch({
+                  type: "terminal-output",
+                  output: output.slice(-settings.aiContextMaxChars),
                 })
               }
               onSelectionChange={(selection) =>
                 setTerminalSelections((current) =>
-                  current[session.id] ===
-                  selection.slice(0, settings.aiContextMaxChars)
+                  current[session.id] === selection.slice(0, settings.aiContextMaxChars)
                     ? current
                     : {
                         ...current,
-                        [session.id]: selection.slice(
-                          0,
-                          settings.aiContextMaxChars,
-                        ),
+                        [session.id]: selection.slice(0, settings.aiContextMaxChars),
                       },
                 )
               }
@@ -783,42 +651,51 @@ function App() {
     </section>
   );
 
+  const sftpPanelCommands = useMemo<ComponentProps<typeof SftpPanel>["commands"]>(
+    () => ({
+      currentPathChange: updateSftpCurrentPath,
+      reconnect: () => {
+        if (activeSession) reconnectSession(activeSession);
+      },
+      sendFilesToAi: async (sessionId, files) => {
+        await handoffRemoteFiles(sessionId, files);
+      },
+      sendSelectionToAi: async (sessionId, currentDirectory, entries) => {
+        await handoffContext(sessionId, createSftpSelectionAiHandoff(currentDirectory, entries));
+      },
+      showFiles: () => openWorkspaceTool("files"),
+      showTransfers: () => openWorkspaceTool("transfers"),
+    }),
+    [
+      activeSession,
+      handoffContext,
+      handoffRemoteFiles,
+      openWorkspaceTool,
+      reconnectSession,
+      updateSftpCurrentPath,
+    ],
+  );
+
   const sftpPanel = (
     <WorkspaceToolPanel activeTool={workspaceTool} onSelect={openWorkspaceTool}>
       <SftpPanel
+        commands={sftpPanelCommands}
         filesVisible={workspaceTool === "files" && !sftpCollapsed}
         transfersVisible={workspaceTool === "transfers" && !sftpCollapsed}
-        onShowFiles={() => openWorkspaceTool("files")}
-        onShowTransfers={() => openWorkspaceTool("transfers")}
         confirmFileDelete={settings.confirmFileDelete}
         externalEditorName={settings.externalEditorName}
         externalEditorPath={settings.externalEditorPath}
         sftpUploadRetryAttempts={settings.sftpUploadRetryAttempts}
-        onCurrentPathChange={updateSftpCurrentPath}
-        onReconnect={() => {
-          if (activeSession) reconnectSession(activeSession);
-        }}
-        onSendFilesToAi={async (sessionId, files) => {
-          await handoffRemoteFiles(sessionId, files);
-        }}
-        onSendSelectionToAi={async (sessionId, currentDirectory, entries) => {
-          await handoffContext(
-            sessionId,
-            createSftpSelectionAiHandoff(currentDirectory, entries),
-          );
-        }}
-        refreshRequest={
-          activeSessionId ? (sftpRefreshRequests[activeSessionId] ?? 0) : 0
-        }
+        refreshRequest={sftpRefreshRequest}
         session={activeSession}
         showHiddenFiles={settings.showHiddenFiles}
-        terminalDirectory={
-          activeSessionId
-            ? terminalCurrentDirectories[activeSessionId]
-            : undefined
-        }
+        terminalDirectory={terminalCurrentDirectory ?? undefined}
       />
-      <div className="workspace-tool-slot" hidden={!["tunnels", "processes", "network"].includes(workspaceTool)} ref={setWorkspaceToolTarget} />
+      <div
+        className="workspace-tool-slot"
+        hidden={!["tunnels", "processes", "network"].includes(workspaceTool)}
+        ref={setWorkspaceToolTarget}
+      />
       {workspaceTool === "commands" && !sftpCollapsed && (
         <>
           {editingQuickCommands && (
@@ -846,7 +723,10 @@ function App() {
             onEdit={() => setEditingQuickCommands(true)}
             onSend={sendQuickCommand}
             targets={sessions
-              .filter((session) => session.id !== activeSessionId && isTerminalSessionOperational(session.status))
+              .filter(
+                (session) =>
+                  session.id !== activeSessionId && isTerminalSessionOperational(session.status),
+              )
               .map((session) => ({
                 label: `${session.host.name} (${session.host.address})`,
                 value: session.id,
@@ -860,39 +740,64 @@ function App() {
 
   const aiAssistantPanel = aiAssistantMounted ? (
     <Suspense fallback={<div className="ai-assistant-sidebar-panel" />}>
-      <AiAssistantPanel
-        canInsertCommand={Boolean(
-          activeSession && isTerminalSessionOperational(activeSession.status),
-        )}
-        contextSources={aiContextSources}
-        hostId={activeSession?.host.id ?? null}
-        hostName={activeSession?.host.name ?? ""}
-        initialPrompt={aiInitialPrompt}
-        initialContextIds={aiInitialContextIds}
-        initialPromptRequest={aiInitialPromptRequest}
-        onAgentActionExecuted={handleAiAgentActionExecuted}
-        onRemoveRemoteFile={(sessionId, path) =>
-          setAiRemoteFileContexts((current) => {
-            const remaining = (current[sessionId] ?? []).filter(
-              (file) => file.path !== path,
-            );
-            if (remaining.length) {
-              return { ...current, [sessionId]: remaining };
-            }
-            const next = { ...current };
-            delete next[sessionId];
-            return next;
-          })
-        }
-        remoteFiles={
-          activeSessionId ? (aiRemoteFileContexts[activeSessionId] ?? []) : []
-        }
+      <AiContextSourcesBridge
+        businessContexts={activeSessionId ? (aiBusinessContexts[activeSessionId] ?? []) : []}
+        remoteFileContexts={activeSessionId ? (aiRemoteFileContexts[activeSessionId] ?? []) : []}
         sessionId={activeSessionId}
-        settings={settings}
-        visible={aiAssistantVisible}
-      />
+        store={activeSessionStore}
+        terminalSelection={activeSessionId ? (terminalSelections[activeSessionId] ?? "") : ""}
+      >
+        {(contextSources) => (
+          <AiAssistantPanel
+            canInsertCommand={Boolean(
+              activeSession && isTerminalSessionOperational(activeSession.status),
+            )}
+            contextSources={contextSources}
+            hostId={activeSession?.host.id ?? null}
+            hostName={activeSession?.host.name ?? ""}
+            initialPrompt={aiInitialPrompt}
+            initialContextIds={aiInitialContextIds}
+            initialPromptRequest={aiInitialPromptRequest}
+            onAgentActionExecuted={handleAiAgentActionExecuted}
+            onRemoveRemoteFile={(sessionId, path) =>
+              setAiRemoteFileContexts((current) => {
+                const remaining = (current[sessionId] ?? []).filter((file) => file.path !== path);
+                if (remaining.length) {
+                  return { ...current, [sessionId]: remaining };
+                }
+                const next = { ...current };
+                delete next[sessionId];
+                return next;
+              })
+            }
+            remoteFiles={activeSessionId ? (aiRemoteFileContexts[activeSessionId] ?? []) : []}
+            sessionId={activeSessionId}
+            settings={settings}
+            visible={aiAssistantVisible}
+          />
+        )}
+      </AiContextSourcesBridge>
     </Suspense>
   ) : null;
+
+  if (localDataState !== "unlocked") {
+    return (
+      <LocalDataUnlock
+        error={localDataError}
+        onUnlock={async (passphrase) => {
+          setLocalDataError(undefined);
+          try {
+            await unlockLocalData(passphrase);
+            setConfigurationLoadAttempt((attempt) => attempt + 1);
+          } catch (error) {
+            setLocalDataState("locked");
+            setLocalDataError(commandErrorMessage(error));
+          }
+        }}
+        state={localDataState}
+      />
+    );
+  }
 
   return (
     <AppWorkspaceLayout

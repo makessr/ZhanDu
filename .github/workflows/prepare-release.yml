@@ -26,28 +26,35 @@ jobs:
   prepare:
     name: Prepare release pull request
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Require main branch
         if: github.ref != 'refs/heads/main'
         run: |
           echo "Prepare Release must run from main." >&2
           exit 1
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.3.11
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Prepare version files and changelog
         run: bun scripts/prepare-release.ts "${{ inputs.version_bump }}"
-      - name: Validate release files
+      - name: Validate release tooling
         run: |
           bun test \
             scripts/prepare-release.test.ts \
             scripts/check-release-version.test.ts \
-            scripts/extract-release-notes.test.ts
+            scripts/extract-release-notes.test.ts \
+            scripts/normalize-updater-manifest.test.ts \
+            scripts/validate-updater-manifest.test.ts \
+            scripts/verify-release-assets.test.ts \
+            scripts/download-ota-baseline.test.ts
+      - name: Validate release files
+        run: |
           release_tag="v$(bun -e 'const value = await Bun.file("package.json").json(); console.log(value.version)')"
           bun run release:check -- "$release_tag"
           bun run release:notes -- "$release_tag" > /tmp/release-notes.md

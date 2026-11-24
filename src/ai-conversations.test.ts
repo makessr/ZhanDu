@@ -113,12 +113,8 @@ describe("AI conversation persistence", () => {
         status: "applied",
       },
     ]);
-    expect(JSON.stringify(sanitized)).not.toContain(
-      "proposal-must-not-be-saved",
-    );
-    expect(JSON.stringify(sanitized)).not.toContain(
-      "applied-must-not-be-saved",
-    );
+    expect(JSON.stringify(sanitized)).not.toContain("proposal-must-not-be-saved");
+    expect(JSON.stringify(sanitized)).not.toContain("applied-must-not-be-saved");
     expect(JSON.stringify(sanitized)).not.toContain("/etc/app.conf");
     expect(sanitized.messages[1]?.toolRuns?.[0]).toMatchObject({
       label: "Ping",
@@ -139,9 +135,7 @@ describe("AI conversation persistence", () => {
         totalTokens: 1_740,
       },
     });
-    expect(sanitized.messages[1]?.toolRuns?.[0]?.summary).not.toContain(
-      "must-not-be-saved",
-    );
+    expect(sanitized.messages[1]?.toolRuns?.[0]?.summary).not.toContain("must-not-be-saved");
     expect(sanitized.messages[1]?.diagnosticPlans?.[0]).toMatchObject({
       description: "使用 token=[已隐藏] 检查网络",
       id: "plan-1",
@@ -168,15 +162,11 @@ describe("AI conversation persistence", () => {
   });
 
   test("creates bounded titles and filesystem-safe export names", () => {
-    expect(aiConversationTitleFromPrompt("  检查   nginx 配置  ")).toBe(
-      "检查 nginx 配置",
+    expect(aiConversationTitleFromPrompt("  检查   nginx 配置  ")).toBe("检查 nginx 配置");
+    expect(aiConversationTitleFromPrompt("a".repeat(50))).toBe(`${"a".repeat(36)}…`);
+    expect(aiConversationExportFilename({ ...conversation(), title: "nginx/a:b" })).toBe(
+      "nginx-a-b.md",
     );
-    expect(aiConversationTitleFromPrompt("a".repeat(50))).toBe(
-      `${"a".repeat(36)}…`,
-    );
-    expect(
-      aiConversationExportFilename({ ...conversation(), title: "nginx/a:b" }),
-    ).toBe("nginx-a-b.md");
   });
 
   test("exports messages and source labels without raw context", () => {
@@ -288,8 +278,7 @@ describe("AI conversation persistence", () => {
           commandProposals: [
             {
               id: "command-1",
-              command:
-                "curl -H 'Authorization: Bearer must-not-be-saved' example.com",
+              command: "curl -H 'Authorization: Bearer must-not-be-saved' example.com",
               purpose: "使用 token=must-not-be-saved 检查服务",
               assessment: { risk: "caution" },
               status: "failed",
@@ -328,9 +317,7 @@ describe("AI conversation persistence", () => {
       messages,
     })!;
     expect(sanitized.messages.length).toBeLessThanOrEqual(60);
-    expect(sanitized.messages.some((item) => item.id === "message-69")).toBe(
-      false,
-    );
+    expect(sanitized.messages.some((item) => item.id === "message-69")).toBe(false);
     expect(sanitized.messages[0]?.role).toBe("user");
   });
 });

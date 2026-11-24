@@ -27,21 +27,17 @@ function conversation(id: string): AiConversation {
 
 function renderActions(options?: {
   exportResult?: boolean;
-  onConfirmDelete?: (
-    confirmation: AiConversationDeleteConfirmation,
-  ) => void;
+  onConfirmDelete?: (confirmation: AiConversationDeleteConfirmation) => void;
   onRequestRename?: (request: AiConversationRenameRequest) => void;
 }) {
   const createConversation = mock(() => conversation("new"));
   const exportConversation = mock(
     async (_conversation: AiConversation) => options?.exportResult ?? true,
   );
-  const onNotice = mock(
-    (_type: "success" | "warning" | "error", _content: string) => undefined,
-  );
+  const onNotice = mock((_type: "success" | "warning" | "error", _content: string) => undefined);
   const removeConversation = mock(async (_conversationId: string) => undefined);
-  const renameConversation = mock(
-    async (_conversationId: string, _title: string) => conversation("one"),
+  const renameConversation = mock(async (_conversationId: string, _title: string) =>
+    conversation("one"),
   );
   const selectConversation = mock((_conversationId: string) => undefined);
   const hook = renderHook(() =>
@@ -120,9 +116,7 @@ describe("useAiConversationActions", () => {
     expect(view.removeConversation).toHaveBeenCalledWith("one");
 
     await act(async () => view.result.current.exportConversation("one"));
-    expect(view.exportConversation).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "one" }),
-    );
+    expect(view.exportConversation).toHaveBeenCalledWith(expect.objectContaining({ id: "one" }));
     expect(view.onNotice).not.toHaveBeenCalledWith("success", "对话已导出");
   });
 });

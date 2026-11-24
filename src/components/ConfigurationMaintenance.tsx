@@ -10,17 +10,12 @@ import {
   Typography,
 } from "@arco-design/web-react";
 import type { TableColumnProps } from "@arco-design/web-react";
-import {
-  IconDelete,
-  IconExport,
-  IconImport,
-  IconUndo,
-} from "@arco-design/web-react/icon";
+import { IconDelete, IconExport, IconImport, IconUndo } from "@arco-design/web-react/icon";
 import { isTauri } from "@tauri-apps/api/core";
-import { open, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import type { AppSettings } from "../app-settings";
 import { APP_DISPLAY_NAME } from "../application-brand";
 import { diagnosticInvoke as invoke } from "../diagnostics";
+import { pickLocalPath } from "../local-path-picker";
 import {
   type ConfigurationBackup,
   type DeletedHostRecord,
@@ -36,10 +31,7 @@ import {
   restoreConfigurationBackup,
   restoreDeletedHost,
 } from "../configuration-mutations";
-import {
-  emitProtocolEventTo,
-  listenProtocolEvent,
-} from "../tauri-protocol";
+import { emitProtocolEventTo, listenProtocolEvent } from "../tauri-protocol";
 
 interface ConfigurationMaintenanceProps {
   onConfigurationImported?: (settings: AppSettings) => void;
@@ -74,9 +66,7 @@ async function notifyMainWindow(settings?: AppSettings) {
   if (!isTauri()) return;
   await Promise.allSettled([
     emitProtocolEventTo("main", "configuration:changed"),
-    ...(settings
-      ? [emitProtocolEventTo("main", "settings:changed", settings)]
-      : []),
+    ...(settings ? [emitProtocolEventTo("main", "settings:changed", settings)] : []),
   ]);
 }
 
@@ -154,16 +144,18 @@ function ConfigurationMaintenance({
 
     setActing(true);
     try {
-      const path = await saveDialog({
+      const picked = await pickLocalPath({
         defaultPath: `fineshell-config-${new Date().toISOString().slice(0, 10)}.json`,
-        filters: [{ name: `${APP_DISPLAY_NAME}配置`, extensions: ["json"] }],
+        extensions: ["json"],
+        filterName: `${APP_DISPLAY_NAME}配置`,
+        mode: "save",
         title: `导出${APP_DISPLAY_NAME}配置`,
       });
-      if (!path) return;
+      if (!picked) return;
 
       const configuration = await loadConfiguration();
       await invoke("write_config_file", {
-        path,
+        token: picked.token,
         contents: serializeConfigurationExport(configuration),
       });
       Message.success("配置已导出");
@@ -182,15 +174,15 @@ function ConfigurationMaintenance({
 
     setActing(true);
     try {
-      const path = await open({
-        directory: false,
-        filters: [{ name: `${APP_DISPLAY_NAME}配置`, extensions: ["json"] }],
-        multiple: false,
+      const picked = await pickLocalPath({
+        extensions: ["json"],
+        filterName: `${APP_DISPLAY_NAME}配置`,
+        mode: "open",
         title: `导入${APP_DISPLAY_NAME}配置`,
       });
-      if (typeof path !== "string") return;
+      if (!picked) return;
 
-      const contents = await invoke<string>("read_config_file", { path });
+      const contents = await invoke<string>("read_config_file", { token: picked.token });
       const imported = parseConfigurationExport(contents);
       Modal.confirm({
         cancelText: "取消",
@@ -260,19 +252,13 @@ function ConfigurationMaintenance({
     }
   };
 
-  const permanentlyDeleteTrashedHost = async (
-    deletedHost: DeletedHostRecord,
-  ) => {
+  const permanentlyDeleteTrashedHost = async (deletedHost: DeletedHostRecord) => {
     setActing(true);
     try {
       const configuration = await permanentlyDeleteHost(deletedHost.id);
       setTrash(configuration.trash);
-      const hostIdIsActive = configuration.hosts.some(
-        (host) => host.id === deletedHost.host.id,
-      );
-      const cleanup = hostIdIsActive
-        ? []
-        : await removeHostCredentials(deletedHost.host.id);
+      const hostIdIsActive = configuration.hosts.some((host) => host.id === deletedHost.host.id);
+      const cleanup = hostIdIsActive ? [] : await removeHostCredentials(deletedHost.host.id);
       if (cleanup.some((result) => result.status === "rejected")) {
         Message.warning("主机已永久删除，但部分系统凭据清理失败");
       } else {
@@ -297,8 +283,7 @@ function ConfigurationMaintenance({
     {
       title: "内容",
       width: 150,
-      render: (_, backup) =>
-        `${backup.hosts.length} 台主机，${backup.sshKeys.length} 个密钥`,
+      render: (_, backup) => `${backup.hosts.length} 台主机，${backup.sshKeys.length} 个密钥`,
     },
     {
       title: "操作",
@@ -325,8 +310,7 @@ function ConfigurationMaintenance({
         <div className="host-name-cell">
           <Typography.Text bold>{deletedHost.host.name}</Typography.Text>
           <Typography.Text type="secondary">
-            {deletedHost.host.username}@{deletedHost.host.address}:
-            {deletedHost.host.port}
+            {deletedHost.host.username}@{deletedHost.host.address}:{deletedHost.host.port}
           </Typography.Text>
         </div>
       ),

@@ -6,13 +6,20 @@ import {
 } from "./config-database";
 import { createDeletedHostRecord } from "./configuration-mutations";
 import { authenticateOpaque, enrollOpaque } from "./host-sync-auth";
+import { LocalDataLockedError } from "./local-encryption";
 import {
   connectionTargetKey,
   createCredentialReference,
   credentialReferenceId,
   type CredentialProbeResult,
 } from "./credential-registry";
-import type { HostRecord, ProxyRecord, QuickCommandRecord, SshKeyRecord } from "./models";
+import type {
+  HostRecord,
+  ProxyRecord,
+  QuickCommandRecord,
+  SftpLocationRecord,
+  SshKeyRecord,
+} from "./models";
 import {
   commandErrorMessage,
   emitProtocolEventTo,
@@ -33,6 +40,7 @@ interface HostSyncConfiguration {
   proxies: ProxyRecord[];
   quickCommands: QuickCommandRecord[];
   quickCommandGroups: string[];
+  sftpBookmarks: Pick<SftpLocationRecord, "hostId" | "bookmarks">[];
 }
 
 interface AppliedConfiguration extends HostSyncConfiguration {
@@ -65,6 +73,7 @@ export interface SyncOptions {
   resolution?: { snapshot: string; choices: Record<string, boolean> };
   recover?: boolean;
   manual?: boolean;
+  requestId?: string;
 }
 
 interface SyncInspection {
@@ -86,23 +95,37 @@ export function hostSyncDevices(accountId: string, revoke?: string, rename?: str
   return invoke<HostSyncDevice[]>("host_sync_devices", { accountId, revoke, rename });
 }
 
-export async function rotateHostSyncKey(account: HostSyncAccount, recoveryKey: string, accountPassword: string) {
+export async function rotateHostSyncKey(
+  account: HostSyncAccount,
+  recoveryKey: string,
+  accountPassword: string,
+) {
   const { hostSyncBase } = await loadConfiguration();
   if (!hostSyncBase) throw new Error("请先完成一次同步，再更换主密码");
   if (recoveryKey === accountPassword) throw new Error("账号密码和主密码必须不同");
   const capabilities = await hostSyncRegistration(account.server);
-  if (!account.opaque && capabilities.opaquePublicKey) throw new Error("请先迁移旧账号认证，再更换主密码");
+  if (!account.opaque && capabilities.opaquePublicKey)
+    throw new Error("请先迁移旧账号认证，再更换主密码");
   const auth = capabilities.opaquePublicKey
-    ? await authenticateOpaque({ server: account.server, email: account.email, password: accountPassword,
-      publicKey: capabilities.opaquePublicKey })
+    ? await authenticateOpaque({
+        server: account.server,
+        email: account.email,
+        password: accountPassword,
+        publicKey: capabilities.opaquePublicKey,
+      })
     : undefined;
   const replacement = await invoke<object>("host_sync_rotate_key", {
-    accountId: account.accountId, base: JSON.parse(hostSyncBase), recoveryKey, accountPassword,
+    accountId: account.accountId,
+    base: JSON.parse(hostSyncBase),
+    recoveryKey,
+    accountPassword,
     opaqueReauthToken: auth?.token,
   });
-  await updateConfiguration((current) => current.hostSyncBase === hostSyncBase
-    ? { ...current, hostSyncBase: JSON.stringify(replacement) }
-    : current);
+  await updateConfiguration((current) =>
+    current.hostSyncBase === hostSyncBase
+      ? { ...current, hostSyncBase: JSON.stringify(replacement) }
+      : current,
+  );
   void requestHostSync({ manual: true }).catch(() => undefined);
 }
 
@@ -115,7 +138,8 @@ export async function hostSyncRegistration(server: string) {
   }>("host_sync_registration", { server });
   const pinName = "zhandu.hostSync.opaque." + new URL(server.trim()).origin;
   const pinned = localStorage.getItem(pinName);
-  if (pinned && pinned !== info.opaquePublicKey) throw new Error("同步服务器的认证公钥已变化或新认证不可用");
+  if (pinned && pinned !== info.opaquePublicKey)
+    throw new Error("同步服务器的认证公钥已变化或新认证不可用");
   if (info.opaquePublicKey && !pinned) localStorage.setItem(pinName, info.opaquePublicKey);
   return info;
 }
@@ -125,11 +149,21 @@ export function sendHostSyncVerification(server: string, email: string, inviteCo
 }
 
 export async function relinkHostSyncKey(issue: BlockedSyncRecord, path: string) {
-  await updateConfiguration((current) => issue.kind === "keys"
-    ? { ...current, sshKeys: current.sshKeys.map((item) => item.id === issue.id
-      ? { ...item, privateKeyPath: path, source: "file" } : item) }
-    : { ...current, hosts: current.hosts.map((item) => item.id === issue.id
-      ? { ...item, privateKeyPath: path } : item) });
+  await updateConfiguration((current) =>
+    issue.kind === "keys"
+      ? {
+          ...current,
+          sshKeys: current.sshKeys.map((item) =>
+            item.id === issue.id ? { ...item, privateKeyPath: path, source: "file" } : item,
+          ),
+        }
+      : {
+          ...current,
+          hosts: current.hosts.map((item) =>
+            item.id === issue.id ? { ...item, privateKeyPath: path } : item,
+          ),
+        },
+  );
   await Promise.allSettled([
     emitProtocolEventTo("main", "configuration:changed"),
     emitProtocolEventTo("settings", "configuration:changed"),
@@ -138,7 +172,7 @@ export async function relinkHostSyncKey(issue: BlockedSyncRecord, path: string) 
 }
 
 export interface HostSyncStatus {
-  state: "working" | "success" | "failed";
+  state: "queued" | "working" | "success" | "failed";
   time?: string;
   message?: string;
   conflicts?: HostSyncConflict[];
@@ -182,21 +216,32 @@ export async function signInToHostSync(values: {
     if (register) {
       if (!values.registrationId) throw new Error("注册标识无效");
       const vault = await invoke<object>("host_sync_prepare_vault", {
-        accountId: values.registrationId, masterPassword: recoveryKey,
+        accountId: values.registrationId,
+        masterPassword: recoveryKey,
       });
       session = await enrollOpaque<{ accountId: string; token: string }>(credentials, {
-        flow: "register", accountId: values.registrationId, vault, proof: values.proof,
+        flow: "register",
+        accountId: values.registrationId,
+        vault,
+        proof: values.proof,
       });
     } else if (legacyLogin) {
-      session = await enrollOpaque<{ accountId: string; token: string }>(credentials, { flow: "upgrade" });
+      session = await enrollOpaque<{ accountId: string; token: string }>(credentials, {
+        flow: "upgrade",
+      });
     } else {
       session = await authenticateOpaque(credentials);
     }
     account = await invoke<HostSyncAccount>("host_sync_accept_login", {
-      server, email, recoveryKey, boundAccount, ...session,
+      server,
+      email,
+      recoveryKey,
+      boundAccount,
+      ...session,
     });
   } else {
-    if (!register && !legacyLogin) throw new Error("此同步服务仅支持旧版认证，请确认后选择兼容登录");
+    if (!register && !legacyLogin)
+      throw new Error("此同步服务仅支持旧版认证，请确认后选择兼容登录");
     account = await invoke<HostSyncAccount>("host_sync_login", { ...values, boundAccount });
   }
   localStorage.setItem(bindingKey, account.accountId);
@@ -204,10 +249,18 @@ export async function signInToHostSync(values: {
   return account;
 }
 
-export async function resetHostSyncPassword(server: string, email: string, code: string, password: string) {
+export async function resetHostSyncPassword(
+  server: string,
+  email: string,
+  code: string,
+  password: string,
+) {
   const { opaquePublicKey, passwordRecovery } = await hostSyncRegistration(server);
   if (!opaquePublicKey || !passwordRecovery) throw new Error("同步服务未启用邮箱找回");
-  await enrollOpaque<object>({ server, email, password, publicKey: opaquePublicKey }, { flow: "recovery", code });
+  await enrollOpaque<object>(
+    { server, email, password, publicKey: opaquePublicKey },
+    { flow: "recovery", code },
+  );
 }
 
 export async function signOutOfHostSync() {
@@ -217,7 +270,7 @@ export async function signOutOfHostSync() {
 
 export function readHostSyncStatus(): HostSyncStatus | null {
   const raw = localStorage.getItem(statusKey);
-  return raw ? JSON.parse(raw) as HostSyncStatus : null;
+  return raw ? (JSON.parse(raw) as HostSyncStatus) : null;
 }
 
 export function isHostSyncStorageEvent(event: StorageEvent) {
@@ -233,14 +286,20 @@ export function requestHostSync(options: SyncOptions = {}) {
 }
 
 function project(config: FineShellConfiguration): HostSyncConfiguration {
+  const hostIds = new Set(config.hosts.map((host) => host.id));
   const keys = new Set(config.hosts.map((host) => host.sshKeyId));
   const proxies = new Set(config.hosts.map((host) => host.proxyId));
   return {
-    hosts: config.hosts.map(({ lastConnectedAt, hostFingerprint, ...host }) => host),
+    hosts: config.hosts.map(
+      ({ lastConnectedAt: _lastConnectedAt, hostFingerprint: _hostFingerprint, ...host }) => host,
+    ),
     keys: config.sshKeys.filter((key) => keys.has(key.id)),
     proxies: config.proxies.filter((proxy) => proxies.has(proxy.id)),
     quickCommands: config.quickCommands,
     quickCommandGroups: config.quickCommandGroups,
+    sftpBookmarks: config.sftpLocations
+      .filter(({ hostId, bookmarks }) => hostIds.has(hostId) && bookmarks.length > 0)
+      .map(({ hostId, bookmarks }) => ({ hostId, bookmarks })),
   };
 }
 
@@ -253,7 +312,11 @@ function restoreLocalFields(incoming: HostRecord, local?: HostRecord) {
   };
 }
 
-function mergeOrder<T extends { id: string }>(existing: T[], incoming: T[], keepUnmatched: boolean) {
+function mergeOrder<T extends { id: string }>(
+  existing: T[],
+  incoming: T[],
+  keepUnmatched: boolean,
+) {
   const byId = new Map(incoming.map((record) => [record.id, record]));
   const merged: T[] = [];
   for (const record of existing) {
@@ -268,8 +331,15 @@ function mergeOrder<T extends { id: string }>(existing: T[], incoming: T[], keep
   return [...merged, ...byId.values()];
 }
 
-function writeStatus(status: HostSyncStatus) {
+function notifyStatus(status: HostSyncStatus, requestId?: string) {
+  void emitProtocolEventTo("settings", "host-sync:status", { status, requestId }).catch(
+    () => undefined,
+  );
+}
+
+function writeStatus(status: HostSyncStatus, requestId?: string) {
   localStorage.setItem(statusKey, JSON.stringify(status));
+  notifyStatus(status, requestId);
 }
 
 interface SyncCache {
@@ -282,36 +352,56 @@ interface SyncCache {
 }
 
 async function synchronize(
-  account: HostSyncAccount, options: SyncOptions, cache?: SyncCache,
+  account: HostSyncAccount,
+  options: SyncOptions,
+  cache?: SyncCache,
 ): Promise<{ status: HostSyncStatus; cache?: SyncCache }> {
   const current = await loadConfiguration();
   const configuration = project(current);
   const expected = JSON.stringify(configuration);
-  if (!options.manual && cache && cache.account.accountId === account.accountId &&
-      cache.account.server === account.server && cache.configuration === expected &&
-      cache.base === current.hostSyncBase && Date.now() - cache.checkedAt < 120_000) {
+  if (
+    !options.manual &&
+    cache &&
+    cache.account.accountId === account.accountId &&
+    cache.account.server === account.server &&
+    cache.configuration === expected &&
+    cache.base === current.hostSyncBase &&
+    Date.now() - cache.checkedAt < 120_000
+  ) {
     const unchanged = await invoke<boolean | null>("host_sync_probe", {
-      accountId: account.accountId, known: cache.inspection,
+      accountId: account.accountId,
+      known: cache.inspection,
     });
     if (unchanged) {
-      return { status: { state: "success", time: new Date().toISOString(), blocked: cache.blocked }, cache };
+      return {
+        status: { state: "success", time: new Date().toISOString(), blocked: cache.blocked },
+        cache,
+      };
     }
   }
-  const { base, inspection, expectedLocal, conflicts, conflictSnapshot, blocked } = await invoke<SyncResult>("host_sync_exchange", {
-    accountId: account.accountId,
-    configuration,
-    base: current.hostSyncBase ? JSON.parse(current.hostSyncBase) : null,
-    resolution: options.resolution,
-    recover: options.recover,
-  });
+  const { base, inspection, expectedLocal, conflicts, conflictSnapshot, blocked } =
+    await invoke<SyncResult>("host_sync_exchange", {
+      accountId: account.accountId,
+      configuration,
+      base: current.hostSyncBase ? JSON.parse(current.hostSyncBase) : null,
+      resolution: options.resolution,
+      recover: options.recover,
+    });
   if (conflicts?.length && conflictSnapshot) {
     return { status: { state: "failed", conflicts, snapshot: conflictSnapshot, blocked } };
   }
   const status: HostSyncStatus = { state: "success", time: new Date().toISOString(), blocked };
   const encoded = JSON.stringify(base);
-  const nextCache = inspection ? {
-    account, configuration: expected, base: encoded, inspection, checkedAt: Date.now(), blocked,
-  } satisfies SyncCache : undefined;
+  const nextCache = inspection
+    ? ({
+        account,
+        configuration: expected,
+        base: encoded,
+        inspection,
+        checkedAt: Date.now(),
+        blocked,
+      } satisfies SyncCache)
+    : undefined;
   if (encoded === current.hostSyncBase && !expectedLocal) return { status, cache: nextCache };
 
   let received: AppliedConfiguration | undefined;
@@ -324,8 +414,14 @@ async function synchronize(
       vault: base,
       expectedLocal,
       configuration,
-      preserveHosts: blocked?.filter((issue) => issue.kind === "hosts" && issue.preserve).map((issue) => issue.id) ?? [],
-      preserveKeys: blocked?.filter((issue) => issue.kind === "keys" && issue.preserve).map((issue) => issue.id) ?? [],
+      preserveHosts:
+        blocked
+          ?.filter((issue) => issue.kind === "hosts" && issue.preserve)
+          .map((issue) => issue.id) ?? [],
+      preserveKeys:
+        blocked
+          ?.filter((issue) => issue.kind === "keys" && issue.preserve)
+          .map((issue) => issue.id) ?? [],
     });
   }
   let changed = false;
@@ -335,14 +431,32 @@ async function synchronize(
     committed = true;
     if (!received) return { ...latest, hostSyncBase: encoded };
     const local = new Map(latest.hosts.map((host) => [host.id, host]));
-    const retained = new Set(blocked?.filter((issue) => issue.kind === "hosts" && issue.preserve)
-      .map((issue) => issue.id));
-    const incomingHosts = [...received.hosts, ...latest.hosts.filter((host) => retained.has(host.id))];
+    const retained = new Set(
+      blocked?.filter((issue) => issue.kind === "hosts" && issue.preserve).map((issue) => issue.id),
+    );
+    const incomingHosts = [
+      ...received.hosts,
+      ...latest.hosts.filter((host) => retained.has(host.id)),
+    ];
     const receivedIds = new Set(incomingHosts.map((host) => host.id));
     const deleted = latest.hosts
       .filter((host) => !receivedIds.has(host.id))
       .map((host) => createDeletedHostRecord(host));
     const deletedIds = new Set(deleted.map(({ host }) => host.id));
+    const bookmarksByHost = new Map(
+      received.sftpBookmarks.map(({ hostId, bookmarks }) => [hostId, bookmarks]),
+    );
+    const sftpLocations = latest.sftpLocations.map((location) => ({
+      ...location,
+      bookmarks: retained.has(location.hostId)
+        ? location.bookmarks
+        : (bookmarksByHost.get(location.hostId) ??
+          (local.has(location.hostId) ? [] : location.bookmarks)),
+    }));
+    const existingLocationIds = new Set(sftpLocations.map(({ hostId }) => hostId));
+    for (const [hostId, bookmarks] of bookmarksByHost) {
+      if (!existingLocationIds.has(hostId)) sftpLocations.push({ hostId, bookmarks, history: [] });
+    }
     const labels = new Map(
       [...received.hosts, ...received.proxies, ...received.keys].map(({ id, name }) => [id, name]),
     );
@@ -351,18 +465,25 @@ async function synchronize(
       const id = credentialReferenceId(kind, ownerId);
       if (!exists) references.delete(id);
       else if (!references.has(id)) {
-        references.set(id, createCredentialReference(kind, ownerId, labels.get(ownerId) ?? ownerId));
+        references.set(
+          id,
+          createCredentialReference(kind, ownerId, labels.get(ownerId) ?? ownerId),
+        );
       }
     }
     changed = true;
     return {
       ...latest,
-      hosts: mergeOrder(latest.hosts, incomingHosts, false)
-        .map((host) => restoreLocalFields(host, local.get(host.id))),
+      hosts: mergeOrder(latest.hosts, incomingHosts, false).map((host) =>
+        restoreLocalFields(host, local.get(host.id)),
+      ),
       sshKeys: mergeOrder(latest.sshKeys, received.keys, true),
       proxies: mergeOrder(latest.proxies, received.proxies, true),
       quickCommands: mergeOrder(latest.quickCommands, received.quickCommands, false),
       quickCommandGroups: received.quickCommandGroups,
+      sftpLocations: sftpLocations.filter(
+        ({ bookmarks, history }) => bookmarks.length || history.length,
+      ),
       credentialReferences: [...references.values()],
       trash: [
         ...deleted,
@@ -381,9 +502,13 @@ async function synchronize(
   return { status, cache: nextCache };
 }
 
-export function startHostSync() {
-  if (!isTauri()) return;
+let stopHostSync: (() => void) | undefined;
+
+export function startHostSync(): () => void {
+  if (!isTauri()) return () => undefined;
+  if (stopHostSync) return stopHostSync;
   let running = false;
+  let stopped = false;
   let queued: SyncOptions | undefined;
   let lastDeviceUpdate = 0;
   let deviceAccount: string | undefined;
@@ -393,41 +518,65 @@ export function startHostSync() {
   let changeTimer: number | undefined;
 
   async function run(options: SyncOptions = {}, fromChange = false) {
-    if (!hostSyncIsBound() || (!options.manual && Date.now() < retryAfter)) return;
+    if (stopped) return;
+    if (!options.manual && (!hostSyncIsBound() || Date.now() < retryAfter)) return;
     if (running) {
-      if (options.manual) queued = options;
-      else if (fromChange) queued ??= options;
+      if (options.manual) {
+        if (queued?.requestId && !options.requestId) return;
+        queued = options;
+        notifyStatus({ state: "queued" }, options.requestId);
+      } else if (fromChange) queued ??= options;
       return;
     }
     running = true;
     try {
+      if (options.manual) writeStatus({ state: "working" }, options.requestId);
       const account = await hostSyncAccount();
-      if (!account) return;
+      if (!account) {
+        if (options.manual) throw new Error("同步账号会话已失效，请重新登录");
+        return;
+      }
+      const boundAccount = localStorage.getItem(bindingKey);
+      if (boundAccount && boundAccount !== account.accountId) {
+        throw new Error("本机配置已关联其他同步账号，请重新登录原账号");
+      }
+      if (!boundAccount) localStorage.setItem(bindingKey, account.accountId);
       const status = readHostSyncStatus();
       if (!options.manual && status?.conflicts?.length) return;
-      if (options.manual) writeStatus({ state: "working" });
       const { status: result, cache: nextCache } = await synchronize(account, options, cache);
       cache = nextCache;
-      writeStatus(result);
+      writeStatus(result, options.requestId);
       retries = 0;
       retryAfter = 0;
-      if (result.state === "success" && (deviceAccount !== account.accountId || Date.now() - lastDeviceUpdate >= 60_000)) {
+      if (
+        result.state === "success" &&
+        (deviceAccount !== account.accountId || Date.now() - lastDeviceUpdate >= 60_000)
+      ) {
         deviceAccount = account.accountId;
         lastDeviceUpdate = Date.now();
-        void invoke("host_sync_devices", { accountId: account.accountId, markSynced: true }).catch(() => undefined);
+        void invoke("host_sync_devices", { accountId: account.accountId, markSynced: true }).catch(
+          () => undefined,
+        );
       }
       if (options.recover && result.state === "success") queued ??= { manual: true };
     } catch (error) {
       cache = undefined;
+      if (error instanceof LocalDataLockedError) {
+        retryAfter = Date.now() + 5_000;
+        return;
+      }
       const message = commandErrorMessage(error);
       retries = Math.min(retries + 1, 5);
       retryAfter = Date.now() + 15_000 * 2 ** retries;
-      writeStatus({
-        state: "failed",
-        message,
-        recoverable: message.startsWith("云端快照落后"),
-        signInRequired: message.includes("重新登录"),
-      });
+      writeStatus(
+        {
+          state: "failed",
+          message,
+          recoverable: message.startsWith("云端快照落后"),
+          signInRequired: message.includes("重新登录"),
+        },
+        options.requestId,
+      );
     } finally {
       running = false;
       if (queued) {
@@ -438,14 +587,41 @@ export function startHostSync() {
     }
   }
 
+  const unlisteners: Array<() => void> = [];
   void listenProtocolEvent("host-sync:request", ({ payload }) => {
     void run(payload);
-  }).catch((error) => writeStatus({ state: "failed", message: commandErrorMessage(error) }));
+  })
+    .then((unlisten) => {
+      if (stopped) unlisten();
+      else unlisteners.push(unlisten);
+    })
+    .catch((error) => writeStatus({ state: "failed", message: commandErrorMessage(error) }));
   void listenProtocolEvent("configuration:changed", () => {
     window.clearTimeout(changeTimer);
     changeTimer = window.setTimeout(() => void run({}, true), 350);
-  }).catch((error) => writeStatus({ state: "failed", message: commandErrorMessage(error) }));
-  window.addEventListener("online", () => { retryAfter = 0; void run(); });
-  window.setInterval(() => void run(), 15_000);
+  })
+    .then((unlisten) => {
+      if (stopped) unlisten();
+      else unlisteners.push(unlisten);
+    })
+    .catch((error) => writeStatus({ state: "failed", message: commandErrorMessage(error) }));
+  const handleOnline = () => {
+    retryAfter = 0;
+    void run();
+  };
+  window.addEventListener("online", handleOnline);
+  const interval = window.setInterval(() => void run(), 15_000);
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+    window.clearTimeout(changeTimer);
+    window.clearInterval(interval);
+    window.removeEventListener("online", handleOnline);
+    for (const unlisten of unlisteners.splice(0)) unlisten();
+    if (stopHostSync === stop) stopHostSync = undefined;
+  };
+  stopHostSync = stop;
+  window.addEventListener("pagehide", stop, { once: true });
   void run();
+  return stop;
 }

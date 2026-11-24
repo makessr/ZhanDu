@@ -1,7 +1,4 @@
-import type {
-  ConnectionHistoryLimit,
-  ConnectionHistoryRetentionDays,
-} from "./app-settings";
+import type { ConnectionHistoryLimit, ConnectionHistoryRetentionDays } from "./app-settings";
 import type { ConnectionHistoryRecord } from "./models";
 
 export interface ConnectionHistoryPolicy {
@@ -15,18 +12,14 @@ export function applyConnectionHistoryPolicy(
   now = new Date(),
 ) {
   const cutoff = policy.connectionHistoryRetentionDays
-    ? now.getTime() -
-      policy.connectionHistoryRetentionDays * 24 * 60 * 60 * 1_000
+    ? now.getTime() - policy.connectionHistoryRetentionDays * 24 * 60 * 60 * 1_000
     : Number.NEGATIVE_INFINITY;
   const retained = history
     .filter((record) => {
       const connectedAt = Date.parse(record.connectedAt);
       return Number.isFinite(connectedAt) && connectedAt >= cutoff;
     })
-    .sort(
-      (left, right) =>
-        Date.parse(right.connectedAt) - Date.parse(left.connectedAt),
-    );
+    .sort((left, right) => Date.parse(right.connectedAt) - Date.parse(left.connectedAt));
 
   return policy.connectionHistoryLimit === 0
     ? retained

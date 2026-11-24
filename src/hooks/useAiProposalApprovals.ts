@@ -21,12 +21,8 @@ function rejectApprovalsForRequest<TDecision>(
 }
 
 export function useAiProposalApprovals() {
-  const commandApprovalsRef = useRef(
-    new Map<string, PendingApproval<AiCommandApprovalDecision>>(),
-  );
-  const fileApprovalsRef = useRef(
-    new Map<string, PendingApproval<AiFileApprovalDecision>>(),
-  );
+  const commandApprovalsRef = useRef(new Map<string, PendingApproval<AiCommandApprovalDecision>>());
+  const fileApprovalsRef = useRef(new Map<string, PendingApproval<AiFileApprovalDecision>>());
 
   const decideCommandProposal = useCallback(
     (proposalId: string, decision: AiCommandApprovalDecision) => {
@@ -39,16 +35,13 @@ export function useAiProposalApprovals() {
     [],
   );
 
-  const decideFileProposal = useCallback(
-    (proposalId: string, decision: AiFileApprovalDecision) => {
-      const pending = fileApprovalsRef.current.get(proposalId);
-      if (!pending) return false;
-      fileApprovalsRef.current.delete(proposalId);
-      pending.resolve(decision);
-      return true;
-    },
-    [],
-  );
+  const decideFileProposal = useCallback((proposalId: string, decision: AiFileApprovalDecision) => {
+    const pending = fileApprovalsRef.current.get(proposalId);
+    if (!pending) return false;
+    fileApprovalsRef.current.delete(proposalId);
+    pending.resolve(decision);
+    return true;
+  }, []);
 
   const waitForCommandApproval = useCallback(
     (proposalId: string, requestId: string) =>
@@ -76,21 +69,14 @@ export function useAiProposalApprovals() {
 
   const rejectPendingCommandApprovals = useCallback(
     (requestId: string, message = "AI 请求已取消") => {
-      rejectApprovalsForRequest(
-        commandApprovalsRef.current,
-        requestId,
-        message,
-      );
+      rejectApprovalsForRequest(commandApprovalsRef.current, requestId, message);
     },
     [],
   );
 
-  const rejectPendingFileApprovals = useCallback(
-    (requestId: string, message = "AI 请求已取消") => {
-      rejectApprovalsForRequest(fileApprovalsRef.current, requestId, message);
-    },
-    [],
-  );
+  const rejectPendingFileApprovals = useCallback((requestId: string, message = "AI 请求已取消") => {
+    rejectApprovalsForRequest(fileApprovalsRef.current, requestId, message);
+  }, []);
 
   return {
     decideCommandProposal,

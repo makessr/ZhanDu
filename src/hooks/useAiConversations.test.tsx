@@ -29,9 +29,7 @@ function conversation(
   };
 }
 
-function memoryStorage(
-  load: AiConversationStorage["load"] = async () => [],
-) {
+function memoryStorage(load: AiConversationStorage["load"] = async () => []) {
   const deleteConversation = mock(async () => undefined);
   const save = mock(async (value: AiConversationRecord) => value);
   return {
@@ -93,20 +91,14 @@ describe("useAiConversations", () => {
       { initialProps: { sessionId: "session-1" } },
     );
 
-    await waitFor(() =>
-      expect(result.current.activeConversationId).toBe("conversation-1"),
-    );
+    await waitFor(() => expect(result.current.activeConversationId).toBe("conversation-1"));
     act(() => result.current.selectConversation("conversation-2"));
     expect(result.current.activeConversationId).toBe("conversation-2");
 
     rerender({ sessionId: "session-2" });
-    await waitFor(() =>
-      expect(result.current.activeConversationId).toBe("conversation-1"),
-    );
+    await waitFor(() => expect(result.current.activeConversationId).toBe("conversation-1"));
     rerender({ sessionId: "session-1" });
-    await waitFor(() =>
-      expect(result.current.activeConversationId).toBe("conversation-2"),
-    );
+    await waitFor(() => expect(result.current.activeConversationId).toBe("conversation-2"));
   });
 
   test("ignores an obsolete host load after the active host changes", async () => {
@@ -129,9 +121,7 @@ describe("useAiConversations", () => {
     );
 
     rerender({ hostId: "host-2" });
-    await waitFor(() =>
-      expect(result.current.activeConversationId).toBe("conversation-2"),
-    );
+    await waitFor(() => expect(result.current.activeConversationId).toBe("conversation-2"));
     await act(async () => {
       hostOne.resolve([conversation("conversation-1", "host-1")]);
       await hostOne.promise;
@@ -167,9 +157,7 @@ describe("useAiConversations", () => {
   test("serializes persistence writes", async () => {
     const firstSave = deferred<AiConversationRecord>();
     const save = mock((value: AiConversationRecord) =>
-      value.id === "conversation-1"
-        ? firstSave.promise
-        : Promise.resolve(value),
+      value.id === "conversation-1" ? firstSave.promise : Promise.resolve(value),
     );
     const storage: AiConversationStorage = {
       delete: async () => undefined,
@@ -212,9 +200,7 @@ describe("useAiConversations", () => {
       }),
     );
 
-    await waitFor(() =>
-      expect(result.current.activeConversationId).toBe("conversation-1"),
-    );
+    await waitFor(() => expect(result.current.activeConversationId).toBe("conversation-1"));
     await act(async () => {
       await result.current.removeConversation("conversation-1");
     });

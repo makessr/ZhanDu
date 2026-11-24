@@ -12,11 +12,10 @@ import {
 } from "@visactor/vchart";
 import { useResolvedAppearance } from "../hooks/useResolvedAppearance";
 import type { ServerMonitorHistoryPoint } from "../models";
-import {
-  formatMonitorPercent,
-  normalizeMonitorPercent,
-} from "../monitor-utils";
+import { formatMonitorPercent, normalizeMonitorPercent } from "../monitor-utils";
 
+// VChart chart components must be registered once at module scope, not inside a hook.
+// eslint-disable-next-line react-hooks/rules-of-hooks
 VChart.useRegisters([
   registerAreaChart,
   registerCartesianBandAxis,
@@ -29,7 +28,14 @@ VChart.useRegisters([
 type MonitorChartProps = { type: "area" } & AreaChartProps;
 
 function MonitorChart({ className, height, ...spec }: MonitorChartProps) {
-  return <VChartSimple vchartConstructor={VChart} className={className} style={{ height }} spec={{ ...spec, background: "transparent" }} />;
+  return (
+    <VChartSimple
+      vchartConstructor={VChart}
+      className={className}
+      style={{ height }}
+      spec={{ ...spec, background: "transparent" }}
+    />
+  );
 }
 
 function enforcePercentTooltipContent(content?: ITooltipLineActual[]) {
@@ -55,7 +61,11 @@ const PERCENT_TOOLTIP = {
   mark: PERCENT_TOOLTIP_CONTENT,
 };
 
-export function ResourceTrendChart({ monitorHistory }: { monitorHistory: ServerMonitorHistoryPoint[] }) {
+export function ResourceTrendChart({
+  monitorHistory,
+}: {
+  monitorHistory: ServerMonitorHistoryPoint[];
+}) {
   const appearance = useResolvedAppearance();
   const chartTextColor = appearance === "dark" ? "#c9cdd4" : "#4e5969";
   const chartSecondaryTextColor = appearance === "dark" ? "rgba(255, 255, 255, 0.45)" : "#86909c";

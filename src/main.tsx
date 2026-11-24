@@ -17,9 +17,7 @@ installSelectAllShortcuts();
 
 const App = React.lazy(() => import("./App"));
 const SettingsWindow = React.lazy(() => import("./components/SettingsWindow"));
-const ShortcutGuideWindow = React.lazy(
-  () => import("./components/ShortcutGuideWindow"),
-);
+const ShortcutGuideWindow = React.lazy(() => import("./components/ShortcutGuideWindow"));
 
 if (isTauri()) {
   document.addEventListener("contextmenu", (event) => event.preventDefault());
@@ -29,11 +27,7 @@ const view = windowViewFromContext({
   windowLabel: isTauri() ? getCurrentWindow().label : null,
 });
 const RootView =
-  view === "settings"
-    ? SettingsWindow
-    : view === "shortcuts"
-      ? ShortcutGuideWindow
-      : App;
+  view === "settings" ? SettingsWindow : view === "shortcuts" ? ShortcutGuideWindow : App;
 
 if (RootView === App) startHostSync();
 

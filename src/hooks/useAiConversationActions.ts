@@ -21,9 +21,7 @@ interface UseAiConversationActionsOptions {
   createConversation: () => AiConversation | undefined;
   exportConversation: (conversation: AiConversation) => Promise<boolean>;
   hostId: string | null;
-  onConfirmDelete: (
-    confirmation: AiConversationDeleteConfirmation,
-  ) => void;
+  onConfirmDelete: (confirmation: AiConversationDeleteConfirmation) => void;
   onNotice: (type: AiConversationNotice, content: string) => void;
   onRequestRename: (request: AiConversationRenameRequest) => void;
   removeConversation: (conversationId: string) => Promise<void>;
@@ -56,9 +54,7 @@ export function useAiConversationActions({
     setHistoryVisible(false);
   }, [sessionId]);
 
-  const historyConversations = conversations.filter(
-    (conversation) => conversation.messages.length,
-  );
+  const historyConversations = conversations.filter((conversation) => conversation.messages.length);
 
   const findConversation = (conversationId: string) =>
     conversations.find((conversation) => conversation.id === conversationId);

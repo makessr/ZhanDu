@@ -1,7 +1,4 @@
-import type {
-  AiCapabilityState,
-  AiServiceCapabilities,
-} from "./tauri-protocol";
+import type { AiCapabilityState, AiServiceCapabilities } from "./tauri-protocol";
 
 export type AiCapabilityKey = keyof AiServiceCapabilities;
 

@@ -16,12 +16,7 @@ import {
   Space,
   Typography,
 } from "@arco-design/web-react";
-import {
-  IconEdit,
-  IconPaste,
-  IconPlus,
-  IconPlayArrow,
-} from "@arco-design/web-react/icon";
+import { IconEdit, IconPaste, IconPlus, IconPlayArrow } from "@arco-design/web-react/icon";
 import type { QuickCommandFormValues, QuickCommandRecord } from "../models";
 import {
   filterQuickCommands,
@@ -95,26 +90,21 @@ function QuickCommandDrawer({
     return [...counts];
   }, [commands, savedGroups]);
   const activeGroup = groups.some(([group]) => group === selectedGroup) ? selectedGroup : null;
-  const [pendingCommand, setPendingCommand] =
-    useState<QuickCommandRecord | null>(null);
-  const [parameterValues, setParameterValues] = useState<
-    Record<string, string>
-  >({});
+  const [pendingCommand, setPendingCommand] = useState<QuickCommandRecord | null>(null);
+  const [parameterValues, setParameterValues] = useState<Record<string, string>>({});
   const [sending, setSending] = useState<{
     commandId: string;
     mode: "insert" | "execute";
   } | null>(null);
 
   const filteredCommands = useMemo(
-    () => filterQuickCommands(commands, query).filter((command) =>
-      activeGroup === null || (command.group ?? "") === activeGroup,
-    ),
+    () =>
+      filterQuickCommands(commands, query).filter(
+        (command) => activeGroup === null || (command.group ?? "") === activeGroup,
+      ),
     [activeGroup, commands, query],
   );
-  const commandGroups = useMemo(
-    () => groupQuickCommands(filteredCommands),
-    [filteredCommands],
-  );
+  const commandGroups = useMemo(() => groupQuickCommands(filteredCommands), [filteredCommands]);
   const parameters = useMemo(
     () => quickCommandParameters(pendingCommand?.command ?? ""),
     [pendingCommand],
@@ -126,10 +116,7 @@ function QuickCommandDrawer({
     setParameterValues({});
   }, [visible]);
 
-  const sendCommand = async (
-    command: QuickCommandRecord,
-    execute: boolean,
-  ) => {
+  const sendCommand = async (command: QuickCommandRecord, execute: boolean) => {
     if (!targetAvailable) {
       Message.warning("目标会话未连接");
       return;
@@ -139,10 +126,7 @@ function QuickCommandDrawer({
       setPendingCommand(command);
       setParameterValues(
         Object.fromEntries(
-          commandParameters.map((parameter) => [
-            parameter.name,
-            parameter.defaultValue ?? "",
-          ]),
+          commandParameters.map((parameter) => [parameter.name, parameter.defaultValue ?? ""]),
         ),
       );
       return;
@@ -164,8 +148,7 @@ function QuickCommandDrawer({
   const sendParameterizedCommand = async (execute: boolean) => {
     if (!pendingCommand || !targetAvailable) return;
     const missingParameter = parameters.find(
-      (parameter) =>
-        !parameter.defaultValue && !parameterValues[parameter.name]?.trim(),
+      (parameter) => !parameter.defaultValue && !parameterValues[parameter.name]?.trim(),
     );
     if (missingParameter) {
       Message.warning(`请填写参数“${missingParameter.name}”`);
@@ -254,23 +237,50 @@ function QuickCommandDrawer({
       >
         {embedded && (
           <aside aria-label="快捷命令分组" className="quick-command-groups">
-            <Button aria-pressed={activeGroup === null} onClick={() => setSelectedGroup(null)} size="small" type="text">
-              <span>全部</span><span>{commands.length}</span>
+            <Button
+              aria-pressed={activeGroup === null}
+              onClick={() => setSelectedGroup(null)}
+              size="small"
+              type="text"
+            >
+              <span>全部</span>
+              <span>{commands.length}</span>
             </Button>
             {groups.map(([group, count]) => (
-              <Button aria-pressed={activeGroup === group} key={group} onClick={() => setSelectedGroup(group)} size="small" type="text">
-                <span title={group}>{group || "未分组"}</span><span>{count}</span>
+              <Button
+                aria-pressed={activeGroup === group}
+                key={group}
+                onClick={() => setSelectedGroup(group)}
+                size="small"
+                type="text"
+              >
+                <span title={group}>{group || "未分组"}</span>
+                <span>{count}</span>
               </Button>
             ))}
-            <Button className="quick-command-new-group" icon={<IconPlus />} onClick={() => setGroupName("")} size="small" type="text">新建分组</Button>
+            <Button
+              className="quick-command-new-group"
+              icon={<IconPlus />}
+              onClick={() => setGroupName("")}
+              size="small"
+              type="text"
+            >
+              新建分组
+            </Button>
           </aside>
         )}
         <div className="quick-command-main">
           <div className="quick-command-drawer-toolbar">
             {embedded && (
               <div className="quick-command-toolbar-actions">
-                <Button icon={<IconPlus />} onClick={() => setCreatingCommand(true)} size="small">新建命令</Button>
-                {onEdit && <Button icon={<IconEdit />} onClick={onEdit} size="small">命令编辑器</Button>}
+                <Button icon={<IconPlus />} onClick={() => setCreatingCommand(true)} size="small">
+                  新建命令
+                </Button>
+                {onEdit && (
+                  <Button icon={<IconEdit />} onClick={onEdit} size="small">
+                    命令编辑器
+                  </Button>
+                )}
               </div>
             )}
             <div className="quick-command-toolbar-search">
@@ -308,10 +318,7 @@ function QuickCommandDrawer({
             {commandGroups.length ? (
               commandGroups.map((group) => (
                 <section className="quick-command-group" key={group.label}>
-                  <Typography.Text
-                    className="quick-command-group-title"
-                    type="secondary"
-                  >
+                  <Typography.Text className="quick-command-group-title" type="secondary">
                     {group.label}
                   </Typography.Text>
                   <div className="quick-command-list">
@@ -319,10 +326,7 @@ function QuickCommandDrawer({
                       <div className="quick-command-list-item" key={command.id}>
                         <div className="quick-command-list-copy">
                           <Typography.Text bold>{command.name}</Typography.Text>
-                          <Typography.Text
-                            className="quick-command-list-template"
-                            code
-                          >
+                          <Typography.Text className="quick-command-list-template" code>
                             {command.command}
                           </Typography.Text>
                           {command.description && (
@@ -335,10 +339,7 @@ function QuickCommandDrawer({
                           <Button
                             disabled={!targetAvailable || sending !== null}
                             icon={<IconPaste />}
-                            loading={
-                              sending?.commandId === command.id &&
-                              sending.mode === "insert"
-                            }
+                            loading={sending?.commandId === command.id && sending.mode === "insert"}
                             onClick={() => void sendCommand(command, false)}
                             size="mini"
                           >
@@ -348,8 +349,7 @@ function QuickCommandDrawer({
                             disabled={!targetAvailable || sending !== null}
                             icon={<IconPlayArrow />}
                             loading={
-                              sending?.commandId === command.id &&
-                              sending.mode === "execute"
+                              sending?.commandId === command.id && sending.mode === "execute"
                             }
                             onClick={() => void sendCommand(command, true)}
                             size="mini"
@@ -363,12 +363,12 @@ function QuickCommandDrawer({
                   </div>
                 </section>
               ))
+            ) : embedded ? (
+              <p className="quick-command-empty">
+                {query ? "没有匹配的快捷命令" : "暂无快捷命令，点击「新建命令」添加。"}
+              </p>
             ) : (
-              embedded ? (
-                <p className="quick-command-empty">
-                  {query ? "没有匹配的快捷命令" : "暂无快捷命令，点击「新建命令」添加。"}
-                </p>
-              ) : <Empty description={query ? "没有匹配的快捷命令" : "暂无快捷命令"} />
+              <Empty description={query ? "没有匹配的快捷命令" : "暂无快捷命令"} />
             )}
           </div>
         </div>
@@ -384,8 +384,21 @@ function QuickCommandDrawer({
         />
       )}
       {visible && groupName !== null && (
-        <Modal confirmLoading={saving} onCancel={() => setGroupName(null)} onOk={() => void saveGroup()} title="新建命令分组" visible>
-          <Input aria-label="分组名称" autoFocus maxLength={60} onChange={setGroupName} onPressEnter={() => void saveGroup()} value={groupName} />
+        <Modal
+          confirmLoading={saving}
+          onCancel={() => setGroupName(null)}
+          onOk={() => void saveGroup()}
+          title="新建命令分组"
+          visible
+        >
+          <Input
+            aria-label="分组名称"
+            autoFocus
+            maxLength={60}
+            onChange={setGroupName}
+            onPressEnter={() => void saveGroup()}
+            value={groupName}
+          />
         </Modal>
       )}
       {pendingCommand && (
@@ -420,10 +433,7 @@ function QuickCommandDrawer({
               </label>
             ))}
           </div>
-          <Typography.Text
-            className="quick-command-parameter-preview"
-            code
-          >
+          <Typography.Text className="quick-command-parameter-preview" code>
             {renderQuickCommand(pendingCommand.command, parameterValues)}
           </Typography.Text>
           <div className="modal-actions">

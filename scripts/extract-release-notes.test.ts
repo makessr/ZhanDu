@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  extractReleaseNotes,
-  releaseVersionFromTag,
-} from "./extract-release-notes";
+import { extractReleaseNotes, releaseVersionFromTag } from "./extract-release-notes";
 
 const changelog = `# 更新日志
 
@@ -38,11 +35,9 @@ describe("release notes extraction", () => {
 
   test("rejects invalid tags, missing versions and empty sections", () => {
     expect(() => releaseVersionFromTag("release-1.2.3")).toThrow("格式无效");
-    expect(() => extractReleaseNotes(changelog, "v1.2.4")).toThrow(
-      "缺少版本 1.2.4",
+    expect(() => extractReleaseNotes(changelog, "v1.2.4")).toThrow("缺少版本 1.2.4");
+    expect(() => extractReleaseNotes("## [1.2.3]\n\n## [1.2.2]\n\n- 旧版本", "v1.2.3")).toThrow(
+      "更新日志为空",
     );
-    expect(() =>
-      extractReleaseNotes("## [1.2.3]\n\n## [1.2.2]\n\n- 旧版本", "v1.2.3"),
-    ).toThrow("更新日志为空");
   });
 });

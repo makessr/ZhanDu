@@ -3,9 +3,7 @@ export function isSftpTransferCancellation(message: string) {
 }
 
 export function isSftpSessionFailure(message: string) {
-  return /会话不存在|会话已停止|连接已关闭|connection|disconnect|socket/i.test(
-    message,
-  );
+  return /会话不存在|会话已停止|连接已关闭|connection|disconnect|socket/i.test(message);
 }
 
 export function isSftpUploadRetryableError(message: string) {
@@ -16,7 +14,5 @@ export function isSftpUploadRetryableError(message: string) {
   ) {
     return false;
   }
-  return /connection|disconnect|socket|timeout|超时|无进度|网络|远程|上传|写入/i.test(
-    message,
-  );
+  return /connection|disconnect|socket|timeout|超时|无进度|网络|远程|上传|写入/i.test(message);
 }

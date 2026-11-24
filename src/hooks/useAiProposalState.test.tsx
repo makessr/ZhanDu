@@ -7,9 +7,7 @@ import type { TerminalCommandSubmission } from "../terminal-utils";
 import type { AiConversation, AiMessage } from "./useAiConversations";
 import { useAiProposalState } from "./useAiProposalState";
 
-function commandProposal(
-  status: AiCommandProposal["status"] = "pending",
-): AiCommandProposal {
+function commandProposal(status: AiCommandProposal["status"] = "pending"): AiCommandProposal {
   return {
     assessment: { canInsert: true, label: "低风险", risk: "safe" },
     command: "ls -la",
@@ -63,11 +61,7 @@ function conversation(messages: AiMessage[]): AiConversation {
 function createHarness(initial: AiConversation) {
   let current = initial;
   const updateMessages = mock(
-    (
-      _hostId: string,
-      _conversationId: string,
-      update: (messages: AiMessage[]) => AiMessage[],
-    ) => {
+    (_hostId: string, _conversationId: string, update: (messages: AiMessage[]) => AiMessage[]) => {
       current = { ...current, messages: update(current.messages) };
       return current;
     },
@@ -175,11 +169,7 @@ describe("useAiProposalState", () => {
         }),
       ),
     );
-    expect(observeCommandLifecycle).toHaveBeenCalledWith(
-      "assistant-1",
-      "command-1",
-      submission,
-    );
+    expect(observeCommandLifecycle).toHaveBeenCalledWith("assistant-1", "command-1", submission);
     expect(persistConversation).toHaveBeenCalledTimes(1);
   });
 
@@ -236,14 +226,7 @@ describe("useAiProposalState", () => {
         }),
       ),
     );
-    expect(observeCommandLifecycle).toHaveBeenCalledWith(
-      "assistant-1",
-      "command-1",
-      result,
-    );
-    expect(onCommandLifecycleProcessed).toHaveBeenCalledWith(
-      "command-1",
-      result,
-    );
+    expect(observeCommandLifecycle).toHaveBeenCalledWith("assistant-1", "command-1", result);
+    expect(onCommandLifecycleProcessed).toHaveBeenCalledWith("command-1", result);
   });
 });

@@ -5,8 +5,7 @@ export const MANAGED_SSH_KEY_PREFIX = "managed://";
 export function getSshKeySource(
   sshKey: Pick<SshKeyRecord, "source" | "privateKeyPath">,
 ): SshKeySource {
-  return sshKey.source === "managed" ||
-    sshKey.privateKeyPath.startsWith(MANAGED_SSH_KEY_PREFIX)
+  return sshKey.source === "managed" || sshKey.privateKeyPath.startsWith(MANAGED_SSH_KEY_PREFIX)
     ? "managed"
     : "file";
 }

@@ -18,11 +18,17 @@ describe("updater manifest validation", () => {
       "windows-aarch64-nsis": platform,
     });
     expect(validateUpdaterManifest(windows, "v1.2.3", repository, "windows")).toEqual([
-      "windows-x86_64-nsis", "windows-aarch64-nsis",
+      "windows-x86_64-nsis",
+      "windows-aarch64-nsis",
     ]);
-    expect(() => validateUpdaterManifest(
-      manifest({ "windows-x86_64-nsis": platform }), "v1.2.3", repository, "windows",
-    )).toThrow("缺少 Windows ARM64");
+    expect(() =>
+      validateUpdaterManifest(
+        manifest({ "windows-x86_64-nsis": platform }),
+        "v1.2.3",
+        repository,
+        "windows",
+      ),
+    ).toThrow("缺少 Windows ARM64");
   });
 
   test("accepts a complete cross-platform manifest", () => {
@@ -121,9 +127,7 @@ describe("updater manifest validation", () => {
       ),
     ).toThrow("缺少签名");
 
-    expect(() =>
-      validateUpdaterManifest(manifest({}), "v1.2.4", repository),
-    ).toThrow("版本不一致");
+    expect(() => validateUpdaterManifest(manifest({}), "v1.2.4", repository)).toThrow("版本不一致");
   });
 
   test("requires HTTPS download URLs", () => {
@@ -177,8 +181,9 @@ describe("updater manifest validation", () => {
           url: platform.url.replace(repository, otherRepository),
         },
       });
-      expect(() => validateUpdaterManifest(windows, "v1.2.3", repository, "windows"))
-        .toThrow(`下载地址必须属于发布仓库 ${repository}`);
+      expect(() => validateUpdaterManifest(windows, "v1.2.3", repository, "windows")).toThrow(
+        `下载地址必须属于发布仓库 ${repository}`,
+      );
     }
   });
 });

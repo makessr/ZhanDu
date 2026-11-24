@@ -38,10 +38,7 @@ export type AiApprovalQueueItem =
       proposal: AiFileOperationProposal;
     };
 
-export function aiApprovalRequiresUserDecision(
-  item: AiApprovalQueueItem,
-  mode: AgentApprovalMode,
-) {
+export function aiApprovalRequiresUserDecision(item: AiApprovalQueueItem, mode: AgentApprovalMode) {
   if (mode === "on_request" || item.kind === "diagnostic") return true;
   // Mirrors the backend policy: destructive commands are never auto-run.
   if (mode === "full_access") {
@@ -68,42 +65,29 @@ export function buildAiApprovalQueue(
     : messages.slice(-1);
 
   return taskMessages.flatMap((message) => {
-    const diagnosticApprovals: AiApprovalQueueItem[] = (
-      message.diagnosticPlans ?? []
-    )
-      .filter(
-        (plan) =>
-          plan.status === "pending" && plan.id === pendingDiagnosticPlanId,
-      )
+    const diagnosticApprovals: AiApprovalQueueItem[] = (message.diagnosticPlans ?? [])
+      .filter((plan) => plan.status === "pending" && plan.id === pendingDiagnosticPlanId)
       .map((plan) => ({
         kind: "diagnostic" as const,
         messageId: message.id,
         plan,
-        runs: (message.toolRuns ?? []).filter(
-          (run) => run.planId === plan.id,
-        ),
+        runs: (message.toolRuns ?? []).filter((run) => run.planId === plan.id),
       }));
-    const commandApprovals: AiApprovalQueueItem[] = (
-      message.commandProposals ?? []
-    )
+    const commandApprovals: AiApprovalQueueItem[] = (message.commandProposals ?? [])
       .filter((proposal) => BLOCKING_COMMAND_STATUSES.has(proposal.status))
       .map((proposal) => ({
         kind: "command" as const,
         messageId: message.id,
         proposal,
       }));
-    const fileEditApprovals: AiApprovalQueueItem[] = (
-      message.fileEditProposals ?? []
-    )
+    const fileEditApprovals: AiApprovalQueueItem[] = (message.fileEditProposals ?? [])
       .filter((proposal) => proposal.status === "pending")
       .map((proposal) => ({
         kind: "file-edit" as const,
         messageId: message.id,
         proposal,
       }));
-    const fileOperationApprovals: AiApprovalQueueItem[] = (
-      message.fileOperationProposals ?? []
-    )
+    const fileOperationApprovals: AiApprovalQueueItem[] = (message.fileOperationProposals ?? [])
       .filter((proposal) => proposal.status === "pending")
       .map((proposal) => ({
         kind: "file-operation" as const,

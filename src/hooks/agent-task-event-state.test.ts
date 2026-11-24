@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { PROTOCOL_VERSION, type AgentTask } from "../tauri-protocol";
-import {
-  applyAgentTaskEvent,
-  reconcileAgentTaskSync,
-} from "./agent-task-event-state";
+import { applyAgentTaskEvent, reconcileAgentTaskSync } from "./agent-task-event-state";
 
 function task(id: string, sequence: number): AgentTask {
   return {
@@ -72,12 +69,14 @@ describe("agent task event state", () => {
     expect(
       reconcileAgentTaskSync(undefined, "task-1", {
         task: snapshot,
-        events: [{
-          kind: "task_completed",
-          protocolVersion: PROTOCOL_VERSION,
-          sequence: 5,
-          task: replayed,
-        }],
+        events: [
+          {
+            kind: "task_completed",
+            protocolVersion: PROTOCOL_VERSION,
+            sequence: 5,
+            task: replayed,
+          },
+        ],
       }),
     ).toBe(replayed);
   });

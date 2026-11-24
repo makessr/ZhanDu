@@ -92,8 +92,6 @@ describe("terminal log batching", () => {
 
   test("formats connection state markers", () => {
     expect(terminalLogStatusMessage("connected")).toBe("连接成功");
-    expect(terminalLogStatusMessage("failed", "连接超时")).toBe(
-      "连接失败：连接超时",
-    );
+    expect(terminalLogStatusMessage("failed", "连接超时")).toBe("连接失败：连接超时");
   });
 });

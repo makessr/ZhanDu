@@ -1,3 +1,4 @@
+import { randomIdSuffix } from "./random-id";
 import type { QuickCommandFormValues, QuickCommandRecord } from "./models";
 
 export interface QuickCommandParameter {
@@ -5,8 +6,7 @@ export interface QuickCommandParameter {
   defaultValue?: string;
 }
 
-const QUICK_COMMAND_PARAMETER_PATTERN =
-  /\{\{\s*([^{}:]+?)\s*(?::\s*([^{}]*?))?\s*\}\}/g;
+const QUICK_COMMAND_PARAMETER_PATTERN = /\{\{\s*([^{}:]+?)\s*(?::\s*([^{}]*?))?\s*\}\}/g;
 
 export function quickCommandParameters(template: string) {
   const parameters = new Map<string, QuickCommandParameter>();
@@ -22,38 +22,30 @@ export function quickCommandParameters(template: string) {
   return [...parameters.values()];
 }
 
-export function renderQuickCommand(
-  template: string,
-  values: Record<string, string>,
-) {
+export function renderQuickCommand(template: string, values: Record<string, string>) {
   return template.replace(
     QUICK_COMMAND_PARAMETER_PATTERN,
     (_, rawName: string, rawDefaultValue?: string) => {
       const name = rawName.trim();
       const value = values[name];
-      return value === undefined || !value.trim()
-        ? rawDefaultValue?.trim() ?? ""
-        : value;
+      return value === undefined || !value.trim() ? (rawDefaultValue?.trim() ?? "") : value;
     },
   );
 }
 
-export function filterQuickCommands(
-  commands: QuickCommandRecord[],
-  query: string,
-) {
+export function filterQuickCommands(commands: QuickCommandRecord[], query: string) {
   const normalizedQuery = query.trim().toLocaleLowerCase();
   if (!normalizedQuery) return commands;
   return commands.filter((command) =>
-    [command.name, command.group, command.description, command.command].some(
-      (value) => value?.toLocaleLowerCase().includes(normalizedQuery),
+    [command.name, command.group, command.description, command.command].some((value) =>
+      value?.toLocaleLowerCase().includes(normalizedQuery),
     ),
   );
 }
 
 export function quickCommandFromForm(
   values: QuickCommandFormValues,
-  id = `command-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  id = `command-${Date.now()}-${randomIdSuffix()}`,
 ): QuickCommandRecord {
   return {
     id,

@@ -1,18 +1,6 @@
 import { useState } from "react";
-import {
-  Button,
-  Modal,
-  Tag,
-  Tooltip,
-  Typography,
-} from "@arco-design/web-react";
-import {
-  IconCommand,
-  IconCopy,
-  IconDown,
-  IconRight,
-  IconRobot,
-} from "@arco-design/web-react/icon";
+import { Button, Modal, Tag, Tooltip, Typography } from "@arco-design/web-react";
+import { IconCommand, IconCopy, IconDown, IconRight, IconRobot } from "@arco-design/web-react/icon";
 import {
   aiCommandRiskColor,
   type AiCommandProposal,
@@ -29,10 +17,7 @@ interface AiCommandProposalListProps {
   onCopyAll: (proposals: AiCommandProposal[]) => void | Promise<void>;
   onApprove: (proposal: AiCommandProposal) => void | Promise<void>;
   onReject: (proposalId: string) => unknown | Promise<unknown>;
-  onRevise: (
-    proposal: AiCommandProposal,
-    feedback: string,
-  ) => void | Promise<void>;
+  onRevise: (proposal: AiCommandProposal, feedback: string) => void | Promise<void>;
   presentation?: "approval" | "timeline";
   proposals?: AiCommandProposal[];
   queueCount?: number;
@@ -99,12 +84,8 @@ function AiCommandProposalList({
   sending,
   sessionId,
 }: AiCommandProposalListProps) {
-  const [collapsedOutputs, setCollapsedOutputs] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const [fullOutputProposalId, setFullOutputProposalId] = useState<
-    string | null
-  >(null);
+  const [collapsedOutputs, setCollapsedOutputs] = useState<Set<string>>(() => new Set());
+  const [fullOutputProposalId, setFullOutputProposalId] = useState<string | null>(null);
   if (!proposals.length && !records.length) return null;
 
   if (!proposals.length) {
@@ -138,9 +119,7 @@ function AiCommandProposalList({
   }
 
   return (
-    <div
-      className={`ai-command-proposals ai-command-proposals-${presentation}`}
-    >
+    <div className={`ai-command-proposals ai-command-proposals-${presentation}`}>
       <div className="ai-command-proposals-heading">
         <span>
           <Typography.Text bold>
@@ -172,11 +151,8 @@ function AiCommandProposalList({
           (proposal.status === "succeeded" || proposal.status === "failed") &&
           proposal.resultOutput !== undefined;
         const canAnalyze =
-          hasCapturedResult ||
-          (proposal.status === "executed" && hasRecentTerminalOutput);
-        const hasOutput =
-          proposal.resultOutput !== undefined ||
-          proposal.outputStreamsSeparated;
+          hasCapturedResult || (proposal.status === "executed" && hasRecentTerminalOutput);
+        const hasOutput = proposal.resultOutput !== undefined || proposal.outputStreamsSeparated;
         const outputCollapsed = collapsedOutputs.has(proposal.id);
         const hasFullOutput =
           proposal.resultOutputTruncated === true ||
@@ -193,21 +169,15 @@ function AiCommandProposalList({
             <div className="ai-command-proposal-heading">
               <span className="ai-command-proposal-title">
                 {presentation === "timeline" && (
-                  <span className="ai-command-proposal-index">
-                    {proposalIndex + 1}
-                  </span>
+                  <span className="ai-command-proposal-index">{proposalIndex + 1}</span>
                 )}
                 <Typography.Text bold>{proposal.purpose}</Typography.Text>
               </span>
               <span className="ai-command-proposal-tags">
-                <Tag
-                  color={aiCommandRiskColor(proposal.assessment.risk)}
-                  size="small"
-                >
+                <Tag color={aiCommandRiskColor(proposal.assessment.risk)} size="small">
                   {proposal.assessment.label}
                 </Tag>
-                {(presentation === "timeline" ||
-                  proposal.status !== "pending") && (
+                {(presentation === "timeline" || proposal.status !== "pending") && (
                   <Tag color={status.color} size="small">
                     {status.label}
                   </Tag>
@@ -222,18 +192,13 @@ function AiCommandProposalList({
                 {hostName}
                 {proposal.directory ? ` · ${proposal.directory}` : ""}
               </Typography.Text>
-              {proposal.assessment.reason &&
-                proposal.assessment.risk !== "safe" && (
-                  <Typography.Text
-                    type={
-                      proposal.assessment.risk === "danger"
-                        ? "error"
-                        : "secondary"
-                    }
-                  >
-                    {proposal.assessment.reason}
-                  </Typography.Text>
-                )}
+              {proposal.assessment.reason && proposal.assessment.risk !== "safe" && (
+                <Typography.Text
+                  type={proposal.assessment.risk === "danger" ? "error" : "secondary"}
+                >
+                  {proposal.assessment.reason}
+                </Typography.Text>
+              )}
             </div>
             {presentation === "approval" &&
               (proposal.status === "pending" ? (
@@ -290,8 +255,7 @@ function AiCommandProposalList({
               ) : null)}
             {(proposal.status === "succeeded" ||
               proposal.status === "failed" ||
-              (proposal.status === "verified" &&
-                proposal.exitCode !== undefined)) && (
+              (proposal.status === "verified" && proposal.exitCode !== undefined)) && (
               <Typography.Text
                 className="ai-command-proposal-result"
                 type={proposal.exitCode === 0 ? "success" : "error"}
@@ -308,9 +272,7 @@ function AiCommandProposalList({
                 <div className="ai-command-proposal-output-heading">
                   <Button
                     aria-expanded={!outputCollapsed}
-                    aria-label={
-                      outputCollapsed ? "展开命令输出" : "收起命令输出"
-                    }
+                    aria-label={outputCollapsed ? "展开命令输出" : "收起命令输出"}
                     icon={outputCollapsed ? <IconRight /> : <IconDown />}
                     onClick={() =>
                       setCollapsedOutputs((current) => {
@@ -361,9 +323,7 @@ function AiCommandProposalList({
                       </>
                     ) : (
                       <pre className="ai-command-proposal-live-output">
-                        <code>
-                          {proposal.resultOutput || "（命令未产生输出）"}
-                        </code>
+                        <code>{proposal.resultOutput || "（命令未产生输出）"}</code>
                       </pre>
                     )}
                   </div>
@@ -371,12 +331,8 @@ function AiCommandProposalList({
               </div>
             )}
             {proposal.status === "unavailable" && (
-              <Typography.Text
-                className="ai-command-proposal-warning"
-                type="secondary"
-              >
-                {proposal.resultUnavailableReason ??
-                  "无法可靠获取命令结束边界或退出码"}
+              <Typography.Text className="ai-command-proposal-warning" type="secondary">
+                {proposal.resultUnavailableReason ?? "无法可靠获取命令结束边界或退出码"}
               </Typography.Text>
             )}
           </div>
@@ -390,9 +346,7 @@ function AiCommandProposalList({
         visible={fullOutputProposalId !== null}
       >
         {(() => {
-          const proposal = proposals.find(
-            (item) => item.id === fullOutputProposalId,
-          );
+          const proposal = proposals.find((item) => item.id === fullOutputProposalId);
           if (!proposal) return null;
           return (
             <div className="ai-command-full-output">

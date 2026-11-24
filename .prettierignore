@@ -1,0 +1,11 @@
+dist
+node_modules
+src-tauri
+sync-server
+public
+bun.lock
+CHANGELOG.md
+README.md
+docs
+
+coverage.txt

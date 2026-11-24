@@ -429,17 +429,16 @@ fn trusted_file_execution_requires_confirmation_and_uses_private_snapshot() {
 
     assert_eq!(
         manager
-            .authorize_action_execution("task-1", "edit-1", false, false, None)
+            .authorize_action_execution("task-1", "edit-1", false, None, None)
             .unwrap_err(),
         "该 AI 动作需要本次用户审批"
     );
 
     let (action, events) = manager
-        .authorize_action_execution(
+        .authorize_action_execution_confirmed(
             "task-1",
             "edit-1",
             false,
-            true,
             Some("server { listen 443; }".to_string()),
         )
         .unwrap();
@@ -450,7 +449,7 @@ fn trusted_file_execution_requires_confirmation_and_uses_private_snapshot() {
     assert_eq!(events[1].kind, AgentTaskEventKind::ActionStarted);
     assert_eq!(events[1].task.actions[0].status, AgentActionStatus::Running);
     assert!(manager
-        .authorize_action_execution("task-1", "edit-1", false, true, None)
+        .authorize_action_execution_confirmed("task-1", "edit-1", false, None)
         .is_err());
     assert_eq!(
         manager
@@ -500,7 +499,7 @@ fn trusted_file_execution_requires_confirmation_and_uses_private_snapshot() {
         AgentVerificationStatus::Verified
     );
     let (rollback, _) = manager
-        .authorize_action_execution("task-1", "edit-1", true, true, None)
+        .authorize_action_execution_confirmed("task-1", "edit-1", true, None)
         .unwrap();
     assert_eq!(rollback.arguments["content"], "server { listen 443; }");
 }
@@ -532,7 +531,7 @@ fn terminal_commands_run_without_confirmation_in_full_access_mode() {
     manager.finish_model_turn("task-1", false).unwrap();
 
     let (action, events) = manager
-        .authorize_action_execution("task-1", "command-1", false, false, None)
+        .authorize_action_execution("task-1", "command-1", false, None, None)
         .unwrap();
     assert_eq!(
         action.execution_kind,
@@ -557,7 +556,7 @@ fn auto_safe_approves_only_commands_assessed_as_low_risk() {
         .unwrap();
     manager.finish_model_turn("task-1", false).unwrap();
     assert!(manager
-        .authorize_action_execution("task-1", "command-1", false, false, None)
+        .authorize_action_execution("task-1", "command-1", false, None, None)
         .is_ok());
 
     let manager = AgentTaskManager::default();
@@ -568,7 +567,7 @@ fn auto_safe_approves_only_commands_assessed_as_low_risk() {
     manager.finish_model_turn("task-1", false).unwrap();
     assert_eq!(
         manager
-            .authorize_action_execution("task-1", "command-1", false, false, None)
+            .authorize_action_execution("task-1", "command-1", false, None, None)
             .unwrap_err(),
         "该 AI 动作需要本次用户审批"
     );
@@ -583,7 +582,7 @@ fn terminal_command_observations_drive_the_trusted_lifecycle() {
         .unwrap();
     manager.finish_model_turn("task-1", false).unwrap();
     manager
-        .authorize_action_execution("task-1", "command-1", false, true, None)
+        .authorize_action_execution_confirmed("task-1", "command-1", false, None)
         .unwrap();
 
     let submitted = manager
@@ -687,7 +686,7 @@ fn command_progress_is_live_only_and_restart_marks_it_interrupted() {
     );
     manager.record_events(&manager.finish_model_turn("task-1", false).unwrap());
     let (_, approved) = manager
-        .authorize_action_execution("task-1", "command-1", false, true, None)
+        .authorize_action_execution_confirmed("task-1", "command-1", false, None)
         .unwrap();
     manager.record_events(&approved);
     let submitted = manager
@@ -768,7 +767,7 @@ fn cancelled_command_accepts_only_its_late_terminal_observation() {
         .unwrap();
     manager.finish_model_turn("task-1", false).unwrap();
     manager
-        .authorize_action_execution("task-1", "command-1", false, true, None)
+        .authorize_action_execution_confirmed("task-1", "command-1", false, None)
         .unwrap();
     manager
         .observe_command_execution(command_observation(AgentCommandObservationPhase::Submitted))
@@ -833,7 +832,7 @@ fn cancelled_command_restores_as_interrupted_before_late_observation() {
     );
     manager.record_events(&manager.finish_model_turn("task-1", false).unwrap());
     let (_, approved) = manager
-        .authorize_action_execution("task-1", "command-1", false, true, None)
+        .authorize_action_execution_confirmed("task-1", "command-1", false, None)
         .unwrap();
     manager.record_events(&approved);
     let submitted = manager
@@ -871,7 +870,7 @@ fn registered_business_verification_completes_a_successful_command() {
         .unwrap();
     manager.finish_model_turn("task-1", false).unwrap();
     manager
-        .authorize_action_execution("task-1", "command-1", false, true, None)
+        .authorize_action_execution_confirmed("task-1", "command-1", false, None)
         .unwrap();
     manager
         .observe_command_execution(command_observation(AgentCommandObservationPhase::Submitted))
@@ -925,7 +924,7 @@ fn repair_budget_allows_two_retries_and_then_stops() {
 
     for attempt in 0_u8..=2 {
         manager
-            .authorize_action_execution("task-1", "command-1", false, true, None)
+            .authorize_action_execution_confirmed("task-1", "command-1", false, None)
             .unwrap();
         let mut submitted = command_observation(AgentCommandObservationPhase::Submitted);
         submitted.submission_id = format!("submission-{attempt}");
@@ -1022,7 +1021,7 @@ fn trusted_rollback_records_verified_recovery_state() {
         .unwrap();
     manager.finish_model_turn("task-1", false).unwrap();
     manager
-        .authorize_action_execution("task-1", "edit-1", false, true, None)
+        .authorize_action_execution_confirmed("task-1", "edit-1", false, None)
         .unwrap();
     manager
         .complete_trusted_action_execution(
@@ -1033,7 +1032,7 @@ fn trusted_rollback_records_verified_recovery_state() {
         )
         .unwrap();
     manager
-        .authorize_action_execution("task-1", "edit-1", true, true, None)
+        .authorize_action_execution_confirmed("task-1", "edit-1", true, None)
         .unwrap();
     let events = manager
         .complete_trusted_action_execution(
@@ -1083,7 +1082,7 @@ fn terminal_command_observations_support_batched_failures_and_reject_mismatches(
         .register_actions("task-1", vec![terminal_command_intent()])
         .unwrap();
     manager
-        .authorize_action_execution("task-1", "command-1", false, true, None)
+        .authorize_action_execution_confirmed("task-1", "command-1", false, None)
         .unwrap();
 
     let mut mismatched = command_observation(AgentCommandObservationPhase::Submitted);
@@ -1123,7 +1122,7 @@ fn task_result_reports_partial_verification_for_mixed_evidence() {
     manager.finish_model_turn("task-1", false).unwrap();
 
     manager
-        .authorize_action_execution("task-1", "edit-1", false, true, None)
+        .authorize_action_execution_confirmed("task-1", "edit-1", false, None)
         .unwrap();
     manager
         .complete_trusted_action_execution(
@@ -1134,7 +1133,7 @@ fn task_result_reports_partial_verification_for_mixed_evidence() {
         )
         .unwrap();
     manager
-        .authorize_action_execution("task-1", "command-1", false, true, None)
+        .authorize_action_execution_confirmed("task-1", "command-1", false, None)
         .unwrap();
     let mut completed = command_observation(AgentCommandObservationPhase::Completed);
     completed.exit_code = Some(0);
@@ -1317,7 +1316,7 @@ fn command_timeout_pauses_task_for_explicit_recovery() {
         .unwrap();
     manager.finish_model_turn("task-1", false).unwrap();
     manager
-        .authorize_action_execution("task-1", "command-1", false, true, None)
+        .authorize_action_execution_confirmed("task-1", "command-1", false, None)
         .unwrap();
     manager
         .observe_command_execution(command_observation(AgentCommandObservationPhase::Submitted))

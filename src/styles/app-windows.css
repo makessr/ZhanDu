@@ -421,9 +421,9 @@
 
 .terminal-theme-cursor {
   display: inline-block;
-  width: .6em;
+  width: 0.6em;
   height: 1em;
-  vertical-align: -.12em;
+  vertical-align: -0.12em;
 }
 
 .terminal-theme-ansi {
@@ -928,9 +928,7 @@
 }
 
 .ssh-key-managed-content textarea {
-  font-family:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
-    monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
 .proxy-form-row {
@@ -1424,4 +1422,36 @@
   .sftp-toolbar {
     flex-wrap: wrap;
   }
+}
+
+.local-data-gate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  background: var(--color-bg-1);
+}
+
+.local-data-gate-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(420px, 100%);
+  padding: 32px;
+  border-radius: 12px;
+  background: var(--color-bg-2);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+  text-align: center;
+}
+
+.local-data-gate-icon {
+  display: flex;
+  justify-content: center;
+  font-size: 40px;
+  color: var(--color-text-3);
+}
+
+.local-data-gate-hint {
+  font-size: 12px;
 }

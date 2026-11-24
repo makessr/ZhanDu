@@ -14,9 +14,7 @@ function ConnectionStatusOverlay({
 }: ConnectionStatusOverlayProps) {
   return (
     <div
-      className={`connection-status-overlay${
-        reconnecting ? " is-reconnecting" : ""
-      }`}
+      className={`connection-status-overlay${reconnecting ? " is-reconnecting" : ""}`}
       role="alert"
     >
       <Spin
@@ -26,12 +24,7 @@ function ConnectionStatusOverlay({
         tip={
           <div className="connection-status-overlay-content">
             <span>{description}</span>
-            <Button
-              disabled={reconnecting}
-              onClick={onReconnect}
-              size="small"
-              type="primary"
-            >
+            <Button disabled={reconnecting} onClick={onReconnect} size="small" type="primary">
               {reconnecting ? "正在重连" : "重新连接"}
             </Button>
           </div>

@@ -42,21 +42,13 @@ export default function useSftpArchives({
   onRefreshDirectory,
   sessionId,
 }: SftpArchivesOptions) {
-  const [archiveDialog, setArchiveDialog] = useState<ArchiveDialogState | null>(
-    null,
-  );
+  const [archiveDialog, setArchiveDialog] = useState<ArchiveDialogState | null>(null);
   const [archiveBaseName, setArchiveBaseName] = useState("");
-  const [archiveFormat, setArchiveFormat] =
-    useState<RemoteArchiveFormat>("tarGz");
+  const [archiveFormat, setArchiveFormat] = useState<RemoteArchiveFormat>("tarGz");
 
-  function openArchiveDialog(
-    targetEntries: SftpEntry[],
-    mode: ArchiveDialogState["mode"],
-  ) {
+  function openArchiveDialog(targetEntries: SftpEntry[], mode: ArchiveDialogState["mode"]) {
     const suggestedBase =
-      targetEntries.length === 1
-        ? remoteArchiveBaseName(targetEntries[0].name)
-        : "archive";
+      targetEntries.length === 1 ? remoteArchiveBaseName(targetEntries[0].name) : "archive";
     const suggestedName = nextAvailableRemoteArchiveName(
       suggestedBase || "archive",
       "tarGz",
@@ -75,10 +67,7 @@ export default function useSftpArchives({
 
   async function submitArchiveDialog() {
     if (!archiveDialog || !sessionId || !currentDirectory) return;
-    const archiveName = remoteArchiveFileName(
-      archiveBaseName.trim(),
-      archiveFormat,
-    );
+    const archiveName = remoteArchiveFileName(archiveBaseName.trim(), archiveFormat);
     if (!isValidRemoteName(archiveName)) {
       Message.warning("请输入有效的归档文件名称");
       return;
@@ -135,10 +124,7 @@ export default function useSftpArchives({
     }
   }
 
-  async function extractRemoteArchive(
-    entry: SftpEntry,
-    createDirectory: boolean,
-  ) {
+  async function extractRemoteArchive(entry: SftpEntry, createDirectory: boolean) {
     if (!sessionId || !currentDirectory) return;
     const format = remoteArchiveFormatFromName(entry.name);
     if (!format) {
@@ -149,10 +135,7 @@ export default function useSftpArchives({
     const targetDirectory = createDirectory
       ? remoteJoinPath(currentDirectory, targetName)
       : currentDirectory;
-    if (
-      createDirectory &&
-      entries.some((candidate) => candidate.path === targetDirectory)
-    ) {
+    if (createDirectory && entries.some((candidate) => candidate.path === targetDirectory)) {
       Message.warning(`目标目录“${targetName}”已存在`);
       return;
     }
@@ -176,9 +159,7 @@ export default function useSftpArchives({
         createDirectory,
       });
       Message.success(
-        createDirectory
-          ? `已解压到 ${targetName}`
-          : `已将 ${entry.name} 解压到当前目录`,
+        createDirectory ? `已解压到 ${targetName}` : `已将 ${entry.name} 解压到当前目录`,
       );
       await onRefreshDirectory();
     } catch (error) {

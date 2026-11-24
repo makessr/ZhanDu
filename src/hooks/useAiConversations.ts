@@ -1,8 +1,6 @@
+import { randomIdSuffix } from "../random-id";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type {
-  AiCommandProposal,
-  AiCommandRecord,
-} from "../ai-command-proposals";
+import type { AiCommandProposal, AiCommandRecord } from "../ai-command-proposals";
 import {
   deleteAiConversation,
   loadAiConversations,
@@ -10,10 +8,7 @@ import {
   saveAiConversation,
   type AiConversationRecord,
 } from "../ai-conversations";
-import type {
-  AiFileChangeRecord,
-  AiFileEditProposal,
-} from "../ai-file-edits";
+import type { AiFileChangeRecord, AiFileEditProposal } from "../ai-file-edits";
 import type { AiFileOperationProposal } from "../ai-file-operations";
 import type { AiDiagnosticPlan } from "../ai-diagnostic-plans";
 import type { AiToolRun } from "../ai-tools";
@@ -68,13 +63,10 @@ function createId(prefix: string) {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return `${prefix}-${crypto.randomUUID()}`;
   }
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `${prefix}-${Date.now()}-${randomIdSuffix()}`;
 }
 
-export function createAiConversation(
-  hostId: string,
-  hostName: string,
-): AiConversation {
+export function createAiConversation(hostId: string, hostName: string): AiConversation {
   const now = new Date().toISOString();
   return {
     id: createId("ai-conversation"),
@@ -88,9 +80,7 @@ export function createAiConversation(
 }
 
 export function sortAiConversations(conversations: AiConversation[]) {
-  return [...conversations].sort((left, right) =>
-    right.updatedAt.localeCompare(left.updatedAt),
-  );
+  return [...conversations].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 }
 
 export function useAiConversations({
@@ -101,14 +91,12 @@ export function useAiConversations({
   sessionId,
   storage = DEFAULT_STORAGE,
 }: UseAiConversationsOptions) {
-  const [conversationsByHost, setConversationsByHost] = useState<
-    Record<string, AiConversation[]>
-  >({});
+  const [conversationsByHost, setConversationsByHost] = useState<Record<string, AiConversation[]>>(
+    {},
+  );
   const conversationsRef = useRef<Record<string, AiConversation[]>>({});
   const loadedHostsRef = useRef(new Set<string>());
-  const [activeConversationIds, setActiveConversationIds] = useState<
-    Record<string, string>
-  >({});
+  const [activeConversationIds, setActiveConversationIds] = useState<Record<string, string>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const persistenceWarningRef = useRef(false);
@@ -119,10 +107,7 @@ export function useAiConversations({
   onSaveErrorRef.current = onSaveError;
 
   const replaceHostConversations = useCallback(
-    (
-      targetHostId: string,
-      update: (current: AiConversation[]) => AiConversation[],
-    ) => {
+    (targetHostId: string, update: (current: AiConversation[]) => AiConversation[]) => {
       const nextHostConversations = sortAiConversations(
         update(conversationsRef.current[targetHostId] ?? []).filter(
           (conversation) => conversation.hostId === targetHostId,
@@ -159,11 +144,7 @@ export function useAiConversations({
   );
 
   const updateMessages = useCallback(
-    (
-      targetHostId: string,
-      conversationId: string,
-      update: (current: AiMessage[]) => AiMessage[],
-    ) =>
+    (targetHostId: string, conversationId: string, update: (current: AiMessage[]) => AiMessage[]) =>
       updateConversation(targetHostId, conversationId, (current) => ({
         ...current,
         messages: update(current.messages),
@@ -192,11 +173,7 @@ export function useAiConversations({
   );
 
   const activateAvailableConversation = useCallback(
-    (
-      targetHostId: string,
-      targetHostName: string,
-      targetSessionId: string,
-    ) => {
+    (targetHostId: string, targetHostName: string, targetSessionId: string) => {
       let available = conversationsRef.current[targetHostId] ?? [];
       if (!available.length) {
         available = replaceHostConversations(targetHostId, () => [
@@ -242,9 +219,7 @@ export function useAiConversations({
       .catch((error) => {
         if (disposed) return;
         loadedHostsRef.current.add(hostId);
-        replaceHostConversations(hostId, () => [
-          createAiConversation(hostId, hostName),
-        ]);
+        replaceHostConversations(hostId, () => [createAiConversation(hostId, hostName)]);
         activateAvailableConversation(hostId, hostName, sessionId);
         onLoadErrorRef.current?.(error);
       })
@@ -264,18 +239,14 @@ export function useAiConversations({
   ]);
 
   const hostConversations = hostId
-    ? (conversationsByHost[hostId] ?? []).filter(
-        (conversation) => conversation.hostId === hostId,
-      )
+    ? (conversationsByHost[hostId] ?? []).filter((conversation) => conversation.hostId === hostId)
     : [];
-  const activeConversationId = sessionId
-    ? activeConversationIds[sessionId]
-    : undefined;
+  const activeConversationId = sessionId ? activeConversationIds[sessionId] : undefined;
   const activeConversation = hostConversations.find(
     (conversation) => conversation.id === activeConversationId,
   );
   const conversationId = activeConversation?.id;
-  const draft = conversationId ? drafts[conversationId] ?? "" : "";
+  const draft = conversationId ? (drafts[conversationId] ?? "") : "";
 
   const setDraft = useCallback((conversationId: string, value: string) => {
     setDrafts((current) => ({ ...current, [conversationId]: value }));
@@ -298,9 +269,7 @@ export function useAiConversations({
   const selectConversation = useCallback(
     (conversationId: string) => {
       if (!sessionId) return;
-      const available = hostId
-        ? conversationsRef.current[hostId] ?? []
-        : [];
+      const available = hostId ? (conversationsRef.current[hostId] ?? []) : [];
       if (!available.some((item) => item.id === conversationId)) return;
       setActiveConversationIds((current) => ({
         ...current,

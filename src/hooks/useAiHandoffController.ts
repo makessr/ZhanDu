@@ -38,10 +38,7 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function aiHandoffTargetError(
-  activeSession: TerminalSession | null,
-  sessionId: string,
-) {
+export function aiHandoffTargetError(activeSession: TerminalSession | null, sessionId: string) {
   if (!activeSession) return "请先打开终端会话";
   if (activeSession.id !== sessionId) {
     return "当前会话已切换，请重新选择要分析的内容";
@@ -89,8 +86,7 @@ export default function useAiHandoffController({
   }, []);
 
   const isCurrentHandoff = useCallback(
-    (key: string, revision: number) =>
-      handoffRevisionRef.current.get(key) === revision,
+    (key: string, revision: number) => handoffRevisionRef.current.get(key) === revision,
     [],
   );
 
@@ -133,23 +129,16 @@ export default function useAiHandoffController({
       }
       const source = { ...request.source, content };
       const currentSources = businessContextsRef.current[sessionId] ?? [];
-      const previousSource = currentSources.find(
-        (item) => item.id === source.id,
-      );
+      const previousSource = currentSources.find((item) => item.id === source.id);
       const transactionKey = `business:${sessionId}:${source.id}`;
       const revision = beginHandoff([transactionKey]);
       const nextContexts = {
         ...businessContextsRef.current,
-        [sessionId]: [
-          ...currentSources.filter((item) => item.id !== source.id),
-          source,
-        ],
+        [sessionId]: [...currentSources.filter((item) => item.id !== source.id), source],
       };
       businessContextsRef.current = nextContexts;
       setBusinessContexts(nextContexts);
-      const opened = await revealAssistant(sessionId, request.prompt, [
-        source.id,
-      ]);
+      const opened = await revealAssistant(sessionId, request.prompt, [source.id]);
       if (!opened && isCurrentHandoff(transactionKey, revision)) {
         const current = businessContextsRef.current[sessionId] ?? [];
         const restored = current.filter((item) => item.id !== source.id);
@@ -194,11 +183,9 @@ export default function useAiHandoffController({
       };
       terminalSelectionsRef.current = nextSelections;
       setTerminalSelections(nextSelections);
-      const opened = await revealAssistant(
-        sessionId,
-        "请解释这段终端输出，并给出排查建议。",
-        ["terminal-selection"],
-      );
+      const opened = await revealAssistant(sessionId, "请解释这段终端输出，并给出排查建议。", [
+        "terminal-selection",
+      ]);
       if (!opened && isCurrentHandoff(transactionKey, revision)) {
         const rolledBackSelections = { ...terminalSelectionsRef.current };
         if (previousSelection === undefined) {
@@ -231,12 +218,8 @@ export default function useAiHandoffController({
         return false;
       }
       const currentFiles = remoteFileContextsRef.current[sessionId] ?? [];
-      const previousFiles = new Map(
-        currentFiles.map((file) => [file.path, file]),
-      );
-      const transactionKeys = files.map(
-        (file) => `remote-file:${sessionId}:${file.path}`,
-      );
+      const previousFiles = new Map(currentFiles.map((file) => [file.path, file]));
+      const transactionKeys = files.map((file) => `remote-file:${sessionId}:${file.path}`);
       const revision = beginHandoff(transactionKeys);
       let nextFiles: AiRemoteFileContext[];
       try {
@@ -260,15 +243,13 @@ export default function useAiHandoffController({
       if (!opened) {
         const incomingPaths = new Set(
           files
-            .filter((_, index) =>
-              isCurrentHandoff(transactionKeys[index]!, revision),
-            )
+            .filter((_, index) => isCurrentHandoff(transactionKeys[index]!, revision))
             .map((file) => file.path),
         );
         if (incomingPaths.size) {
-          const restoredFiles = (
-            remoteFileContextsRef.current[sessionId] ?? []
-          ).filter((file) => !incomingPaths.has(file.path));
+          const restoredFiles = (remoteFileContextsRef.current[sessionId] ?? []).filter(
+            (file) => !incomingPaths.has(file.path),
+          );
           for (const path of incomingPaths) {
             const previousFile = previousFiles.get(path);
             if (previousFile) restoredFiles.push(previousFile);

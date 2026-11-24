@@ -1,10 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { ServerProcess } from "./models";
-import {
-  filterServerProcesses,
-  formatProcessElapsed,
-  formatProcessPercent,
-} from "./process-utils";
+import { filterServerProcesses, formatProcessElapsed, formatProcessPercent } from "./process-utils";
 
 const processes: ServerProcess[] = [
   {

@@ -30,6 +30,8 @@ v0.6.2 已在栈渡仓库公开，v0.6.1 已在 FineShell 仓库公开。已安�
 
 GitHub Actions 需要配置仓库密钥 `TAURI_SIGNING_PRIVATE_KEY`，用于生成可由客户端验证的更新签名。工作流使用仓库提供的 `GITHUB_TOKEN` 创建发布 PR、Release 和构建产物，无需额外访问令牌。
 
+签名密钥放在名为 `release` 的 GitHub Environment 中（`Release` 工作流的构建作业声明了 `environment: release`），并为该环境配置必需的审核人和仅允许 `main` 分支的部署规则，避免其他分支的构建读取签名私钥。
+
 如果签名私钥受密码保护，同时配置 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。仓库变量 `FINESHELL_RELEASE_PLATFORMS` 可设为 `windows`，仅发布 Windows x64 和 ARM64，校验阶段也会使用相同的平台范围。默认值 `all` 保留完整平台矩阵。
 
 仓库的 Actions 设置需要允许 GitHub Actions 创建 Pull Request。`main` 分支保护继续负责审核发布 PR，工作流不会直接向 `main` 提交。
@@ -108,6 +110,10 @@ v0.6.3 已在栈渡独立渠道公开。公开更新清单与签名草稿的 SHA
 从公开的 v0.6.2 安装包起步，Windows x64 和 ARM64、macOS Apple Silicon 和 Intel，以及 Debian 12、13 XFCE 的 x64 和 ARM64 均通过应用内升级。各环境均检查重启后的版本和测试配置标记。Windows 双架构还能用原先保存的密码和加密私钥重新连接本地 SSH 测试主机。Debian 容器核对了更新后安装包的 CA 证书依赖。[八项正式渠道升级记录](https://github.com/makessr/ZhanDu/actions/runs/44673891037)
 
 ## Windows 桌面验收
+
+中文版 Windows 安装包在 Release 中使用 `ZhanDu_` 前缀。验收时分别检查 NSIS 安装和卸载向导、MSI 安装向导及 Windows 已安装应用的名称。覆盖安装测试应从旧版同格式的安装包开始，并检查自选安装目录、原有配置与凭据、快捷方式和卸载记录。Windows 自定义模板保留了历史安装注册表路径和 MSI UpgradeCode，升级 Tauri CLI 时应对照上游模板检查这些兼容逻辑。
+
+首次全局安装默认使用 `C:\Program Files\栈渡`。OTA 脚本显式传入临时安装目录，以兼容旧版 `fineshell.exe` 和新版 `ZhanDu.exe` 的升级测试。
 
 在安装了 WebView2、Node.js 26、Bun、Rust MSVC 工具链和 Windows 原生 Perl（如 Strawberry Perl）的测试机上运行。Perl 用于编译随 Windows 客户端构建的 OpenSSL。先在仓库安装 Bun 前端依赖和 `sync-server` 的 npm 依赖。为 SSH 测试另装 `ssh2`，传入其入口文件，测试会使用本地回环地址和合成凭据。
 

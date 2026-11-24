@@ -1,11 +1,5 @@
 import { Button, Dropdown, Menu, Modal, Space, Tooltip } from "@arco-design/web-react";
-import {
-  IconCopy,
-  IconDelete,
-  IconEdit,
-  IconLink,
-  IconMore,
-} from "@arco-design/web-react/icon";
+import { IconCopy, IconDelete, IconEdit, IconLink, IconMore } from "@arco-design/web-react/icon";
 import type { HostRecord } from "../models";
 
 interface HostActionsProps {
@@ -17,14 +11,7 @@ interface HostActionsProps {
   onEdit: (host: HostRecord) => void;
 }
 
-function HostActions({
-  disabled,
-  host,
-  onConnect,
-  onCopy,
-  onDelete,
-  onEdit,
-}: HostActionsProps) {
+function HostActions({ disabled, host, onConnect, onCopy, onDelete, onEdit }: HostActionsProps) {
   return (
     <Space size="mini">
       <Button

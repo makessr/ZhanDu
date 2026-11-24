@@ -27,9 +27,7 @@ describe("AI task recovery", () => {
 
   test("only exposes the recovery card for interrupted statuses", () => {
     expect(agentTaskNeedsRecovery({ status: "paused" } as AgentTask)).toBe(true);
-    expect(
-      agentTaskNeedsRecovery({ status: "paused_disconnected" } as AgentTask),
-    ).toBe(true);
+    expect(agentTaskNeedsRecovery({ status: "paused_disconnected" } as AgentTask)).toBe(true);
     expect(agentTaskNeedsRecovery({ status: "failed" } as AgentTask)).toBe(false);
   });
 
@@ -45,9 +43,7 @@ describe("AI task recovery", () => {
   test("detects commands whose remote process may outlive the task", () => {
     const task = (phase: string | null) =>
       ({
-        actions: [
-          { commandExecution: phase === null ? null : { phase } },
-        ],
+        actions: [{ commandExecution: phase === null ? null : { phase } }],
       }) as unknown as AgentTask;
     expect(agentTaskMayHaveRunningCommand(task("interrupted"))).toBe(true);
     expect(agentTaskMayHaveRunningCommand(task("cancelling"))).toBe(true);

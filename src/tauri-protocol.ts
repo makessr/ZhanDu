@@ -1,10 +1,5 @@
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
-import {
-  emitTo,
-  listen,
-  type Event,
-  type UnlistenFn,
-} from "@tauri-apps/api/event";
+import { emitTo, listen, type Event, type UnlistenFn } from "@tauri-apps/api/event";
 import contract from "../protocol/contract.json";
 import type { AppSettings } from "./app-settings";
 import type { PortForwardStatus } from "./models";
@@ -22,20 +17,13 @@ export type AgentPlanStatus = keyof typeof contract.agentPlanStatuses;
 export type AgentApprovalMode = keyof typeof contract.agentApprovalModes;
 export type AgentActionRisk = keyof typeof contract.agentActionRisks;
 export type AgentActionStatus = keyof typeof contract.agentActionStatuses;
-export type AgentCommandExecutionPhase =
-  keyof typeof contract.agentCommandExecutionPhases;
-export type AgentActionTransition =
-  keyof typeof contract.agentActionTransitions;
-export type AgentTaskRecoveryDecision =
-  "continue_analysis" | "retry" | "finish";
-export type AgentVerificationStatus =
-  keyof typeof contract.agentVerificationStatuses;
-export type AgentVerificationEvidenceKind =
-  keyof typeof contract.agentVerificationEvidenceKinds;
-export type AgentRepairStopReason =
-  keyof typeof contract.agentRepairStopReasons;
-export type AgentRecoveryRecommendation =
-  keyof typeof contract.agentRecoveryRecommendations;
+export type AgentCommandExecutionPhase = keyof typeof contract.agentCommandExecutionPhases;
+export type AgentActionTransition = keyof typeof contract.agentActionTransitions;
+export type AgentTaskRecoveryDecision = "continue_analysis" | "retry" | "finish";
+export type AgentVerificationStatus = keyof typeof contract.agentVerificationStatuses;
+export type AgentVerificationEvidenceKind = keyof typeof contract.agentVerificationEvidenceKinds;
+export type AgentRepairStopReason = keyof typeof contract.agentRepairStopReasons;
+export type AgentRecoveryRecommendation = keyof typeof contract.agentRecoveryRecommendations;
 export type AgentRecoveryStatus = keyof typeof contract.agentRecoveryStatuses;
 
 export interface CommandErrorPayload {
@@ -403,9 +391,11 @@ interface EventPayloadMap {
   "ai-complete": AiCompletePayload;
   "ai-task": AgentTaskEventPayload;
   "configuration:changed": undefined;
-  "host-sync:request": { resolution?: { snapshot: string; choices: Record<string, boolean> }; recover?: boolean; manual?: boolean };
+  "host-sync:request": import("./host-sync").SyncOptions;
+  "host-sync:status": { status: import("./host-sync").HostSyncStatus; requestId?: string };
   "settings:changed": AppSettings;
   "appearance:preview": AppSettings["appearanceMode"] | null;
+  "local-encryption:changed": undefined;
   "menu-select-all": MenuSelectAllPayload;
 }
 
@@ -509,8 +499,7 @@ export function normalizeCommandError(
         message,
         retryable: error.retryable === true,
         operation:
-          typeof error.operation === "string" &&
-          error.operation in contract.commands
+          typeof error.operation === "string" && error.operation in contract.commands
             ? (error.operation as TauriCommand)
             : operation,
         context: isRecord(error.context) ? error.context : undefined,
@@ -550,16 +539,13 @@ export function listenProtocolEvent<E extends TauriEvent>(
 export function emitProtocolEventTo<E extends TauriEvent>(
   target: string,
   event: E,
-  ...payload: EventPayloadMap[E] extends undefined
-    ? []
-    : [payload: EventPayloadMap[E]]
+  ...payload: EventPayloadMap[E] extends undefined ? [] : [payload: EventPayloadMap[E]]
 ) {
   return emitTo(target, event, payload[0]);
 }
 
 export async function verifyProtocolVersion() {
-  const result =
-    await invokeProtocolCommand<ProtocolVersionResult>("protocol_version");
+  const result = await invokeProtocolCommand<ProtocolVersionResult>("protocol_version");
   if (result.version !== PROTOCOL_VERSION) {
     throw new FineShellCommandError({
       code: "unsupported",

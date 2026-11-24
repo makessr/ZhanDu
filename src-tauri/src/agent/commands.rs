@@ -1,3 +1,5 @@
+#![allow(deprecated)] // from_message 兼容层，待内部模块改为结构化错误后移除。
+
 use super::*;
 
 pub(crate) fn emit_task_events(app: &AppHandle, events: Vec<AgentTaskEvent>) {

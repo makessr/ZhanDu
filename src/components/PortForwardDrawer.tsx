@@ -1,4 +1,5 @@
 import { WorkspaceToolSurface } from "./WorkspaceToolPanel";
+import { useResizableColumns } from "./ResizableTableColumns";
 import { useMemo, useState } from "react";
 import {
   Button,
@@ -11,15 +12,9 @@ import {
   Typography,
 } from "@arco-design/web-react";
 import type { TableColumnProps } from "@arco-design/web-react";
-import {
-  IconPause,
-  IconPlayArrow,
-} from "@arco-design/web-react/icon";
+import { IconPause, IconPlayArrow } from "@arco-design/web-react/icon";
 import { diagnosticInvoke as invoke } from "../diagnostics";
-import {
-  commandErrorMessage,
-  type TauriCommand,
-} from "../tauri-protocol";
+import { commandErrorMessage, type TauriCommand } from "../tauri-protocol";
 import type {
   DynamicPortForwardRule,
   LocalPortForwardRule,
@@ -31,9 +26,7 @@ import { isTerminalSessionOperational } from "../terminal-utils";
 
 type ForwardKind = "local" | "remote" | "dynamic";
 type RuntimeForwardRule = (
-  | LocalPortForwardRule
-  | RemotePortForwardRule
-  | DynamicPortForwardRule
+  LocalPortForwardRule | RemotePortForwardRule | DynamicPortForwardRule
 ) & {
   kind: ForwardKind;
 };
@@ -94,11 +87,7 @@ function PortForwardDrawer({
     [session.host.dynamicPortForwards],
   );
   const rules =
-    activeKind === "local"
-      ? localRules
-      : activeKind === "remote"
-        ? remoteRules
-        : dynamicRules;
+    activeKind === "local" ? localRules : activeKind === "remote" ? remoteRules : dynamicRules;
   const statusByRuleKey = useMemo(
     () =>
       new Map(
@@ -111,24 +100,21 @@ function PortForwardDrawer({
   );
   const connected = isTerminalSessionOperational(session.status);
 
-  const changeRuntimeStatus = async (
-    rule: RuntimeForwardRule,
-    running: boolean,
-  ) => {
+  const changeRuntimeStatus = async (rule: RuntimeForwardRule, running: boolean) => {
     const key = statusKey(rule.kind, rule.id);
     setPendingRuleKey(key);
     try {
       const command: TauriCommand = running
-        ? {
+        ? ({
             local: "ssh_stop_local_forward",
             remote: "ssh_stop_remote_forward",
             dynamic: "ssh_stop_dynamic_forward",
-          }[rule.kind] as TauriCommand
-        : {
+          }[rule.kind] as TauriCommand)
+        : ({
             local: "ssh_start_local_forward",
             remote: "ssh_start_remote_forward",
             dynamic: "ssh_start_dynamic_forward",
-          }[rule.kind] as TauriCommand;
+          }[rule.kind] as TauriCommand);
       const status = running
         ? await invoke<PortForwardStatus>(command, {
             sessionId: session.id,
@@ -150,13 +136,13 @@ function PortForwardDrawer({
     {
       dataIndex: "name",
       title: "名称",
+      width: 210,
       render: (name: string) => (
-        <Typography.Text ellipsis={{ showTooltip: true }}>
-          {name}
-        </Typography.Text>
+        <Typography.Text ellipsis={{ showTooltip: true }}>{name}</Typography.Text>
       ),
     },
     {
+      key: "bind",
       title:
         activeKind === "remote"
           ? "远程监听"
@@ -170,21 +156,19 @@ function PortForwardDrawer({
       ? []
       : [
           {
+            key: "target",
             title: activeKind === "local" ? "远端目标" : "本地目标",
             width: 160,
             render: (_: unknown, rule: RuntimeForwardRule) =>
-              "targetAddress" in rule
-                ? endpoint(rule.targetAddress, rule.targetPort)
-                : "-",
+              "targetAddress" in rule ? endpoint(rule.targetAddress, rule.targetPort) : "-",
           },
         ]),
     {
+      key: "status",
       title: "状态",
       width: 96,
       render: (_, rule) => {
-        const status = statusByRuleKey.get(
-          statusKey(rule.kind, rule.id),
-        ) ?? {
+        const status = statusByRuleKey.get(statusKey(rule.kind, rule.id)) ?? {
           ruleId: rule.id,
           kind: rule.kind,
           status: "stopped" as const,
@@ -193,14 +177,11 @@ function PortForwardDrawer({
         };
         const meta = STATUS_META[status.status];
         const tag = <Tag color={meta.color}>{meta.label}</Tag>;
-        return status.error ? (
-          <Tooltip content={status.error}>{tag}</Tooltip>
-        ) : (
-          tag
-        );
+        return status.error ? <Tooltip content={status.error}>{tag}</Tooltip> : tag;
       },
     },
     {
+      key: "actions",
       title: "操作",
       width: 64,
       render: (_, rule) => {
@@ -222,6 +203,7 @@ function PortForwardDrawer({
       },
     },
   ];
+  const tunnelTable = useResizableColumns(columns);
 
   return (
     <WorkspaceToolSurface
@@ -245,21 +227,18 @@ function PortForwardDrawer({
       </Tabs>
       <Table
         border={false}
-        columns={columns}
+        columns={tunnelTable.columns}
         data={rules}
         noDataElement={
           <Empty
             description={`暂无${
-              activeKind === "local"
-                ? "本地"
-                : activeKind === "remote"
-                  ? "远程"
-                  : "动态"
+              activeKind === "local" ? "本地" : activeKind === "remote" ? "远程" : "动态"
             }端口转发规则`}
           />
         }
         pagination={false}
         rowKey={(rule) => statusKey(rule.kind, rule.id)}
+        scroll={{ x: tunnelTable.tableWidth }}
         size="small"
       />
     </WorkspaceToolSurface>

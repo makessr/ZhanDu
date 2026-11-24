@@ -38,9 +38,7 @@ const ITEMS: AiFileChangeReviewItem[] = [
 ];
 
 function ReviewHarness() {
-  const [activeKey, setActiveKey] = useState<AiFileChangeReviewItem["key"]>(
-    "edit:edit-1",
-  );
+  const [activeKey, setActiveKey] = useState<AiFileChangeReviewItem["key"]>("edit:edit-1");
   return (
     <AiFileChangeReviewModals
       activeKey={activeKey}
@@ -70,8 +68,9 @@ describe("AiFileChangeReviewModals", () => {
     fireEvent.click(screen.getByRole("button", { name: /worker\.ts/ }));
 
     expect(screen.getByText("2 / 2")).not.toBeNull();
-    expect(document.querySelector(".ai-file-edit-review-heading")?.textContent)
-      .toContain("新建文件");
+    expect(document.querySelector(".ai-file-edit-review-heading")?.textContent).toContain(
+      "新建文件",
+    );
     expect(screen.getByText("原文件")).not.toBeNull();
     expect(screen.getByText("建议文件")).not.toBeNull();
   });

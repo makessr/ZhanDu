@@ -1,3 +1,4 @@
+import { randomIdSuffix } from "./random-id";
 import type { TerminalCommandHistoryRecord } from "./models";
 
 export const MAX_TERMINAL_COMMAND_HISTORY_PER_HOST = 500;
@@ -39,9 +40,7 @@ export function sanitizeTerminalCommandHistoryRecord(
   }
   const cwd = nonEmptyString(value.cwd);
   const useCount =
-    typeof value.useCount === "number" &&
-    Number.isSafeInteger(value.useCount) &&
-    value.useCount > 0
+    typeof value.useCount === "number" && Number.isSafeInteger(value.useCount) && value.useCount > 0
       ? Math.min(value.useCount, Number.MAX_SAFE_INTEGER)
       : 1;
   return {
@@ -62,10 +61,7 @@ export function applyTerminalCommandHistoryPolicy(
   const sorted = [...records]
     .map(sanitizeTerminalCommandHistoryRecord)
     .filter((record): record is TerminalCommandHistoryRecord => Boolean(record))
-    .sort(
-      (left, right) =>
-        Date.parse(right.lastUsedAt) - Date.parse(left.lastUsedAt),
-    );
+    .sort((left, right) => Date.parse(right.lastUsedAt) - Date.parse(left.lastUsedAt));
 
   for (const record of sorted) {
     const key = `${record.hostId}\u0000${record.command}`;
@@ -95,13 +91,9 @@ export function recordTerminalCommand(
     return applyTerminalCommandHistoryPolicy(records);
   }
 
-  const existing = records.find(
-    (record) => record.hostId === hostId && record.command === command,
-  );
+  const existing = records.find((record) => record.hostId === hostId && record.command === command);
   const next: TerminalCommandHistoryRecord = {
-    id:
-      existing?.id ??
-      `terminal-history-${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
+    id: existing?.id ?? `terminal-history-${now.getTime()}-${randomIdSuffix()}`,
     hostId,
     command,
     ...(input.cwd?.startsWith("/") ? { cwd: input.cwd.slice(0, 4_096) } : {}),
@@ -133,7 +125,5 @@ export function findTerminalHistoryCompletion(
     return Date.parse(right.lastUsedAt) - Date.parse(left.lastUsedAt);
   });
   const command = candidates[0]?.command;
-  return command
-    ? { command, suffix: command.slice(input.commandLine.length) }
-    : undefined;
+  return command ? { command, suffix: command.slice(input.commandLine.length) } : undefined;
 }

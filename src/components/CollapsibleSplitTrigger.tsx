@@ -1,8 +1,5 @@
 import type { ReactNode } from "react";
-import {
-  IconDragDot,
-  IconDragDotVertical,
-} from "@arco-design/web-react/icon";
+import { IconDragDot, IconDragDotVertical } from "@arco-design/web-react/icon";
 
 interface CollapsibleSplitTriggerProps {
   direction: "horizontal" | "vertical";

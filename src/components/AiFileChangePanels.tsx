@@ -1,17 +1,5 @@
-import {
-  Button,
-  Space,
-  Tag,
-  Tooltip,
-  Typography,
-} from "@arco-design/web-react";
-import {
-  IconDelete,
-  IconEdit,
-  IconFile,
-  IconPlus,
-  IconUndo,
-} from "@arco-design/web-react/icon";
+import { Button, Space, Tag, Tooltip, Typography } from "@arco-design/web-react";
+import { IconDelete, IconEdit, IconFile, IconPlus, IconUndo } from "@arco-design/web-react/icon";
 import type {
   AiFileChangeRecord,
   AiFileEditProposal,
@@ -43,10 +31,7 @@ interface AiFileChangePanelsProps {
   operationProposals?: AiFileOperationProposal[];
 }
 
-export function aiFileProposalStatus(
-  status: AiFileEditProposalStatus,
-  reviewed = false,
-) {
+export function aiFileProposalStatus(status: AiFileEditProposalStatus, reviewed = false) {
   switch (status) {
     case "applied":
       return { color: "green", label: "已应用" };
@@ -108,9 +93,7 @@ function AiFileEditProposalPanel({
   const applied = proposals.filter(
     (proposal) => proposal.status === "applied" && proposal.appliedFile,
   );
-  const rolledBack = proposals.filter(
-    (proposal) => proposal.status === "rolled-back",
-  );
+  const rolledBack = proposals.filter((proposal) => proposal.status === "rolled-back");
   const allReviewed = pending.every((proposal) => proposal.reviewed);
   const statusSummary = [
     pending.length ? `待处理 ${pending.length}` : "",
@@ -132,13 +115,7 @@ function AiFileEditProposalPanel({
         </span>
         <Space size={2}>
           {pending.length > 1 && (
-            <Tooltip
-              content={
-                allReviewed
-                  ? "逐个检查冲突后应用"
-                  : "请先查看每个待应用文件的差异"
-              }
-            >
+            <Tooltip content={allReviewed ? "逐个检查冲突后应用" : "请先查看每个待应用文件的差异"}>
               <Button
                 disabled={!allReviewed || applying}
                 onClick={() => onApplyAll(proposals)}
@@ -171,9 +148,7 @@ function AiFileEditProposalPanel({
             </div>
             <div className="ai-file-edit-card-main">
               <div className="ai-file-edit-card-heading">
-                <Typography.Text bold>
-                  {proposal.originalFile.name}
-                </Typography.Text>
+                <Typography.Text bold>{proposal.originalFile.name}</Typography.Text>
                 <Tag color={status.color} size="small">
                   {status.label}
                 </Tag>
@@ -187,10 +162,7 @@ function AiFileEditProposalPanel({
                 {proposal.originalFile.path}
               </Typography.Text>
               {(proposal.error || proposal.rollbackError) && (
-                <Typography.Text
-                  className="ai-file-edit-card-error"
-                  type="error"
-                >
+                <Typography.Text className="ai-file-edit-card-error" type="error">
                   {proposal.rollbackError ?? proposal.error}
                 </Typography.Text>
               )}
@@ -275,18 +247,13 @@ function AiFileOperationProposalPanel({
         <span className="ai-file-edit-proposals-summary">
           <Typography.Text bold>文件操作</Typography.Text>
           <Typography.Text type="secondary">
-            {proposals.length} 项
-            {pending.length ? ` · 待处理 ${pending.length}` : ""}
+            {proposals.length} 项{pending.length ? ` · 待处理 ${pending.length}` : ""}
             {applied.length ? ` · 已应用 ${applied.length}` : ""}
           </Typography.Text>
         </span>
         <Space size={2}>
           {pending.length > 1 && (
-            <Tooltip
-              content={
-                allReviewed ? "逐项检查冲突后执行" : "请先审阅每个文件操作"
-              }
-            >
+            <Tooltip content={allReviewed ? "逐项检查冲突后执行" : "请先审阅每个文件操作"}>
               <Button
                 disabled={!allReviewed || applying}
                 onClick={() => onApplyAll(proposals)}
@@ -315,9 +282,7 @@ function AiFileOperationProposalPanel({
         const summary = aiFileOperationLineSummary(proposal);
         return (
           <div className="ai-file-edit-card" key={proposal.id}>
-            <div className="ai-file-edit-card-icon">
-              {fileOperationIcon(proposal.operation)}
-            </div>
+            <div className="ai-file-edit-card-icon">{fileOperationIcon(proposal.operation)}</div>
             <div className="ai-file-edit-card-main">
               <div className="ai-file-edit-card-heading">
                 <Typography.Text bold>
@@ -332,31 +297,20 @@ function AiFileOperationProposalPanel({
                 className="ai-file-edit-card-path"
                 ellipsis
                 title={
-                  proposal.targetPath
-                    ? `${proposal.path} → ${proposal.targetPath}`
-                    : proposal.path
+                  proposal.targetPath ? `${proposal.path} → ${proposal.targetPath}` : proposal.path
                 }
                 type="secondary"
               >
-                {proposal.targetPath
-                  ? `${proposal.path} → ${proposal.targetPath}`
-                  : proposal.path}
+                {proposal.targetPath ? `${proposal.path} → ${proposal.targetPath}` : proposal.path}
               </Typography.Text>
               {(summary.addedLines > 0 || summary.removedLines > 0) && (
                 <Typography.Text type="secondary">
-                  <span className="ai-file-lines-added">
-                    +{summary.addedLines}
-                  </span>{" "}
-                  <span className="ai-file-lines-removed">
-                    -{summary.removedLines}
-                  </span>
+                  <span className="ai-file-lines-added">+{summary.addedLines}</span>{" "}
+                  <span className="ai-file-lines-removed">-{summary.removedLines}</span>
                 </Typography.Text>
               )}
               {(proposal.error || proposal.rollbackError) && (
-                <Typography.Text
-                  className="ai-file-edit-card-error"
-                  type="error"
-                >
+                <Typography.Text className="ai-file-edit-card-error" type="error">
                   {proposal.rollbackError ?? proposal.error}
                 </Typography.Text>
               )}
@@ -418,31 +372,22 @@ function AiFileChangeHistory({ changes }: { changes: AiFileChangeRecord[] }) {
     <div className="ai-file-change-history">
       <div className="ai-file-change-history-heading">
         <Typography.Text bold>变更记录</Typography.Text>
-        <Typography.Text type="secondary">
-          仅保留文件名和行数统计
-        </Typography.Text>
+        <Typography.Text type="secondary">仅保留文件名和行数统计</Typography.Text>
       </div>
       {changes.map((change) => {
         const status = fileChangeStatus(change);
         const label = fileChangeLabel(change);
-        const target = change.targetFileName
-          ? ` → ${change.targetFileName}`
-          : "";
+        const target = change.targetFileName ? ` → ${change.targetFileName}` : "";
         return (
           <div className="ai-file-change-history-item" key={change.id}>
             <IconFile />
-            <Typography.Text
-              ellipsis
-              title={`${label} ${change.fileName}${target}`}
-            >
+            <Typography.Text ellipsis title={`${label} ${change.fileName}${target}`}>
               {label} · {change.fileName}
               {target}
             </Typography.Text>
             <Typography.Text type="secondary">
               <span className="ai-file-lines-added">+{change.addedLines}</span>{" "}
-              <span className="ai-file-lines-removed">
-                -{change.removedLines}
-              </span>
+              <span className="ai-file-lines-removed">-{change.removedLines}</span>
             </Typography.Text>
             <Tag color={status.color} size="small">
               {status.label}

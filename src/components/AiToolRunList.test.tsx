@@ -35,9 +35,7 @@ describe("AiToolRunList", () => {
 
     expect(screen.getByText("已完成 · 1.3 秒")).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "展开诊断结果" }));
-    fireEvent.click(
-      screen.getByRole("button", { name: "将诊断摘要加入下一次提问" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "将诊断摘要加入下一次提问" }));
 
     expect(onToggle).toHaveBeenCalledWith("message-1:tool-1:0");
     expect(onAddToDraft).toHaveBeenCalledWith(RUN);

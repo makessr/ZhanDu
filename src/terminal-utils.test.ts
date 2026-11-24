@@ -37,36 +37,20 @@ describe("terminal clipboard shortcuts", () => {
 
   test("maps Ctrl+V to paste for Windows clipboard history", () => {
     expect(isWindowsTerminalPasteShortcut(pasteEvent, "Win32")).toBe(true);
-    expect(
-      isWindowsTerminalPasteShortcut({ ...pasteEvent, key: "V" }, "Win64"),
-    ).toBe(true);
+    expect(isWindowsTerminalPasteShortcut({ ...pasteEvent, key: "V" }, "Win64")).toBe(true);
   });
 
   test("preserves terminal key semantics on other platforms", () => {
     expect(isWindowsTerminalPasteShortcut(pasteEvent, "MacIntel")).toBe(false);
-    expect(
-      isWindowsTerminalPasteShortcut(pasteEvent, "Linux x86_64"),
-    ).toBe(false);
-    expect(
-      isWindowsTerminalPasteShortcut(
-        { ...pasteEvent, shiftKey: true },
-        "Win32",
-      ),
-    ).toBe(false);
-    expect(
-      isWindowsTerminalPasteShortcut(
-        { ...pasteEvent, type: "keyup" },
-        "Win32",
-      ),
-    ).toBe(false);
+    expect(isWindowsTerminalPasteShortcut(pasteEvent, "Linux x86_64")).toBe(false);
+    expect(isWindowsTerminalPasteShortcut({ ...pasteEvent, shiftKey: true }, "Win32")).toBe(false);
+    expect(isWindowsTerminalPasteShortcut({ ...pasteEvent, type: "keyup" }, "Win32")).toBe(false);
   });
 });
 
 describe("decodeSshOutput", () => {
   test("decodes unpadded SSH output without changing bytes", () => {
-    expect(Array.from(decodeSshOutput("AAEC/4A"))).toEqual([
-      0, 1, 2, 255, 128,
-    ]);
+    expect(Array.from(decodeSshOutput("AAEC/4A"))).toEqual([0, 1, 2, 255, 128]);
   });
 });
 
@@ -142,19 +126,17 @@ describe("terminal input tracking", () => {
   });
 
   test("does not report input after cursor control sequences", () => {
-    let result = trackTerminalInput(
-      EMPTY_TERMINAL_INPUT_STATE,
-      "echo test\u001b[Dchanged",
-    );
+    let result = trackTerminalInput(EMPTY_TERMINAL_INPUT_STATE, "echo test\u001b[Dchanged");
     result = trackTerminalInput(result.state, "\r");
     expect(result.submissions).toEqual([]);
     expect(result.state).toEqual(EMPTY_TERMINAL_INPUT_STATE);
   });
 
   test("consumes only an exact AI-inserted command candidate", () => {
-    expect(
-      consumeTerminalCommandCandidate(["pwd", "whoami"], "whoami"),
-    ).toEqual({ candidates: ["pwd"], matched: true });
+    expect(consumeTerminalCommandCandidate(["pwd", "whoami"], "whoami")).toEqual({
+      candidates: ["pwd"],
+      matched: true,
+    });
     expect(consumeTerminalCommandCandidate(["pwd"], "pwd -P")).toEqual({
       candidates: ["pwd"],
       matched: false,
@@ -174,15 +156,9 @@ describe("reconnectDelaySeconds", () => {
 describe("terminalStatusNoticeKey", () => {
   test("deduplicates connecting updates while preserving terminal errors", () => {
     expect(terminalStatusNoticeKey("connecting")).toBe("connecting");
-    expect(terminalStatusNoticeKey("connecting", "等待确认主机指纹")).toBe(
-      "connecting",
-    );
-    expect(terminalStatusNoticeKey("failed", "认证失败")).toBe(
-      "failed:认证失败",
-    );
-    expect(terminalStatusNoticeKey("disconnected", "网络中断")).toBe(
-      "disconnected:网络中断",
-    );
+    expect(terminalStatusNoticeKey("connecting", "等待确认主机指纹")).toBe("connecting");
+    expect(terminalStatusNoticeKey("failed", "认证失败")).toBe("failed:认证失败");
+    expect(terminalStatusNoticeKey("disconnected", "网络中断")).toBe("disconnected:网络中断");
   });
 });
 

@@ -10,12 +10,8 @@ describe("window capabilities", () => {
     expect(defaultCapability.windows).toEqual(
       expect.arrayContaining(["main", "settings", "shortcut-guide"]),
     );
-    expect(defaultCapability.permissions).not.toContain(
-      "core:window:allow-destroy",
-    );
-    expect(defaultCapability.permissions).toContain(
-      "core:window:allow-set-size",
-    );
+    expect(defaultCapability.permissions).not.toContain("core:window:allow-destroy");
+    expect(defaultCapability.permissions).toContain("core:window:allow-set-size");
     expect(defaultCapability.permissions).toEqual(
       expect.arrayContaining([
         "core:app:allow-set-app-theme",
@@ -33,18 +29,12 @@ describe("window capabilities", () => {
   });
 
   test("uses native macOS controls and custom Windows/Linux controls", () => {
-    const macosMainWindow = macosConfig.app.windows.find(
-      (window) => window.label === "main",
-    );
-    const windowsMainWindow = windowsConfig.app.windows.find(
-      (window) => window.label === "main",
-    );
+    const macosMainWindow = macosConfig.app.windows.find((window) => window.label === "main");
+    const windowsMainWindow = windowsConfig.app.windows.find((window) => window.label === "main");
     const windowsSettingsWindow = windowsConfig.app.windows.find(
       (window) => window.label === "settings",
     );
-    const linuxMainWindow = linuxConfig.app.windows.find(
-      (window) => window.label === "main",
-    );
+    const linuxMainWindow = linuxConfig.app.windows.find((window) => window.label === "main");
 
     expect(macosMainWindow).toMatchObject({
       decorations: true,
@@ -58,9 +48,7 @@ describe("window capabilities", () => {
   });
 
   test("allows update checks from both application entry points", () => {
-    expect(updaterCapability.windows).toEqual(
-      expect.arrayContaining(["main", "settings"]),
-    );
+    expect(updaterCapability.windows).toEqual(expect.arrayContaining(["main", "settings"]));
     expect(updaterCapability.permissions).toEqual(
       expect.arrayContaining(["updater:default", "process:allow-restart"]),
     );

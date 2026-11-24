@@ -1,21 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import {
-  AI_SIDEBAR_DEFAULT_WIDTH,
-  aiWindowTargetWidth,
-  clampAiSidebarWidth,
-} from "./ai-sidebar";
+import { AI_SIDEBAR_DEFAULT_WIDTH, aiWindowTargetWidth, clampAiSidebarWidth } from "./ai-sidebar";
 
 describe("AI sidebar layout", () => {
   test("opens by adding the default sidebar width and restores it once", () => {
-    const expanded = aiWindowTargetWidth(
-      1_280,
-      true,
-      AI_SIDEBAR_DEFAULT_WIDTH,
-    );
+    const expanded = aiWindowTargetWidth(1_280, true, AI_SIDEBAR_DEFAULT_WIDTH);
     expect(expanded).toBe(1_280 + AI_SIDEBAR_DEFAULT_WIDTH);
-    expect(
-      aiWindowTargetWidth(expanded, false, AI_SIDEBAR_DEFAULT_WIDTH),
-    ).toBe(1_280);
+    expect(aiWindowTargetWidth(expanded, false, AI_SIDEBAR_DEFAULT_WIDTH)).toBe(1_280);
   });
 
   test("bounds manual sidebar resizing and protects the main window minimum", () => {

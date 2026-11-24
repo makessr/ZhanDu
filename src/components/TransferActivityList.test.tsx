@@ -6,10 +6,7 @@ import TransferActivityList, {
   type TransferActivityRecord,
 } from "./TransferActivityList";
 
-function transfer(
-  status: TransferActivityRecord["status"],
-  id: string,
-): TransferActivityRecord {
+function transfer(status: TransferActivityRecord["status"], id: string): TransferActivityRecord {
   return {
     sessionId: "session-1",
     transferId: id,
@@ -91,12 +88,8 @@ describe("TransferActivityList", () => {
     fireEvent.click(screen.getByRole("button", { name: "继续 paused.zip" }));
     fireEvent.click(screen.getByRole("button", { name: "取消 upload.zip" }));
     fireEvent.click(screen.getByRole("button", { name: "重试 failed.zip" }));
-    fireEvent.click(
-      screen.getByRole("button", { name: "打开 config.toml 的本地副本" }),
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "处理 config.toml 的同步问题" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "打开 config.toml 的本地副本" }));
+    fireEvent.click(screen.getByRole("button", { name: "处理 config.toml 的同步问题" }));
 
     expect(onPause).toHaveBeenCalledWith(running);
     expect(onPause).toHaveBeenCalledWith(waiting);
@@ -150,9 +143,7 @@ describe("TransferActivityList", () => {
         transfers={[failed]}
       />,
     );
-    const list = view.container.querySelector(
-      ".sftp-transfer-list",
-    ) as HTMLElement;
+    const list = view.container.querySelector(".sftp-transfer-list") as HTMLElement;
     list.scrollTop = 240;
 
     fireEvent.click(screen.getByRole("button", { name: "重试 failed.zip" }));
@@ -244,9 +235,7 @@ describe("TransferActivityList", () => {
       onRevealLocal: mock(() => undefined),
     };
     const keys = (record: TransferActivityRecord) =>
-      transferContextMenuItems(record, handlers, "MacIntel").map(
-        (item) => item.key,
-      );
+      transferContextMenuItems(record, handlers, "MacIntel").map((item) => item.key);
 
     expect(keys(transfer("completed", "download"))).toEqual([
       "open-local",
@@ -259,11 +248,7 @@ describe("TransferActivityList", () => {
       "copy-remote-path",
       "remove",
     ]);
-    expect(keys(transfer("failed", "download"))).toEqual([
-      "copy-local-path",
-      "retry",
-      "remove",
-    ]);
+    expect(keys(transfer("failed", "download"))).toEqual(["copy-local-path", "retry", "remove"]);
     expect(keys(transfer("running", "upload"))).toEqual(["copy-remote-path"]);
 
     const reveal = transferContextMenuItems(
@@ -275,10 +260,9 @@ describe("TransferActivityList", () => {
     void reveal?.onClick?.();
     expect(handlers.onRevealLocal).toHaveBeenCalled();
 
-    const copy = transferContextMenuItems(
-      transfer("completed", "upload"),
-      handlers,
-    ).find((item) => item.key === "copy-remote-path");
+    const copy = transferContextMenuItems(transfer("completed", "upload"), handlers).find(
+      (item) => item.key === "copy-remote-path",
+    );
     void copy?.onClick?.();
     expect(handlers.onCopyPath).toHaveBeenCalledWith("/root/upload.zip");
   });

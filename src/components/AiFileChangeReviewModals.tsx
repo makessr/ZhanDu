@@ -49,9 +49,7 @@ function reviewItemName(item: AiFileChangeReviewItem) {
 }
 
 function reviewItemLabel(item: AiFileChangeReviewItem) {
-  return item.kind === "edit"
-    ? "修改文件"
-    : aiFileOperationLabel(item.proposal.operation);
+  return item.kind === "edit" ? "修改文件" : aiFileOperationLabel(item.proposal.operation);
 }
 
 function reviewItemSummary(item: AiFileChangeReviewItem) {
@@ -108,10 +106,7 @@ function AiFileReviewNavigator({
       </div>
       <div className="ai-file-review-navigation-list">
         {items.map((item) => {
-          const status = aiFileProposalStatus(
-            item.proposal.status,
-            item.proposal.reviewed,
-          );
+          const status = aiFileProposalStatus(item.proposal.status, item.proposal.reviewed);
           const summary = reviewItemSummary(item);
           return (
             <button
@@ -124,7 +119,9 @@ function AiFileReviewNavigator({
             >
               <span className="ai-file-review-navigation-name">
                 <strong title={reviewItemName(item)}>{reviewItemName(item)}</strong>
-                <Tag color={status.color} size="small">{status.label}</Tag>
+                <Tag color={status.color} size="small">
+                  {status.label}
+                </Tag>
               </span>
               <span className="ai-file-review-navigation-detail">
                 {reviewItemLabel(item)}
@@ -168,11 +165,9 @@ function AiFileChangeReviewModals({
     if (!visible) setDiffMode("unified");
   }, [visible]);
 
-  const activeOperation = activeItem?.kind === "operation"
-    ? activeItem.proposal
-    : undefined;
-  const canApply = activeItem?.proposal.status === "pending" &&
-    (activeItem.kind !== "edit" || !editError);
+  const activeOperation = activeItem?.kind === "operation" ? activeItem.proposal : undefined;
+  const canApply =
+    activeItem?.proposal.status === "pending" && (activeItem.kind !== "edit" || !editError);
 
   return (
     <Modal
@@ -183,9 +178,7 @@ function AiFileChangeReviewModals({
       okButtonProps={{ disabled: !canApply }}
       okText={activeItem?.kind === "operation" ? "应用操作" : "应用修改"}
       onCancel={onClose}
-      onOk={() => void (
-        activeItem?.kind === "operation" ? onApplyOperation() : onApplyEdit()
-      )}
+      onOk={() => void (activeItem?.kind === "operation" ? onApplyOperation() : onApplyEdit())}
       title="审阅文件变更"
       unmountOnExit
       visible={visible && Boolean(activeItem)}
@@ -211,9 +204,11 @@ function AiFileChangeReviewModals({
               </Typography.Text>
             </div>
             <Alert
-              content={activeOperation
-                ? "只有点击“应用操作”才会修改远程文件；目标已存在或源文件内容变化时，操作会被阻止。"
-                : "只有点击“应用修改”才会写入远程文件；若远程内容已经变化，本次写入会被阻止。"}
+              content={
+                activeOperation
+                  ? "只有点击“应用操作”才会修改远程文件；目标已存在或源文件内容变化时，操作会被阻止。"
+                  : "只有点击“应用修改”才会写入远程文件；若远程内容已经变化，本次写入会被阻止。"
+              }
               type={activeOperation?.operation === "delete" ? "error" : "warning"}
             />
             {activeItem.kind === "edit" ? (
@@ -247,13 +242,15 @@ function AiFileChangeReviewModals({
               <AiFileDiffView
                 mode={diffMode}
                 onChangeMode={setDiffMode}
-                originalContent={activeOperation.operation === "delete"
-                  ? activeOperation.originalFile?.content ?? ""
-                  : ""}
+                originalContent={
+                  activeOperation.operation === "delete"
+                    ? (activeOperation.originalFile?.content ?? "")
+                    : ""
+                }
                 path={activeOperation.path}
-                proposedContent={activeOperation.operation === "create"
-                  ? activeOperation.content ?? ""
-                  : ""}
+                proposedContent={
+                  activeOperation.operation === "create" ? (activeOperation.content ?? "") : ""
+                }
               />
             ) : null}
             {editError && activeItem.kind === "edit" && (

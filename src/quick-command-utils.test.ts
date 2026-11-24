@@ -22,11 +22,7 @@ const commands = [
 
 describe("quick command templates", () => {
   test("extracts unique parameters and their defaults in template order", () => {
-    expect(
-      quickCommandParameters(
-        "tail -n {{ 行数: 100 }} {{文件}} {{行数:200}}",
-      ),
-    ).toEqual([
+    expect(quickCommandParameters("tail -n {{ 行数: 100 }} {{文件}} {{行数:200}}")).toEqual([
       { name: "行数", defaultValue: "100" },
       { name: "文件", defaultValue: undefined },
     ]);

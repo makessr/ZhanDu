@@ -1,3 +1,4 @@
+import { randomIdSuffix } from "./random-id";
 export const FINESHELL_OSC_ID = 633;
 export const MAX_SHELL_COMMAND_RESULT_CHARS = 12_000;
 
@@ -22,7 +23,7 @@ function shellSingleQuote(value: string) {
 }
 
 export function createShellIntegrationNonce() {
-  const random = Math.random().toString(36).slice(2, 10);
+  const random = randomIdSuffix();
   return `${Date.now().toString(36)}${random}`;
 }
 
@@ -47,10 +48,7 @@ export function parseShellIntegrationMessage(
     return null;
   }
   if (values.length !== 1) return null;
-  if (
-    kind === "ready" &&
-    (value === "bash" || value === "zsh" || value === "fish")
-  ) {
+  if (kind === "ready" && (value === "bash" || value === "zsh" || value === "fish")) {
     return { kind, shell: value };
   }
   if (kind === "disabled" && value === "tty") {

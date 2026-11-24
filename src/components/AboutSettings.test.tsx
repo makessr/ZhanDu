@@ -1,13 +1,7 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { Modal } from "@arco-design/web-react";
 import { StrictMode } from "react";
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type {
   ApplicationUpdate,
   ApplicationUpdateNotice,
@@ -88,19 +82,17 @@ describe("AboutSettings", () => {
   });
 
   test("shows installed application information", async () => {
-    render(
-      <AboutSettings
-        updater={updaterService({ canInstallUpdates: false })}
-      />,
-    );
+    render(<AboutSettings updater={updaterService({ canInstallUpdates: false })} />);
 
     expect(await screen.findByText("v0.1.0")).not.toBeNull();
     expect(screen.getByText("2.11.5")).not.toBeNull();
     expect(screen.getByText("Apache-2.0")).not.toBeNull();
     expect(
-      (screen.getByRole("button", {
-        name: "检查更新",
-      }) as HTMLButtonElement).disabled,
+      (
+        screen.getByRole("button", {
+          name: "检查更新",
+        }) as HTMLButtonElement
+      ).disabled,
     ).toBe(true);
     expect(screen.getByText(/开发模式不支持安装更新/)).not.toBeNull();
   });
@@ -108,13 +100,11 @@ describe("AboutSettings", () => {
   test("checks, downloads, installs, and relaunches an update", async () => {
     const relaunch = mock(async () => undefined);
     const close = mock(async () => undefined);
-    const downloadAndInstall: ApplicationUpdate["downloadAndInstall"] = mock(
-      async (onEvent) => {
-        onEvent?.({ event: "Started", data: { contentLength: 1024 } });
-        onEvent?.({ event: "Progress", data: { chunkLength: 1024 } });
-        onEvent?.({ event: "Finished" });
-      },
-    );
+    const downloadAndInstall: ApplicationUpdate["downloadAndInstall"] = mock(async (onEvent) => {
+      onEvent?.({ event: "Started", data: { contentLength: 1024 } });
+      onEvent?.({ event: "Progress", data: { chunkLength: 1024 } });
+      onEvent?.({ event: "Finished" });
+    });
     const update: ApplicationUpdate = {
       body: "新增应用内更新。",
       close,
@@ -138,9 +128,7 @@ describe("AboutSettings", () => {
     expect(screen.getByText("新增应用内更新。")).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "下载并安装" }));
-    expect(
-      await screen.findByText(/更新会关闭当前 SSH 会话/),
-    ).not.toBeNull();
+    expect(await screen.findByText(/更新会关闭当前 SSH 会话/)).not.toBeNull();
     const installButtons = screen.getAllByRole("button", {
       name: "下载并安装",
     });
@@ -173,10 +161,7 @@ describe("AboutSettings", () => {
 
     const view = render(
       <StrictMode>
-        <AboutSettings
-          knownUpdate={knownUpdate}
-          updater={updaterService({ checkForUpdate })}
-        />
+        <AboutSettings knownUpdate={knownUpdate} updater={updaterService({ checkForUpdate })} />
       </StrictMode>,
     );
 
@@ -204,9 +189,7 @@ describe("AboutSettings", () => {
           resolveCheck = resolve;
         }),
     );
-    const view = render(
-      <AboutSettings updater={updaterService({ checkForUpdate })} />,
-    );
+    const view = render(<AboutSettings updater={updaterService({ checkForUpdate })} />);
 
     fireEvent.click(screen.getByRole("button", { name: "检查更新" }));
     await waitFor(() => expect(checkForUpdate).toHaveBeenCalledTimes(1));
@@ -242,12 +225,8 @@ describe("AboutSettings", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "检查更新" }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: "下载并安装" }),
-    );
-    expect(
-      await screen.findByText(/更新会关闭当前 SSH 会话/),
-    ).not.toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "下载并安装" }));
+    expect(await screen.findByText(/更新会关闭当前 SSH 会话/)).not.toBeNull();
     const installButtons = screen.getAllByRole("button", {
       name: "下载并安装",
     });

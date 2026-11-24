@@ -71,9 +71,7 @@ describe("application updater helpers", () => {
     );
 
     expect(readApplicationUpdateNotice()).toBeNull();
-    expect(
-      window.localStorage.getItem("fineshell:application-update"),
-    ).toBeNull();
+    expect(window.localStorage.getItem("fineshell:application-update")).toBeNull();
   });
 
   test("skips the startup update request outside production Tauri", async () => {
@@ -85,9 +83,7 @@ describe("application updater helpers", () => {
 
     expect(
       JSON.parse(
-        window.localStorage.getItem(
-          "fineshell:application-update-relaunch-focus",
-        ) ?? "null",
+        window.localStorage.getItem("fineshell:application-update-relaunch-focus") ?? "null",
       ),
     ).toEqual({ requestedAt: 1234, targetVersion: "0.2.0" });
   });
@@ -102,11 +98,9 @@ describe("application updater helpers", () => {
         targetVersion: packageMetadata.version,
       }),
     );
-    const requestUserAttention = mock(
-      async (type: UserAttentionType | null) => {
-        calls.push(`attention:${type}`);
-      },
-    );
+    const requestUserAttention = mock(async (type: UserAttentionType | null) => {
+      calls.push(`attention:${type}`);
+    });
 
     const focused = await restoreApplicationFocusAfterUpdateRelaunch(
       {
@@ -130,20 +124,9 @@ describe("application updater helpers", () => {
     );
 
     expect(focused).toBe(true);
-    expect(calls).toEqual([
-      "show",
-      "unminimize",
-      "setFocus",
-      "isFocused",
-      "setFocus",
-      "isFocused",
-    ]);
+    expect(calls).toEqual(["show", "unminimize", "setFocus", "isFocused", "setFocus", "isFocused"]);
     expect(requestUserAttention).not.toHaveBeenCalled();
-    expect(
-      window.localStorage.getItem(
-        "fineshell:application-update-relaunch-focus",
-      ),
-    ).toBeNull();
+    expect(window.localStorage.getItem("fineshell:application-update-relaunch-focus")).toBeNull();
   });
 
   test("ignores stale or mismatched relaunch focus requests", async () => {
@@ -163,10 +146,6 @@ describe("application updater helpers", () => {
       }),
     ).toBe(false);
     expect(show).not.toHaveBeenCalled();
-    expect(
-      window.localStorage.getItem(
-        "fineshell:application-update-relaunch-focus",
-      ),
-    ).toBeNull();
+    expect(window.localStorage.getItem("fineshell:application-update-relaunch-focus")).toBeNull();
   });
 });

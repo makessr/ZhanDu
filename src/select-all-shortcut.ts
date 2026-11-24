@@ -49,16 +49,12 @@ export function isEditableSelectAllTarget(target: EventTarget | null) {
   const element = targetElement(target);
   const input = element?.closest<HTMLInputElement>("input");
   if (input) return !nonTextInputTypes.has(input.type);
-  return Boolean(
-    element?.closest('textarea, [contenteditable="true"], [role="textbox"]'),
-  );
+  return Boolean(element?.closest('textarea, [contenteditable="true"], [role="textbox"]'));
 }
 
 export function selectEditableTarget(target: EventTarget | null) {
   const element = targetElement(target);
-  const input = element?.closest<HTMLInputElement | HTMLTextAreaElement>(
-    "input, textarea",
-  );
+  const input = element?.closest<HTMLInputElement | HTMLTextAreaElement>("input, textarea");
   if (input && isEditableSelectAllTarget(input)) {
     input.select();
     return true;
@@ -76,13 +72,10 @@ export function selectEditableTarget(target: EventTarget | null) {
 }
 
 export function requestContextSelectAll(invert: boolean) {
-  const event = new CustomEvent<SelectAllRequestDetail>(
-    SELECT_ALL_REQUEST_EVENT,
-    {
-      cancelable: true,
-      detail: { invert },
-    },
-  );
+  const event = new CustomEvent<SelectAllRequestDetail>(SELECT_ALL_REQUEST_EVENT, {
+    cancelable: true,
+    detail: { invert },
+  });
   window.dispatchEvent(event);
   return event.defaultPrevented;
 }
@@ -92,11 +85,7 @@ function clearDocumentSelection() {
 }
 
 function isSelectAllShortcut(event: KeyboardEvent) {
-  return (
-    (event.metaKey || event.ctrlKey) &&
-    !event.altKey &&
-    event.key.toLowerCase() === "a"
-  );
+  return (event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "a";
 }
 
 export function handleSelectAllShortcut(event: KeyboardEvent) {

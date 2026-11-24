@@ -1,0 +1,12 @@
+[advisories]
+# Both crates stay in Cargo.lock as optional dependencies of `ssh-key`, which is
+# declared with `default-features = false, features = ["std", "ed25519"]` in
+# src-tauri/Cargo.toml. The rsa/p256/p384/p521 features are disabled, so these
+# crates never enter the compiled dependency graph (`cargo tree -i rsa` and
+# `cargo tree -i elliptic-curve` print nothing).
+# No fixed upgrade exists inside the versions ssh-key 0.6 accepts; ssh-key 0.7
+# is still a release candidate.
+ignore = [
+  "RUSTSEC-2023-0071", # rsa 0.9.10 (Marvin attack), lockfile-only optional dep
+  "RUSTSEC-2026-0387", # crypto-bigint 0.5.5 (timing variability), lockfile-only optional dep
+]

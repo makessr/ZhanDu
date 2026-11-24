@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  prepareAiProposalRound,
-  resolveAiProposalRound,
-} from "./ai-proposal-round";
+import { prepareAiProposalRound, resolveAiProposalRound } from "./ai-proposal-round";
 
 const commandCall = {
   id: "command-1",
@@ -47,11 +44,7 @@ describe("AI proposal rounds", () => {
       status: "pending",
     });
 
-    const decisions = await resolveAiProposalRound(
-      [commandCall],
-      round,
-      () => false,
-    );
+    const decisions = await resolveAiProposalRound([commandCall], round, () => false);
     expect(decisions[0]).toEqual({
       callId: "command-1",
       kind: "execution_completed",
@@ -64,16 +57,12 @@ describe("AI proposal rounds", () => {
     const duplicate = prepare([commandCall], proposedCommands);
 
     expect(duplicate.commandProposals).toHaveLength(0);
-    expect(duplicate.proposalErrors.get(commandCall.id)).toBe(
-      "AI 重复返回了同一条终端命令",
-    );
+    expect(duplicate.proposalErrors.get(commandCall.id)).toBe("AI 重复返回了同一条终端命令");
   });
 
   test("rejects tool calls outside the proposal protocol", () => {
-    expect(() =>
-      prepare([
-        { id: "unknown-1", name: "unknown_tool", arguments: "{}" },
-      ]),
-    ).toThrow("AI 后端返回了未处理的工具调用：unknown_tool");
+    expect(() => prepare([{ id: "unknown-1", name: "unknown_tool", arguments: "{}" }])).toThrow(
+      "AI 后端返回了未处理的工具调用：unknown_tool",
+    );
   });
 });

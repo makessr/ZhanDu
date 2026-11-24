@@ -65,26 +65,17 @@ describe("SFTP path helpers", () => {
   });
 
   test("detects descendants without matching sibling prefixes", () => {
-    expect(isRemotePathDescendant("/srv/releases", "/srv/releases/2026")).toBe(
-      true,
-    );
-    expect(isRemotePathDescendant("/srv/releases", "/srv/releases-old")).toBe(
-      false,
-    );
+    expect(isRemotePathDescendant("/srv/releases", "/srv/releases/2026")).toBe(true);
+    expect(isRemotePathDescendant("/srv/releases", "/srv/releases-old")).toBe(false);
     expect(isRemotePathDescendant("/", "/tmp")).toBe(true);
     expect(isRemotePathDescendant("/", "/")).toBe(false);
   });
 
   test("creates available copy names while preserving file extensions", () => {
-    expect(
-      nextAvailableRemoteName(
-        "report.txt",
-        new Set(["report.txt", "report (1).txt"]),
-      ),
-    ).toBe("report (2).txt");
-    expect(nextAvailableRemoteName("archive", new Set(["archive"]))).toBe(
-      "archive (1)",
+    expect(nextAvailableRemoteName("report.txt", new Set(["report.txt", "report (1).txt"]))).toBe(
+      "report (2).txt",
     );
+    expect(nextAvailableRemoteName("archive", new Set(["archive"]))).toBe("archive (1)");
     expect(nextAvailableRemoteName(".env", new Set([".env"]))).toBe(".env (1)");
   });
 
@@ -97,30 +88,15 @@ describe("SFTP path helpers", () => {
     expect(normalizeRemoteDirectoryPath(" /var/log/// ")).toBe("/var/log");
     expect(normalizeRemoteDirectoryPath(" \\var\\log\\ ")).toBe("/var/log");
     expect(normalizeRemoteDirectoryPath("relative/path")).toBeNull();
-    expect(addRemotePathHistory(["/tmp", "/var/log"], "/tmp/", 2)).toEqual([
-      "/tmp",
-      "/var/log",
-    ]);
-    expect(addRemotePathHistory(["/tmp", "/var/log"], "/home", 2)).toEqual([
-      "/home",
-      "/tmp",
-    ]);
+    expect(addRemotePathHistory(["/tmp", "/var/log"], "/tmp/", 2)).toEqual(["/tmp", "/var/log"]);
+    expect(addRemotePathHistory(["/tmp", "/var/log"], "/home", 2)).toEqual(["/home", "/tmp"]);
   });
 
   test("manages bookmarks and matches bookmarks before history", () => {
-    expect(setRemotePathBookmark(["/tmp"], "/var/www", true, 2)).toEqual([
-      "/var/www",
-      "/tmp",
-    ]);
+    expect(setRemotePathBookmark(["/tmp"], "/var/www", true, 2)).toEqual(["/var/www", "/tmp"]);
+    expect(setRemotePathBookmark(["/tmp", "/var/www"], "/tmp", false, 2)).toEqual(["/var/www"]);
     expect(
-      setRemotePathBookmark(["/tmp", "/var/www"], "/tmp", false, 2),
-    ).toEqual(["/var/www"]);
-    expect(
-      matchRemoteDirectoryPaths(
-        ["/var/www"],
-        ["/tmp", "/var/log", "/var/www"],
-        "var",
-      ),
+      matchRemoteDirectoryPaths(["/var/www"], ["/tmp", "/var/log", "/var/www"], "var"),
     ).toEqual(["/var/www", "/var/log"]);
   });
 
@@ -139,18 +115,13 @@ describe("SFTP selection helpers", () => {
   });
 
   test("inverts only the currently visible entries", () => {
-    expect(invertSftpEntryKeys(["a", "b", "c"], ["b", "hidden"])).toEqual([
-      "a",
-      "c",
-    ]);
+    expect(invertSftpEntryKeys(["a", "b", "c"], ["b", "hidden"])).toEqual(["a", "c"]);
   });
 });
 
 describe("SFTP transfer batches", () => {
   test("keeps a batch active while any transfer is queued, running, or waiting", () => {
-    expect(
-      summarizeSftpTransferBatch(["completed", "running", "waiting", "queued"]),
-    ).toEqual({
+    expect(summarizeSftpTransferBatch(["completed", "running", "waiting", "queued"])).toEqual({
       total: 4,
       completed: 1,
       failed: 0,
@@ -162,14 +133,7 @@ describe("SFTP transfer batches", () => {
   });
 
   test("summarizes all terminal results when a batch finishes", () => {
-    expect(
-      summarizeSftpTransferBatch([
-        "completed",
-        "completed",
-        "failed",
-        "cancelled",
-      ]),
-    ).toEqual({
+    expect(summarizeSftpTransferBatch(["completed", "completed", "failed", "cancelled"])).toEqual({
       total: 4,
       completed: 2,
       failed: 1,
@@ -188,14 +152,12 @@ describe("SFTP native drop coordinates", () => {
   const bounds = { left: 500, right: 1_200, top: 400, bottom: 800 };
 
   test("keeps AppKit logical coordinates on a Retina display", () => {
-    expect(resolveNativeDropPoint({ x: 900, y: 650 }, 2, bounds, true)).toEqual(
-      {
-        x: 900,
-        y: 650,
-        inside: true,
-        coordinateMode: "logical",
-      },
-    );
+    expect(resolveNativeDropPoint({ x: 900, y: 650 }, 2, bounds, true)).toEqual({
+      x: 900,
+      y: 650,
+      inside: true,
+      coordinateMode: "logical",
+    });
   });
 
   test("converts physical coordinates when that is the matching coordinate space", () => {
@@ -215,9 +177,7 @@ describe("SFTP native drop coordinates", () => {
   });
 
   test("falls back to the alternate coordinate space when it is the only match", () => {
-    expect(
-      resolveNativeDropPoint({ x: 900, y: 650 }, 2, bounds, false),
-    ).toEqual({
+    expect(resolveNativeDropPoint({ x: 900, y: 650 }, 2, bounds, false)).toEqual({
       x: 900,
       y: 650,
       inside: true,
@@ -226,9 +186,7 @@ describe("SFTP native drop coordinates", () => {
   });
 
   test("reports points outside the panel without producing invalid values", () => {
-    expect(
-      resolveNativeDropPoint({ x: 100, y: 100 }, Number.NaN, bounds, true),
-    ).toEqual({
+    expect(resolveNativeDropPoint({ x: 100, y: 100 }, Number.NaN, bounds, true)).toEqual({
       x: 100,
       y: 100,
       inside: false,
@@ -261,10 +219,7 @@ describe("SFTP display helpers", () => {
       "other-read",
     ]);
     expect(
-      permissionValueFromFlags(
-        ["owner-read", "owner-write", "group-read", "other-read"],
-        0o4000,
-      ),
+      permissionValueFromFlags(["owner-read", "owner-write", "group-read", "other-read"], 0o4000),
     ).toBe(0o4644);
   });
 

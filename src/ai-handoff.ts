@@ -20,26 +20,21 @@ function rounded(value: number) {
   return Math.round(value * 10) / 10;
 }
 
-export function createProcessesAiHandoff(
-  processes: ServerProcess[],
-): AiHandoffRequest {
-  const selected = processes
-    .slice(0, MAX_PROCESS_CONTEXT_ITEMS)
-    .map((process) => ({
-      pid: process.pid,
-      parentPid: process.parentPid,
-      name: process.name,
-      user: process.user,
-      state: process.state,
-      cpuUsagePercent: rounded(process.cpuUsagePercent),
-      memoryUsagePercent: rounded(process.memoryUsagePercent),
-      residentMemoryBytes: process.residentMemoryBytes,
-      elapsedSeconds: process.elapsedSeconds,
-      command: process.command,
-    }));
+export function createProcessesAiHandoff(processes: ServerProcess[]): AiHandoffRequest {
+  const selected = processes.slice(0, MAX_PROCESS_CONTEXT_ITEMS).map((process) => ({
+    pid: process.pid,
+    parentPid: process.parentPid,
+    name: process.name,
+    user: process.user,
+    state: process.state,
+    cpuUsagePercent: rounded(process.cpuUsagePercent),
+    memoryUsagePercent: rounded(process.memoryUsagePercent),
+    residentMemoryBytes: process.residentMemoryBytes,
+    elapsedSeconds: process.elapsedSeconds,
+    command: process.command,
+  }));
   return {
-    prompt:
-      "请分析这些进程的资源占用和运行状态，指出值得关注的进程，并给出安全的排查建议。",
+    prompt: "请分析这些进程的资源占用和运行状态，指出值得关注的进程，并给出安全的排查建议。",
     source: {
       id: "process-selection",
       label: `所选进程(${selected.length})`,
@@ -82,8 +77,7 @@ export function createNetworkAiHandoff(input: {
           connections,
           connectionsOmitted: Math.max(
             0,
-            (input.connections?.connections.length ?? 0) -
-              (connections?.length ?? 0),
+            (input.connections?.connections.length ?? 0) - (connections?.length ?? 0),
           ),
           connectionsTruncated: input.connections?.truncated ?? false,
         },
@@ -110,8 +104,7 @@ export function createSftpSelectionAiHandoff(
     group: entry.group,
   }));
   return {
-    prompt:
-      "请分析所选远程文件或目录，说明其用途、潜在风险，并给出后续操作建议。",
+    prompt: "请分析所选远程文件或目录，说明其用途、潜在风险，并给出后续操作建议。",
     source: {
       id: "sftp-selection",
       label: `所选远程项目(${selected.length})`,

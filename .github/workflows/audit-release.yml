@@ -50,14 +50,14 @@ jobs:
             printf '%s\n' 'Run the audit from main.' >&2
             exit 1
           fi
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '26'
-      - uses: dtolnay/rust-toolchain@stable
+          node-version: "26"
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
       - name: Build the signature verifier
         run: cargo build --locked --manifest-path scripts/verify-release-signature/Cargo.toml --target-dir "$RUNNER_TEMP/verifier"
       - name: Download and verify release assets
@@ -93,9 +93,13 @@ jobs:
           endpoint="repos/$GITHUB_REPOSITORY/releases/$release_id"
           gh api "$endpoint" > "$RUNNER_TEMP/release.json"
           gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/assets"
+          windows_prefix=FineShell
+          if git show "$RELEASE_COMMIT:src-tauri/tauri.windows.conf.json" | jq -e '.productName == "栈渡"' >/dev/null; then
+            windows_prefix=ZhanDu
+          fi
           node scripts/verify-release-assets.mjs "$RUNNER_TEMP/assets" "$RUNNER_TEMP/release.json" \
             "$RUNNER_TEMP/signer.json" "$RUNNER_TEMP/verifier/debug/verify-release-signature" \
-            "$GITHUB_REPOSITORY" "$RELEASE_TAG" "$RELEASE_COMMIT" "$RELEASE_PLATFORMS" "$RELEASE_VISIBILITY"
+            "$GITHUB_REPOSITORY" "$RELEASE_TAG" "$RELEASE_COMMIT" "$RELEASE_PLATFORMS" "$RELEASE_VISIBILITY" "$windows_prefix"
 
           if [[ "$RELEASE_PLATFORMS" == all ]]; then
             for arch in amd64 arm64; do

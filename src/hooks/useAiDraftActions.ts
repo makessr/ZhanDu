@@ -1,8 +1,5 @@
 import { useEffect, useRef } from "react";
-import {
-  availablePresetContextIds,
-  type AiPromptPreset,
-} from "../ai-presets";
+import { availablePresetContextIds, type AiPromptPreset } from "../ai-presets";
 import type { AiToolRun } from "../ai-tools";
 import {
   aiRemoteFileContextSource,
@@ -44,10 +41,7 @@ export function useAiDraftActions({
 }: UseAiDraftActionsOptions) {
   const appliedInitialPromptRequestRef = useRef(-1);
 
-  const updateRemoteFileMention = (
-    file: AiRemoteFileContext,
-    checked: boolean,
-  ) => {
+  const updateRemoteFileMention = (file: AiRemoteFileContext, checked: boolean) => {
     const source = aiRemoteFileContextSource(file);
     updateDraft(
       checked
@@ -58,9 +52,7 @@ export function useAiDraftActions({
 
   const removeRemoteFile = (file: AiRemoteFileContext) => {
     if (!sessionId) return;
-    updateDraft(
-      stripAiContextMentions(prompt, [aiRemoteFileContextSource(file)]),
-    );
+    updateDraft(stripAiContextMentions(prompt, [aiRemoteFileContextSource(file)]));
     onRemoveRemoteFile(sessionId, file.path);
   };
 
@@ -88,31 +80,20 @@ export function useAiDraftActions({
     if (!visible || !conversationId) return;
     if (appliedInitialPromptRequestRef.current === initialPromptRequest) return;
     const availableContextIds = new Set(
-      contextSources
-        .filter((source) => source.content.trim())
-        .map((source) => source.id),
+      contextSources.filter((source) => source.content.trim()).map((source) => source.id),
     );
-    if (
-      initialContextIds.length &&
-      !initialContextIds.every((id) => availableContextIds.has(id))
-    ) {
+    if (initialContextIds.length && !initialContextIds.every((id) => availableContextIds.has(id))) {
       return;
     }
     appliedInitialPromptRequestRef.current = initialPromptRequest;
-    const terminalSelection = contextSources.find(
-      (source) => source.id === "terminal-selection",
-    );
+    const terminalSelection = contextSources.find((source) => source.id === "terminal-selection");
     const contextIds = initialContextIds.length
       ? initialContextIds
       : terminalSelection?.content.trim()
         ? (["terminal-selection"] as AiContextSourceId[])
         : [];
     updateDraft(
-      appendAiContextMentions(
-        initialPrompt || prompt,
-        contextSources,
-        contextIds,
-      ),
+      appendAiContextMentions(initialPrompt || prompt, contextSources, contextIds),
       conversationId,
     );
   }, [

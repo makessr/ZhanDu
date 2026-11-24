@@ -47,9 +47,7 @@ describe("terminal command history policy", () => {
 
   test("rejects terminal controls and malformed persisted records", () => {
     expect(
-      sanitizeTerminalCommandHistoryRecord(
-        historyRecord({ command: "echo ok\nrm -rf /" }),
-      ),
+      sanitizeTerminalCommandHistoryRecord(historyRecord({ command: "echo ok\nrm -rf /" })),
     ).toBeUndefined();
     expect(
       recordTerminalCommand(
@@ -61,21 +59,17 @@ describe("terminal command history policy", () => {
   });
 
   test("keeps only the newest entries within each host limit", () => {
-    const records = Array.from(
-      { length: MAX_TERMINAL_COMMAND_HISTORY_PER_HOST + 2 },
-      (_, index) =>
-        historyRecord({
-          id: `history-${index}`,
-          command: `echo ${index}`,
-          lastUsedAt: new Date(index).toISOString(),
-        }),
+    const records = Array.from({ length: MAX_TERMINAL_COMMAND_HISTORY_PER_HOST + 2 }, (_, index) =>
+      historyRecord({
+        id: `history-${index}`,
+        command: `echo ${index}`,
+        lastUsedAt: new Date(index).toISOString(),
+      }),
     );
 
     const limited = applyTerminalCommandHistoryPolicy(records);
     expect(limited).toHaveLength(MAX_TERMINAL_COMMAND_HISTORY_PER_HOST);
-    expect(limited[0].command).toBe(
-      `echo ${MAX_TERMINAL_COMMAND_HISTORY_PER_HOST + 1}`,
-    );
+    expect(limited[0].command).toBe(`echo ${MAX_TERMINAL_COMMAND_HISTORY_PER_HOST + 1}`);
     expect(limited[limited.length - 1]?.command).toBe("echo 2");
   });
 });

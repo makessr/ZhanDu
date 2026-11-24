@@ -17,10 +17,7 @@ function historyRecord(id: string, connectedAt: string): ConnectionHistoryRecord
 describe("applyConnectionHistoryPolicy", () => {
   test("sorts records and applies the configured count", () => {
     const history = Array.from({ length: 25 }, (_, index) =>
-      historyRecord(
-        String(index),
-        new Date(Date.UTC(2026, 6, index + 1)).toISOString(),
-      ),
+      historyRecord(String(index), new Date(Date.UTC(2026, 6, index + 1)).toISOString()),
     );
 
     const result = applyConnectionHistoryPolicy(history, {

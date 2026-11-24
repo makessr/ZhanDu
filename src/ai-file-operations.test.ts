@@ -171,12 +171,9 @@ describe("AI file operation proposals", () => {
       path: "/etc/app.old.conf",
       targetPath: FILE.path,
     });
-    expect(
-      markAiFileOperationRolledBack(
-        applied,
-        "2026-07-28T02:00:00.000Z",
-      ).status,
-    ).toBe("rolled-back");
+    expect(markAiFileOperationRolledBack(applied, "2026-07-28T02:00:00.000Z").status).toBe(
+      "rolled-back",
+    );
   });
 
   test("summarizes create/delete changes and records review-only tool results", () => {
@@ -194,8 +191,6 @@ describe("AI file operation proposals", () => {
       addedLines: 2,
       removedLines: 0,
     });
-    expect(aiFileOperationToolResult(operationCall({})).content).toContain(
-      "尚未执行",
-    );
+    expect(aiFileOperationToolResult(operationCall({})).content).toContain("尚未执行");
   });
 });

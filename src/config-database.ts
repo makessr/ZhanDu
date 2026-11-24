@@ -1,9 +1,6 @@
+import { randomIdSuffix } from "./random-id";
 import { withHostDefaults } from "./host-storage";
-import {
-  DEFAULT_APP_SETTINGS,
-  sanitizeAppSettings,
-  type AppSettings,
-} from "./app-settings";
+import { DEFAULT_APP_SETTINGS, sanitizeAppSettings, type AppSettings } from "./app-settings";
 import type {
   ConnectionHistoryRecord,
   DynamicPortForwardRule,
@@ -26,19 +23,20 @@ import {
   upsertKnownHostRecord,
 } from "./known-hosts";
 import { normalizeRemoteDirectoryPath } from "./sftp-utils";
-import {
-  getSshKeySource,
-  managedSshKeyReference,
-} from "./ssh-keys";
+import { getSshKeySource, managedSshKeyReference } from "./ssh-keys";
 import { applyConnectionHistoryPolicy } from "./connection-history";
 import {
   applyTerminalCommandHistoryPolicy,
   sanitizeTerminalCommandHistoryRecord,
 } from "./terminal-command-history";
+import { sanitizeCredentialReference, type CredentialReferenceRecord } from "./credential-registry";
 import {
-  sanitizeCredentialReference,
-  type CredentialReferenceRecord,
-} from "./credential-registry";
+  assertLocalDataAccessible,
+  decryptLocalValue,
+  encryptLocalValue,
+  isEncryptedLocalRecord,
+  isLocalDataEncryptionEnabled,
+} from "./local-encryption";
 
 const DATABASE_NAME = "fineshell.config";
 const DATABASE_VERSION = 1;
@@ -119,6 +117,7 @@ type UnknownRecord = Record<string, unknown>;
 
 let databasePromise: Promise<IDBDatabase> | undefined;
 let initializationPromise: Promise<void> | undefined;
+let configurationWriteQueue: Promise<unknown> = Promise.resolve();
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -160,12 +159,7 @@ function sanitizeProxy(value: unknown): ProxyRecord | undefined {
     name: name.trim(),
     type: value.type === "http" ? "http" : "socks5",
     address: address.trim(),
-    port: numberValue(
-      value.port,
-      value.type === "http" ? 8080 : 1080,
-      1,
-      65_535,
-    ),
+    port: numberValue(value.port, value.type === "http" ? 8080 : 1080, 1, 65_535),
     username: stringValue(value.username)?.trim(),
   };
 }
@@ -204,15 +198,17 @@ function sanitizeSshKey(value: unknown): SshKeyRecord | undefined {
 
 export function sanitizeQuickCommandGroups(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return [...new Set(value.flatMap((item) => {
-    const name = stringValue(item)?.trim().slice(0, 60);
-    return name ? [name] : [];
-  }))];
+  return [
+    ...new Set(
+      value.flatMap((item) => {
+        const name = stringValue(item)?.trim().slice(0, 60);
+        return name ? [name] : [];
+      }),
+    ),
+  ];
 }
 
-export function sanitizeQuickCommand(
-  value: unknown,
-): QuickCommandRecord | undefined {
+export function sanitizeQuickCommand(value: unknown): QuickCommandRecord | undefined {
   if (!isRecord(value)) return undefined;
 
   const id = stringValue(value.id);
@@ -233,8 +229,7 @@ function sanitizeRemotePaths(value: unknown, limit: number) {
   if (!Array.isArray(value)) return [];
   const paths: string[] = [];
   for (const item of value) {
-    const path =
-      typeof item === "string" ? normalizeRemoteDirectoryPath(item) : null;
+    const path = typeof item === "string" ? normalizeRemoteDirectoryPath(item) : null;
     if (!path || paths.includes(path)) continue;
     paths.push(path);
     if (paths.length >= limit) break;
@@ -242,9 +237,7 @@ function sanitizeRemotePaths(value: unknown, limit: number) {
   return paths;
 }
 
-export function sanitizeSftpLocation(
-  value: unknown,
-): SftpLocationRecord | undefined {
+export function sanitizeSftpLocation(value: unknown): SftpLocationRecord | undefined {
   if (!isRecord(value)) return undefined;
   const hostId = stringValue(value.hostId);
   if (!hostId) return undefined;
@@ -255,9 +248,7 @@ export function sanitizeSftpLocation(
   };
 }
 
-function sanitizeLocalPortForward(
-  value: unknown,
-): LocalPortForwardRule | undefined {
+function sanitizeLocalPortForward(value: unknown): LocalPortForwardRule | undefined {
   if (!isRecord(value)) return undefined;
   const id = stringValue(value.id);
   const name = stringValue(value.name);
@@ -276,9 +267,7 @@ function sanitizeLocalPortForward(
   };
 }
 
-function sanitizeRemotePortForward(
-  value: unknown,
-): RemotePortForwardRule | undefined {
+function sanitizeRemotePortForward(value: unknown): RemotePortForwardRule | undefined {
   if (!isRecord(value)) return undefined;
   const id = stringValue(value.id);
   const name = stringValue(value.name);
@@ -297,9 +286,7 @@ function sanitizeRemotePortForward(
   };
 }
 
-function sanitizeDynamicPortForward(
-  value: unknown,
-): DynamicPortForwardRule | undefined {
+function sanitizeDynamicPortForward(value: unknown): DynamicPortForwardRule | undefined {
   if (!isRecord(value)) return undefined;
   const id = stringValue(value.id);
   const name = stringValue(value.name);
@@ -327,8 +314,7 @@ function sanitizeHost(value: unknown): HostRecord | undefined {
     value.authMethod === "privateKey" || value.authMethod === "agent"
       ? value.authMethod
       : "password";
-  const sshKeyId =
-    authMethod === "privateKey" ? stringValue(value.sshKeyId) : undefined;
+  const sshKeyId = authMethod === "privateKey" ? stringValue(value.sshKeyId) : undefined;
 
   return withHostDefaults({
     id,
@@ -339,46 +325,23 @@ function sanitizeHost(value: unknown): HostRecord | undefined {
     authMethod,
     sshKeyId,
     privateKeyPath:
-      authMethod === "privateKey" && !sshKeyId
-        ? stringValue(value.privateKeyPath)
-        : undefined,
-    connectTimeoutSeconds: numberValue(
-      value.connectTimeoutSeconds,
-      10,
-      1,
-      120,
-    ),
-    keepAliveIntervalSeconds: numberValue(
-      value.keepAliveIntervalSeconds,
-      15,
-      0,
-      300,
-    ),
+      authMethod === "privateKey" && !sshKeyId ? stringValue(value.privateKeyPath) : undefined,
+    connectTimeoutSeconds: numberValue(value.connectTimeoutSeconds, 10, 1, 120),
+    keepAliveIntervalSeconds: numberValue(value.keepAliveIntervalSeconds, 15, 0, 300),
     autoReconnect: optionalBoolean(value.autoReconnect) ?? true,
     maxReconnectAttempts: numberValue(value.maxReconnectAttempts, 3, 0, 10),
     proxyId: stringValue(value.proxyId),
     jumpHostId: stringValue(value.jumpHostId),
-    localPortForwards: sanitizeList(
-      value.localPortForwards,
-      sanitizeLocalPortForward,
-    ),
-    remotePortForwards: sanitizeList(
-      value.remotePortForwards,
-      sanitizeRemotePortForward,
-    ),
-    dynamicPortForwards: sanitizeList(
-      value.dynamicPortForwards,
-      sanitizeDynamicPortForward,
-    ),
+    localPortForwards: sanitizeList(value.localPortForwards, sanitizeLocalPortForward),
+    remotePortForwards: sanitizeList(value.remotePortForwards, sanitizeRemotePortForward),
+    dynamicPortForwards: sanitizeList(value.dynamicPortForwards, sanitizeDynamicPortForward),
     group: stringValue(value.group),
     hostFingerprint: stringValue(value.hostFingerprint),
     lastConnectedAt: stringValue(value.lastConnectedAt),
   });
 }
 
-function sanitizeHistoryRecord(
-  value: unknown,
-): ConnectionHistoryRecord | undefined {
+function sanitizeHistoryRecord(value: unknown): ConnectionHistoryRecord | undefined {
   if (!isRecord(value)) return undefined;
 
   const id = stringValue(value.id);
@@ -391,8 +354,7 @@ function sanitizeHistoryRecord(
     value.authMethod === "privateKey" || value.authMethod === "agent"
       ? value.authMethod
       : "password";
-  const sshKeyId =
-    authMethod === "privateKey" ? stringValue(value.sshKeyId) : undefined;
+  const sshKeyId = authMethod === "privateKey" ? stringValue(value.sshKeyId) : undefined;
 
   return {
     id,
@@ -404,32 +366,16 @@ function sanitizeHistoryRecord(
     authMethod,
     sshKeyId,
     privateKeyPath:
-      authMethod === "privateKey" && !sshKeyId
-        ? stringValue(value.privateKeyPath)
-        : undefined,
+      authMethod === "privateKey" && !sshKeyId ? stringValue(value.privateKeyPath) : undefined,
     hostFingerprint: stringValue(value.hostFingerprint),
-    keepAliveIntervalSeconds: numberValue(
-      value.keepAliveIntervalSeconds,
-      15,
-      0,
-      300,
-    ),
+    keepAliveIntervalSeconds: numberValue(value.keepAliveIntervalSeconds, 15, 0, 300),
     autoReconnect: optionalBoolean(value.autoReconnect) ?? true,
     maxReconnectAttempts: numberValue(value.maxReconnectAttempts, 3, 0, 10),
     proxyId: stringValue(value.proxyId),
     jumpHostId: stringValue(value.jumpHostId),
-    localPortForwards: sanitizeList(
-      value.localPortForwards,
-      sanitizeLocalPortForward,
-    ),
-    remotePortForwards: sanitizeList(
-      value.remotePortForwards,
-      sanitizeRemotePortForward,
-    ),
-    dynamicPortForwards: sanitizeList(
-      value.dynamicPortForwards,
-      sanitizeDynamicPortForward,
-    ),
+    localPortForwards: sanitizeList(value.localPortForwards, sanitizeLocalPortForward),
+    remotePortForwards: sanitizeList(value.remotePortForwards, sanitizeRemotePortForward),
+    dynamicPortForwards: sanitizeList(value.dynamicPortForwards, sanitizeDynamicPortForward),
     connectedAt,
   };
 }
@@ -438,9 +384,7 @@ function sanitizeKnownHost(value: unknown): KnownHostRecord | undefined {
   if (!isRecord(value)) return undefined;
 
   const address = stringValue(value.address)?.trim();
-  const fingerprint = normalizeHostFingerprint(
-    stringValue(value.fingerprint) ?? "",
-  );
+  const fingerprint = normalizeHostFingerprint(stringValue(value.fingerprint) ?? "");
   if (!address || !fingerprint) return undefined;
 
   const port = numberValue(value.port, 22, 1, 65_535);
@@ -462,17 +406,14 @@ function sanitizeKnownHost(value: unknown): KnownHostRecord | undefined {
     port,
     fingerprint,
     firstSeenAt:
-      Date.parse(firstSeenAt) <= Date.parse(lastVerifiedAt)
-        ? firstSeenAt
-        : lastVerifiedAt,
+      Date.parse(firstSeenAt) <= Date.parse(lastVerifiedAt) ? firstSeenAt : lastVerifiedAt,
     lastVerifiedAt,
   };
 }
 
 function sanitizeKnownHosts(value: unknown) {
   const records = sanitizeList(value, sanitizeKnownHost).sort(
-    (left, right) =>
-      Date.parse(left.lastVerifiedAt) - Date.parse(right.lastVerifiedAt),
+    (left, right) => Date.parse(left.lastVerifiedAt) - Date.parse(right.lastVerifiedAt),
   );
   let deduplicated: KnownHostRecord[] = [];
   for (const record of records) {
@@ -501,8 +442,7 @@ function sanitizeKnownHosts(value: unknown) {
     );
   }
   return deduplicated.sort(
-    (left, right) =>
-      Date.parse(right.lastVerifiedAt) - Date.parse(left.lastVerifiedAt),
+    (left, right) => Date.parse(right.lastVerifiedAt) - Date.parse(left.lastVerifiedAt),
   );
 }
 
@@ -514,9 +454,7 @@ function sanitizeBackup(value: unknown): ConfigurationBackup | undefined {
   const reason = stringValue(value.reason);
   if (!id || !createdAt || !reason) return undefined;
 
-  const settings = isRecord(value.settings)
-    ? sanitizeAppSettings(value.settings)
-    : undefined;
+  const settings = isRecord(value.settings) ? sanitizeAppSettings(value.settings) : undefined;
   return {
     id,
     createdAt,
@@ -530,12 +468,12 @@ function sanitizeBackup(value: unknown): ConfigurationBackup | undefined {
     proxies: sanitizeList(value.proxies, sanitizeProxy),
     sshKeys: sanitizeList(value.sshKeys, sanitizeSshKey),
     quickCommands: sanitizeList(value.quickCommands, sanitizeQuickCommand),
-    ...(Array.isArray(value.quickCommandGroups) && { quickCommandGroups: sanitizeQuickCommandGroups(value.quickCommandGroups) }),
+    ...(Array.isArray(value.quickCommandGroups) && {
+      quickCommandGroups: sanitizeQuickCommandGroups(value.quickCommandGroups),
+    }),
     hostSort: sanitizeHostSortMode(value.hostSort),
     sftpLocations: sanitizeList(value.sftpLocations, sanitizeSftpLocation),
-    knownHosts: Array.isArray(value.knownHosts)
-      ? sanitizeKnownHosts(value.knownHosts)
-      : undefined,
+    knownHosts: Array.isArray(value.knownHosts) ? sanitizeKnownHosts(value.knownHosts) : undefined,
     settings,
   };
 }
@@ -561,10 +499,7 @@ function sanitizeDeletedHost(value: unknown): DeletedHostRecord | undefined {
   return { id, host, deletedAt, expiresAt };
 }
 
-function sanitizeList<T>(
-  value: unknown,
-  sanitize: (item: unknown) => T | undefined,
-) {
+function sanitizeList<T>(value: unknown, sanitize: (item: unknown) => T | undefined) {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
     const sanitized = sanitize(item);
@@ -646,20 +581,11 @@ function normalizeConfiguration(value: unknown): FineShellConfiguration {
       ? sanitizeKnownHosts(value.knownHosts)
       : deriveKnownHostRecords(hosts, history, updatedAt),
     terminalCommandHistory: applyTerminalCommandHistoryPolicy(
-      sanitizeList(
-        value.terminalCommandHistory,
-        sanitizeTerminalCommandHistoryRecord,
-      ),
+      sanitizeList(value.terminalCommandHistory, sanitizeTerminalCommandHistoryRecord),
     ),
     settings,
-    credentialReferences: sanitizeList(
-      value.credentialReferences,
-      sanitizeCredentialReference,
-    ),
-    backups: sanitizeList(value.backups, sanitizeBackup).slice(
-      0,
-      MAX_CONFIGURATION_BACKUPS,
-    ),
+    credentialReferences: sanitizeList(value.credentialReferences, sanitizeCredentialReference),
+    backups: sanitizeList(value.backups, sanitizeBackup).slice(0, MAX_CONFIGURATION_BACKUPS),
     trash: sanitizeList(value.trash, sanitizeDeletedHost),
     ...(typeof value.hostSyncBase === "string" ? { hostSyncBase: value.hostSyncBase } : {}),
     updatedAt,
@@ -672,7 +598,7 @@ export function createBackup(
   now = new Date().toISOString(),
 ): ConfigurationBackup {
   return {
-    id: `backup-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    id: `backup-${Date.now()}-${randomIdSuffix()}`,
     createdAt: now,
     reason,
     hosts: configuration.hosts,
@@ -700,7 +626,8 @@ export function serializeConfigurationExport(
     | "sftpLocations"
     | "knownHosts"
     | "settings"
-  > & Partial<Pick<FineShellConfiguration, "quickCommandGroups">>,
+  > &
+    Partial<Pick<FineShellConfiguration, "quickCommandGroups">>,
   now = new Date().toISOString(),
 ) {
   const settings = sanitizeAppSettings(configuration.settings);
@@ -716,16 +643,12 @@ export function serializeConfigurationExport(
     ),
     proxies: sanitizeList(configuration.proxies, sanitizeProxy),
     sshKeys: sanitizeList(configuration.sshKeys, sanitizeSshKey),
-    quickCommands: sanitizeList(
-      configuration.quickCommands,
-      sanitizeQuickCommand,
-    ),
-    ...(configuration.quickCommandGroups && { quickCommandGroups: sanitizeQuickCommandGroups(configuration.quickCommandGroups) }),
+    quickCommands: sanitizeList(configuration.quickCommands, sanitizeQuickCommand),
+    ...(configuration.quickCommandGroups && {
+      quickCommandGroups: sanitizeQuickCommandGroups(configuration.quickCommandGroups),
+    }),
     hostSort: configuration.hostSort,
-    sftpLocations: sanitizeList(
-      configuration.sftpLocations,
-      sanitizeSftpLocation,
-    ),
+    sftpLocations: sanitizeList(configuration.sftpLocations, sanitizeSftpLocation),
     knownHosts: sanitizeKnownHosts(configuration.knownHosts),
     settings,
   };
@@ -763,16 +686,14 @@ export function parseConfigurationExport(contents: string) {
     proxies: sanitizeList(value.proxies, sanitizeProxy),
     sshKeys: sanitizeList(value.sshKeys, sanitizeSshKey),
     quickCommands: sanitizeList(value.quickCommands, sanitizeQuickCommand),
-    ...(Array.isArray(value.quickCommandGroups) && { quickCommandGroups: sanitizeQuickCommandGroups(value.quickCommandGroups) }),
+    ...(Array.isArray(value.quickCommandGroups) && {
+      quickCommandGroups: sanitizeQuickCommandGroups(value.quickCommandGroups),
+    }),
     hostSort: sanitizeHostSortMode(value.hostSort),
     sftpLocations: sanitizeList(value.sftpLocations, sanitizeSftpLocation),
     knownHosts: Array.isArray(value.knownHosts)
       ? sanitizeKnownHosts(value.knownHosts)
-      : deriveKnownHostRecords(
-          hosts,
-          history,
-          exportedAt,
-        ),
+      : deriveKnownHostRecords(hosts, history, exportedAt),
     settings,
   };
 }
@@ -787,10 +708,8 @@ function requestResult<T>(request: IDBRequest<T>) {
 function transactionDone(transaction: IDBTransaction) {
   return new Promise<void>((resolve, reject) => {
     transaction.oncomplete = () => resolve();
-    transaction.onabort = () =>
-      reject(transaction.error ?? new Error("数据库事务已取消"));
-    transaction.onerror = () =>
-      reject(transaction.error ?? new Error("数据库事务失败"));
+    transaction.onabort = () => reject(transaction.error ?? new Error("数据库事务已取消"));
+    transaction.onerror = () => reject(transaction.error ?? new Error("数据库事务失败"));
   });
 }
 
@@ -804,8 +723,7 @@ function openDatabase() {
       }
     };
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () =>
-      reject(request.error ?? new Error("无法打开本地配置数据库"));
+    request.onerror = () => reject(request.error ?? new Error("无法打开本地配置数据库"));
     request.onblocked = () => reject(new Error("本地配置数据库升级被阻止"));
   });
   return databasePromise;
@@ -821,7 +739,29 @@ async function readConfigurationRecord(database: IDBDatabase) {
   return value;
 }
 
+async function decodeConfigurationRecord(stored: unknown) {
+  if (!stored) return undefined;
+  if (isEncryptedLocalRecord(stored)) {
+    return normalizeConfiguration(await decryptLocalValue<UnknownRecord>(stored));
+  }
+  return normalizeConfiguration(stored);
+}
+
+async function encodeConfigurationRecord(configuration: FineShellConfiguration) {
+  if (!(await isLocalDataEncryptionEnabled())) return configuration;
+  return { id: CONFIGURATION_ID, ...(await encryptLocalValue(configuration)) };
+}
+
+async function writeConfigurationRecord(record: unknown) {
+  const database = await openDatabase();
+  const transaction = database.transaction(CONFIGURATION_STORE, "readwrite");
+  const completed = transactionDone(transaction);
+  transaction.objectStore(CONFIGURATION_STORE).put(record);
+  await completed;
+}
+
 async function initializeConfiguration() {
+  await assertLocalDataAccessible();
   const database = await openDatabase();
   let legacyHosts: string | null = null;
   let legacyHistory: string | null = null;
@@ -834,18 +774,14 @@ async function initializeConfiguration() {
     // Restricted webviews may deny localStorage access.
   }
 
-  const transaction = database.transaction(CONFIGURATION_STORE, "readwrite");
-  const completed = transactionDone(transaction);
-  const store = transaction.objectStore(CONFIGURATION_STORE);
-  const stored = await requestResult(store.get(CONFIGURATION_ID));
-  const configuration = stored
-    ? normalizeConfiguration(stored)
-    : migrateLegacyConfiguration(legacyHosts, legacyHistory);
-  if (!Array.isArray(stored?.quickCommandGroups)) {
-    configuration.quickCommandGroups = sanitizeQuickCommandGroups(parseLegacyList(legacyCommandGroups));
+  const stored = await decodeConfigurationRecord(await readConfigurationRecord(database));
+  const configuration = stored ?? migrateLegacyConfiguration(legacyHosts, legacyHistory);
+  if (!stored || !Array.isArray(stored.quickCommandGroups)) {
+    configuration.quickCommandGroups = sanitizeQuickCommandGroups(
+      parseLegacyList(legacyCommandGroups),
+    );
   }
-  store.put(configuration);
-  await completed;
+  await writeConfigurationRecord(await encodeConfigurationRecord(configuration));
 
   try {
     localStorage.removeItem(HOSTS_STORAGE_KEY);
@@ -857,34 +793,62 @@ async function initializeConfiguration() {
 }
 
 async function ensureInitialized() {
-  initializationPromise ??= initializeConfiguration();
+  if (!initializationPromise) {
+    initializationPromise = initializeConfiguration().catch((error) => {
+      initializationPromise = undefined;
+      throw error;
+    });
+  }
   await initializationPromise;
 }
 
 export async function loadConfiguration() {
   await ensureInitialized();
-  const stored = await readConfigurationRecord(await openDatabase());
-  return normalizeConfiguration(stored);
+  await assertLocalDataAccessible();
+  const stored = await decodeConfigurationRecord(
+    await readConfigurationRecord(await openDatabase()),
+  );
+  return stored ?? normalizeConfiguration(undefined);
 }
 
-export async function updateConfiguration(
+export function updateConfiguration(
   update: (current: FineShellConfiguration) => FineShellConfiguration,
 ) {
-  await ensureInitialized();
-  const database = await openDatabase();
-  const transaction = database.transaction(CONFIGURATION_STORE, "readwrite");
-  const completed = transactionDone(transaction);
-  const store = transaction.objectStore(CONFIGURATION_STORE);
-  const current = normalizeConfiguration(
-    await requestResult(store.get(CONFIGURATION_ID)),
-  );
-  const next = normalizeConfiguration({
-    ...update(current),
-    id: CONFIGURATION_ID,
-    schemaVersion: CONFIGURATION_SCHEMA_VERSION,
-    updatedAt: new Date().toISOString(),
+  const task = configurationWriteQueue.then(async () => {
+    await ensureInitialized();
+    await assertLocalDataAccessible();
+    const current =
+      (await decodeConfigurationRecord(await readConfigurationRecord(await openDatabase()))) ??
+      normalizeConfiguration(undefined);
+    const next = normalizeConfiguration({
+      ...update(current),
+      id: CONFIGURATION_ID,
+      schemaVersion: CONFIGURATION_SCHEMA_VERSION,
+      updatedAt: new Date().toISOString(),
+    });
+    await writeConfigurationRecord(await encodeConfigurationRecord(next));
+    return next;
   });
-  store.put(next);
-  await completed;
-  return next;
+  configurationWriteQueue = task.then(
+    () => undefined,
+    () => undefined,
+  );
+  return task;
+}
+
+export function rewriteStoredConfiguration(options: { plaintext?: boolean } = {}) {
+  const task = configurationWriteQueue.then(async () => {
+    await ensureInitialized();
+    const current =
+      (await decodeConfigurationRecord(await readConfigurationRecord(await openDatabase()))) ??
+      normalizeConfiguration(undefined);
+    const record = options.plaintext ? current : await encodeConfigurationRecord(current);
+    await writeConfigurationRecord(record);
+    return current;
+  });
+  configurationWriteQueue = task.then(
+    () => undefined,
+    () => undefined,
+  );
+  return task;
 }

@@ -16,6 +16,7 @@ mod external_edit;
 mod host_sync;
 mod ip_region;
 mod local_files;
+mod local_paths;
 mod managed_keys;
 mod monitor;
 #[cfg(desktop)]
@@ -117,6 +118,7 @@ pub fn run() {
             config_files::read_ghostty_themes,
             config_files::ssh_config_include_files,
             config_files::write_config_file,
+            local_paths::pick_local_path,
             cloud_backup::cloud_backup_store_s3_credentials,
             cloud_backup::cloud_backup_delete_s3_credentials,
             cloud_backup::cloud_backup_s3_credential_status,
@@ -154,6 +156,7 @@ pub fn run() {
             agent::ai_task_plan_decide,
             agent::ai_task_action_transition,
             agent::ai_task_command_observe,
+            agent_executor::ai_task_action_approve,
             agent_executor::ai_task_action_execute,
             managed_keys::managed_ssh_key_import,
             managed_keys::managed_ssh_key_delete,

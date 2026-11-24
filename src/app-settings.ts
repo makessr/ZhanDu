@@ -28,8 +28,7 @@ export type TerminalLogFormat = "plain" | "raw";
 export type ConnectionHistoryLimit = 0 | 20 | 50 | 100;
 export type ConnectionHistoryRetentionDays = 0 | 7 | 30 | 90;
 export type DiagnosticLogLevel = "debug" | "info" | "warn" | "error";
-export type GithubMirrorRoute =
-  "auto" | "direct" | "gh-proxy.com" | "ghproxy.net" | "custom";
+export type GithubMirrorRoute = "auto" | "direct" | "gh-proxy.com" | "ghproxy.net" | "custom";
 
 export interface AppSettings {
   appearanceMode: AppearanceMode;
@@ -146,7 +145,13 @@ export function terminalFontCss(
 ): string {
   const preset = TERMINAL_FONT_FAMILIES[settings.terminalFontFamily];
   const names = sanitizeTerminalFontNames(settings.terminalCustomFontNames);
-  return names ? names.split(", ").map((name) => `"${name}"`).concat(preset).join(", ") : preset;
+  return names
+    ? names
+        .split(", ")
+        .map((name) => `"${name}"`)
+        .concat(preset)
+        .join(", ")
+    : preset;
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -159,23 +164,13 @@ function booleanValue(value: unknown, fallback: boolean) {
   return typeof value === "boolean" ? value : fallback;
 }
 
-function numberValue(
-  value: unknown,
-  fallback: number,
-  min: number,
-  max: number,
-) {
+function numberValue(value: unknown, fallback: number, min: number, max: number) {
   return typeof value === "number" && Number.isFinite(value)
     ? Math.min(max, Math.max(min, Math.round(value)))
     : fallback;
 }
 
-function decimalValue(
-  value: unknown,
-  fallback: number,
-  min: number,
-  max: number,
-) {
+function decimalValue(value: unknown, fallback: number, min: number, max: number) {
   if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
   return Math.round(Math.min(max, Math.max(min, value)) * 10) / 10;
 }
@@ -188,17 +183,12 @@ function connectionHistoryLimitValue(value: unknown): ConnectionHistoryLimit {
   return value === 0 || value === 20 || value === 100 ? value : 50;
 }
 
-function connectionHistoryRetentionDaysValue(
-  value: unknown,
-): ConnectionHistoryRetentionDays {
+function connectionHistoryRetentionDaysValue(value: unknown): ConnectionHistoryRetentionDays {
   return value === 7 || value === 30 || value === 90 ? value : 0;
 }
 
 function aiProviderValue(value: unknown, baseUrl: string): AiProvider {
-  return value === "openai" ||
-    value === "deepseek" ||
-    value === "ollama" ||
-    value === "custom"
+  return value === "openai" || value === "deepseek" || value === "ollama" || value === "custom"
     ? value
     : inferAiProvider(baseUrl);
 }
@@ -215,21 +205,18 @@ function githubMirrorRouteValue(value: unknown): GithubMirrorRoute {
 export function sanitizeAppSettings(value: unknown): AppSettings {
   const settings = isRecord(value) ? value : {};
   const terminalCustomThemes = sanitizeCustomTerminalThemes(settings.terminalCustomThemes);
-  const aiBaseUrl =
-    stringValue(settings.aiBaseUrl) || DEFAULT_APP_SETTINGS.aiBaseUrl;
+  const aiBaseUrl = stringValue(settings.aiBaseUrl) || DEFAULT_APP_SETTINGS.aiBaseUrl;
   return {
     appearanceMode:
       settings.appearanceMode === "dark" || settings.appearanceMode === "system"
         ? settings.appearanceMode
         : DEFAULT_APP_SETTINGS.appearanceMode,
-    terminalColorScheme:
-      isTerminalColorScheme(settings.terminalColorScheme, terminalCustomThemes)
-        ? settings.terminalColorScheme
-        : DEFAULT_APP_SETTINGS.terminalColorScheme,
+    terminalColorScheme: isTerminalColorScheme(settings.terminalColorScheme, terminalCustomThemes)
+      ? settings.terminalColorScheme
+      : DEFAULT_APP_SETTINGS.terminalColorScheme,
     terminalCustomThemes,
     terminalFontFamily:
-      settings.terminalFontFamily === "menlo" ||
-      settings.terminalFontFamily === "consolas"
+      settings.terminalFontFamily === "menlo" || settings.terminalFontFamily === "consolas"
         ? settings.terminalFontFamily
         : DEFAULT_APP_SETTINGS.terminalFontFamily,
     terminalCustomFontNames: sanitizeTerminalFontNames(settings.terminalCustomFontNames),
@@ -267,8 +254,7 @@ export function sanitizeAppSettings(value: unknown): AppSettings {
       2,
     ),
     terminalCursorStyle:
-      settings.terminalCursorStyle === "underline" ||
-      settings.terminalCursorStyle === "bar"
+      settings.terminalCursorStyle === "underline" || settings.terminalCursorStyle === "bar"
         ? settings.terminalCursorStyle
         : DEFAULT_APP_SETTINGS.terminalCursorStyle,
     terminalCursorBlink: booleanValue(
@@ -295,19 +281,14 @@ export function sanitizeAppSettings(value: unknown): AppSettings {
     ),
     terminalLogDirectory: stringValue(settings.terminalLogDirectory),
     terminalLogFormat:
-      settings.terminalLogFormat === "raw"
-        ? "raw"
-        : DEFAULT_APP_SETTINGS.terminalLogFormat,
+      settings.terminalLogFormat === "raw" ? "raw" : DEFAULT_APP_SETTINGS.terminalLogFormat,
     terminalLogMaxFileSizeMb: numberValue(
       settings.terminalLogMaxFileSizeMb,
       DEFAULT_APP_SETTINGS.terminalLogMaxFileSizeMb,
       10,
       2_048,
     ),
-    showHiddenFiles: booleanValue(
-      settings.showHiddenFiles,
-      DEFAULT_APP_SETTINGS.showHiddenFiles,
-    ),
+    showHiddenFiles: booleanValue(settings.showHiddenFiles, DEFAULT_APP_SETTINGS.showHiddenFiles),
     confirmFileDelete: booleanValue(
       settings.confirmFileDelete,
       DEFAULT_APP_SETTINGS.confirmFileDelete,
@@ -350,9 +331,7 @@ export function sanitizeAppSettings(value: unknown): AppSettings {
       0,
       5,
     ),
-    connectionHistoryLimit: connectionHistoryLimitValue(
-      settings.connectionHistoryLimit,
-    ),
+    connectionHistoryLimit: connectionHistoryLimitValue(settings.connectionHistoryLimit),
     connectionHistoryRetentionDays: connectionHistoryRetentionDaysValue(
       settings.connectionHistoryRetentionDays,
     ),
@@ -363,10 +342,7 @@ export function sanitizeAppSettings(value: unknown): AppSettings {
         ? settings.diagnosticLogLevel
         : DEFAULT_APP_SETTINGS.diagnosticLogLevel,
     githubMirrorRoute: githubMirrorRouteValue(settings.githubMirrorRoute),
-    githubMirrorCustomUrl: stringValue(settings.githubMirrorCustomUrl).slice(
-      0,
-      512,
-    ),
+    githubMirrorCustomUrl: stringValue(settings.githubMirrorCustomUrl).slice(0, 512),
     aiProvider: aiProviderValue(settings.aiProvider, aiBaseUrl),
     aiBaseUrl,
     aiModel: stringValue(settings.aiModel).slice(0, 160),
@@ -376,10 +352,7 @@ export function sanitizeAppSettings(value: unknown): AppSettings {
       2_000,
       32_000,
     ),
-    aiReadOnlyTools: sanitizeAiReadOnlyTools(
-      settings.aiReadOnlyTools,
-      settings.aiToolsEnabled,
-    ),
+    aiReadOnlyTools: sanitizeAiReadOnlyTools(settings.aiReadOnlyTools, settings.aiToolsEnabled),
     aiFileProposalsEnabled: booleanValue(
       settings.aiFileProposalsEnabled,
       DEFAULT_APP_SETTINGS.aiFileProposalsEnabled,
@@ -396,10 +369,9 @@ export function sanitizeAppSettings(value: unknown): AppSettings {
 }
 
 export function appSettingsEqual(left: AppSettings, right: AppSettings) {
-  return (Object.keys(DEFAULT_APP_SETTINGS) as (keyof AppSettings)[]).every(
-    (key) =>
-      Array.isArray(left[key]) && Array.isArray(right[key])
-        ? JSON.stringify(left[key]) === JSON.stringify(right[key])
-        : left[key] === right[key],
+  return (Object.keys(DEFAULT_APP_SETTINGS) as (keyof AppSettings)[]).every((key) =>
+    Array.isArray(left[key]) && Array.isArray(right[key])
+      ? JSON.stringify(left[key]) === JSON.stringify(right[key])
+      : left[key] === right[key],
   );
 }

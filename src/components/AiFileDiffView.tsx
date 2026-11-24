@@ -68,10 +68,7 @@ export function aiFileLanguage(path: string) {
   return EXTENSION_LANGUAGES[fileName.slice(extensionIndex + 1)] ?? "plain";
 }
 
-function boundedItems<T>(
-  items: T[],
-  isChanged: (item: T) => boolean,
-): BoundedItem<T>[] {
+function boundedItems<T>(items: T[], isChanged: (item: T) => boolean): BoundedItem<T>[] {
   if (items.length <= MAX_RENDERED_DIFF_ROWS) {
     return items.map((item) => ({ item }));
   }
@@ -123,9 +120,7 @@ function renderTokens(
   const lineNumber = side === "old" ? line.oldLineNumber : line.newLineNumber;
   const tokens = lineNumber ? render.tokens[lineNumber - 1] : undefined;
   if (!tokens) return line.content || " ";
-  return tokens.map((token, index) => (
-    <span key={index} {...render.getTokenProps({ token })} />
-  ));
+  return tokens.map((token, index) => <span key={index} {...render.getTokenProps({ token })} />);
 }
 
 function OmittedRows({ count }: { count: number }) {
@@ -149,9 +144,7 @@ function UnifiedDiff({
     <div className="ai-file-diff-lines ai-file-diff-lines-unified">
       {items.map((entry, index) => {
         if (!entry.item) {
-          return (
-            <OmittedRows count={entry.omitted ?? 0} key={`omitted-${index}`} />
-          );
+          return <OmittedRows count={entry.omitted ?? 0} key={`omitted-${index}`} />;
         }
         const line = entry.item;
         return (
@@ -161,18 +154,10 @@ function UnifiedDiff({
             data-old-line={line.oldLineNumber}
             key={`${line.kind}-${line.oldLineNumber ?? ""}-${line.newLineNumber ?? ""}`}
           >
-            <span className="ai-file-diff-line-number">
-              {line.oldLineNumber ?? ""}
-            </span>
-            <span className="ai-file-diff-line-number">
-              {line.newLineNumber ?? ""}
-            </span>
+            <span className="ai-file-diff-line-number">{line.oldLineNumber ?? ""}</span>
+            <span className="ai-file-diff-line-number">{line.newLineNumber ?? ""}</span>
             <span className="ai-file-diff-marker" aria-hidden>
-              {line.kind === "added"
-                ? "+"
-                : line.kind === "removed"
-                  ? "-"
-                  : " "}
+              {line.kind === "added" ? "+" : line.kind === "removed" ? "-" : " "}
             </span>
             <code>
               {renderTokens(
@@ -205,30 +190,20 @@ function SplitDiff({
       </div>
       {items.map((entry, index) => {
         if (!entry.item) {
-          return (
-            <OmittedRows count={entry.omitted ?? 0} key={`omitted-${index}`} />
-          );
+          return <OmittedRows count={entry.omitted ?? 0} key={`omitted-${index}`} />;
         }
         const row = entry.item;
         return (
           <div className="ai-file-diff-split-row" key={index}>
-            <div
-              className={`ai-file-diff-cell ai-file-diff-line-${row.left?.kind ?? "empty"}`}
-            >
-              <span className="ai-file-diff-line-number">
-                {row.left?.oldLineNumber ?? ""}
-              </span>
+            <div className={`ai-file-diff-cell ai-file-diff-line-${row.left?.kind ?? "empty"}`}>
+              <span className="ai-file-diff-line-number">{row.left?.oldLineNumber ?? ""}</span>
               <span className="ai-file-diff-marker" aria-hidden>
                 {row.left?.kind === "removed" ? "-" : " "}
               </span>
               <code>{renderTokens(row.left, "old", oldRender)}</code>
             </div>
-            <div
-              className={`ai-file-diff-cell ai-file-diff-line-${row.right?.kind ?? "empty"}`}
-            >
-              <span className="ai-file-diff-line-number">
-                {row.right?.newLineNumber ?? ""}
-              </span>
+            <div className={`ai-file-diff-cell ai-file-diff-line-${row.right?.kind ?? "empty"}`}>
+              <span className="ai-file-diff-line-number">{row.right?.newLineNumber ?? ""}</span>
               <span className="ai-file-diff-marker" aria-hidden>
                 {row.right?.kind === "added" ? "+" : " "}
               </span>
@@ -267,8 +242,7 @@ function AiFileDiffView({
     () =>
       boundedItems(
         aiFileEditSideBySideRows(originalContent, proposedContent),
-        (row) =>
-          row.left?.kind !== "unchanged" || row.right?.kind !== "unchanged",
+        (row) => row.left?.kind !== "unchanged" || row.right?.kind !== "unchanged",
       ),
     [originalContent, proposedContent],
   );
@@ -293,35 +267,15 @@ function AiFileDiffView({
           value={mode}
         />
       </div>
-      <div
-        className="ai-file-edit-diff"
-        role="region"
-        aria-label="文件修改差异"
-      >
-        <Highlight
-          code={originalContent}
-          language={language}
-          theme={syntaxTheme}
-        >
+      <div className="ai-file-edit-diff" role="region" aria-label="文件修改差异">
+        <Highlight code={originalContent} language={language} theme={syntaxTheme}>
           {(oldRender) => (
-            <Highlight
-              code={proposedContent}
-              language={language}
-              theme={syntaxTheme}
-            >
+            <Highlight code={proposedContent} language={language} theme={syntaxTheme}>
               {(newRender) =>
                 mode === "unified" ? (
-                  <UnifiedDiff
-                    items={unifiedItems}
-                    newRender={newRender}
-                    oldRender={oldRender}
-                  />
+                  <UnifiedDiff items={unifiedItems} newRender={newRender} oldRender={oldRender} />
                 ) : (
-                  <SplitDiff
-                    items={splitItems}
-                    newRender={newRender}
-                    oldRender={oldRender}
-                  />
+                  <SplitDiff items={splitItems} newRender={newRender} oldRender={oldRender} />
                 )
               }
             </Highlight>
