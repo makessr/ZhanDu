@@ -1941,7 +1941,7 @@ dependencies = [
  "aws-sdk-s3",
  "aws-smithy-runtime-api",
  "aws-smithy-types",
- "base64 0.22.1",
+ "base64 0.23.1",
  "chacha20poly1305",
  "fast-socks5",
  "futures-util",
