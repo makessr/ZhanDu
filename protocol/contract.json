@@ -142,6 +142,7 @@
     "ai-task": true,
     "configuration:changed": true,
     "host-sync:request": true,
+    "host-sync:status": true,
     "settings:changed": true,
     "appearance:preview": true,
     "menu-select-all": true

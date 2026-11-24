@@ -5,12 +5,13 @@ import { createReadStream } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 
-const [assetDir, releaseFile, previousConfig, verifier, repository, tag, commit, scope, visibility] =
+const [assetDir, releaseFile, previousConfig, verifier, repository, tag, commit, scope, visibility, windowsPrefix = "FineShell"] =
   process.argv.slice(2);
 assert.match(tag ?? "", /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/);
 assert.match(commit ?? "", /^[0-9a-f]{40}$/);
 assert.ok(["all", "windows"].includes(scope), "Invalid release platform scope");
 assert.ok(["draft", "public"].includes(visibility), "Invalid release visibility");
+assert.ok(["FineShell", "ZhanDu"].includes(windowsPrefix), "Invalid Windows asset prefix");
 const release = JSON.parse(await readFile(releaseFile, "utf8"));
 assert.equal(release.tag_name, tag);
 assert.equal(release.target_commitish, commit);
@@ -19,6 +20,9 @@ assert.equal(release.prerelease, tag.includes("-"));
 
 const version = release.tag_name.slice(1);
 const packagePrefix = "FineShell_" + version + "_";
+const packageName = (suffix) => suffix.startsWith("windows_")
+  ? windowsPrefix + "_" + version + "_" + suffix
+  : packagePrefix + suffix;
 const canonicalPlatforms = {
   "darwin-aarch64-app": "darwin_aarch64.app.tar.gz",
   "darwin-x86_64-app": "darwin_x64.app.tar.gz",
@@ -41,7 +45,7 @@ const includesPlatform = (key) => scope === "all" || key.startsWith("windows-");
 const expectedPlatforms = Object.entries(platformPackages).filter(([key]) => includesPlatform(key));
 const signedPackages = Object.entries(canonicalPlatforms)
   .filter(([key]) => includesPlatform(key))
-  .map(([, filename]) => packagePrefix + filename);
+  .map(([, filename]) => packageName(filename));
 const diskImages = scope === "all"
   ? ["darwin_aarch64.dmg", "darwin_x64.dmg"].map((filename) => packagePrefix + filename)
   : [];
@@ -72,7 +76,7 @@ const manifest = JSON.parse(await readFile(join(assetDir, "latest.json"), "utf8"
 assert.equal(manifest.version, version);
 assert.deepEqual(Object.keys(manifest.platforms).sort(), expectedPlatforms.map(([key]) => key).sort());
 for (const [platform, suffix] of expectedPlatforms) {
-  const name = packagePrefix + suffix;
+  const name = packageName(suffix);
   const { url, signature } = manifest.platforms[platform];
   assert.equal(url, `https://github.com/${repository}/releases/download/${release.tag_name}/${name}`);
   assert.equal(signature, (await readFile(join(assetDir, name + ".sig"), "utf8")).trim());

@@ -93,9 +93,13 @@ jobs:
           endpoint="repos/$GITHUB_REPOSITORY/releases/$release_id"
           gh api "$endpoint" > "$RUNNER_TEMP/release.json"
           gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/assets"
+          windows_prefix=FineShell
+          if git show "$RELEASE_COMMIT:src-tauri/tauri.windows.conf.json" | jq -e '.productName == "栈渡"' >/dev/null; then
+            windows_prefix=ZhanDu
+          fi
           node scripts/verify-release-assets.mjs "$RUNNER_TEMP/assets" "$RUNNER_TEMP/release.json" \
             "$RUNNER_TEMP/signer.json" "$RUNNER_TEMP/verifier/debug/verify-release-signature" \
-            "$GITHUB_REPOSITORY" "$RELEASE_TAG" "$RELEASE_COMMIT" "$RELEASE_PLATFORMS" "$RELEASE_VISIBILITY"
+            "$GITHUB_REPOSITORY" "$RELEASE_TAG" "$RELEASE_COMMIT" "$RELEASE_PLATFORMS" "$RELEASE_VISIBILITY" "$windows_prefix"
 
           if [[ "$RELEASE_PLATFORMS" == all ]]; then
             for arch in amd64 arm64; do

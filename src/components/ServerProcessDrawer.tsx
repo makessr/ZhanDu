@@ -1,4 +1,5 @@
 import { WorkspaceToolSurface } from "./WorkspaceToolPanel";
+import { useResizableColumns } from "./ResizableTableColumns";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -44,7 +45,6 @@ interface ServerProcessDrawerProps {
   embedded?: boolean;
 }
 
-const PROCESS_TABLE_WIDTH = 830;
 
 const PROCESS_REFRESH_INTERVAL_MS = 5_000;
 
@@ -242,19 +242,22 @@ function ServerProcessDrawer({
       {
         dataIndex: "command",
         title: "命令行",
-        width: "24%",
+        width: 200,
         render: (command: string) => (
           <span className="server-process-cell" title={command}>{command || "—"}</span>
         ),
       },
       {
+        key: "path",
         title: "路径",
+        width: 160,
         render: (_, process) => {
           const path = process.command?.trimStart().match(/^\/\S+/)?.[0];
           return <span className="server-process-cell" title={path}>{path ?? "—"}</span>;
         },
       },
       {
+        key: "actions",
         title: "操作",
         width: 76,
         render: (_, process) => (
@@ -292,6 +295,7 @@ function ServerProcessDrawer({
     ],
     [confirmSignalProcess, signalingProcess],
   );
+  const processTable = useResizableColumns(columns);
 
   return (
     <WorkspaceToolSurface
@@ -365,7 +369,7 @@ function ServerProcessDrawer({
       )}
       <Table
         border={false}
-        columns={columns}
+        columns={processTable.columns}
         data={filteredProcesses}
         loading={loading && !result}
         noDataElement={
@@ -381,7 +385,7 @@ function ServerProcessDrawer({
           selectedRowKeys: selectedProcessIds,
           type: "checkbox",
         }}
-        scroll={{ x: PROCESS_TABLE_WIDTH, y: "calc(100vh - 180px)" }}
+        scroll={{ x: processTable.tableWidth + 36, y: "calc(100vh - 180px)" }}
         size="mini"
         tableLayoutFixed
       />

@@ -23,27 +23,32 @@ $uninstallRoots = @(
     'HKLM:/Software/Microsoft/Windows/CurrentVersion/Uninstall'
     'HKLM:/Software/WOW6432Node/Microsoft/Windows/CurrentVersion/Uninstall'
 )
-if ((Get-Process -Name fineshell -ErrorAction SilentlyContinue) -or
+$processNames = @('ZhanDu', 'fineshell')
+if ((Get-Process -Name $processNames -ErrorAction SilentlyContinue) -or
     (Get-ChildItem -Path $uninstallRoots -ErrorAction SilentlyContinue |
-        Get-ItemProperty | Where-Object DisplayName -Match '^FineShell(\s|$)')) {
-    throw 'Use a Windows test user or VM with no existing FineShell installation or process.'
+        Get-ItemProperty | Where-Object DisplayName -Match '^(FineShell|栈渡)(\s|$)')) {
+    throw 'Use a Windows test user or VM with no existing ZhanDu installation or process.'
 }
 
 $installer = (Resolve-Path -LiteralPath $VerifiedInstaller).Path
-$workspace = Join-Path ([IO.Path]::GetTempPath()) ('fineshell-ota-' + [guid]::NewGuid().ToString('N'))
+$workspace = Join-Path ([IO.Path]::GetTempPath()) ('zhandu-ota-' + [guid]::NewGuid().ToString('N'))
 $install = Join-Path $workspace 'App'
-$binary = Join-Path $install 'fineshell.exe'
+$binaryPaths = @($processNames | ForEach-Object { Join-Path $install "$_.exe" })
 New-Item -ItemType Directory -Path $workspace | Out-Null
 
 function Get-TestProcess {
-    Get-Process -Name fineshell -ErrorAction SilentlyContinue | Where-Object Path -EQ $binary
+    Get-Process -Name $processNames -ErrorAction SilentlyContinue | Where-Object { $_.Path -in $binaryPaths }
+}
+function Get-TestBinary {
+    $binaryPaths | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
 }
 function Get-TestVersion {
-    if (Test-Path -LiteralPath $binary) { (Get-Item -LiteralPath $binary).VersionInfo.ProductVersion }
+    $binary = Get-TestBinary
+    if ($binary) { (Get-Item -LiteralPath $binary).VersionInfo.ProductVersion }
 }
 function Confirm-TestArchitecture {
     if (!$RequireArm64) { return }
-    $reader = [IO.BinaryReader]::new([IO.File]::OpenRead($binary))
+    $reader = [IO.BinaryReader]::new([IO.File]::OpenRead((Get-TestBinary)))
     try {
         $reader.BaseStream.Position = 0x3c
         $reader.BaseStream.Position = $reader.ReadUInt32()
@@ -63,7 +68,7 @@ function Close-TestProcess {
     }
 }
 function Start-TestApp {
-    Start-Process -FilePath $binary -WorkingDirectory $install -WindowStyle Hidden -PassThru -RedirectStandardError (Join-Path $workspace 'app-stderr.log')
+    Start-Process -FilePath (Get-TestBinary) -WorkingDirectory $install -WindowStyle Hidden -PassThru -RedirectStandardError (Join-Path $workspace 'app-stderr.log')
 }
 
 $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
@@ -75,7 +80,6 @@ $oldFlags = $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS
 $env:WEBVIEW2_USER_DATA_FOLDER = Join-Path $workspace 'WebView2'
 $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$port --remote-debugging-address=127.0.0.1"
 $marker = [guid]::NewGuid().ToString('N')
-$policyName = 'fineshell.exe'
 $runnerPolicyRoot = 'HKLM:/Software/Policies/Microsoft/Edge/WebView2'
 $runnerPolicies = @{
     AdditionalBrowserArguments = $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS
@@ -88,11 +92,14 @@ try {
         foreach ($policy in $runnerPolicies.GetEnumerator()) {
             $policyPath = Join-Path $runnerPolicyRoot $policy.Key
             if (!(Test-Path -LiteralPath $policyPath)) { New-Item -Path $policyPath -Force | Out-Null }
-            if ((Get-Item -LiteralPath $policyPath).GetValueNames() -contains $policyName) {
-                throw "FineShell already has a machine WebView2 $($policy.Key) policy."
+            foreach ($processName in $processNames) {
+                $policyName = "$processName.exe"
+                if ((Get-Item -LiteralPath $policyPath).GetValueNames() -contains $policyName) {
+                    throw "$policyName already has a machine WebView2 $($policy.Key) policy."
+                }
+                New-ItemProperty -LiteralPath $policyPath -Name $policyName -Value $policy.Value -PropertyType String | Out-Null
+                $createdPolicies += @{ Path = $policyPath; Name = $policyName }
             }
-            New-ItemProperty -LiteralPath $policyPath -Name $policyName -Value $policy.Value -PropertyType String | Out-Null
-            $createdPolicies += $policyPath
         }
     }
     $setup = Start-Process -FilePath $installer -ArgumentList '/S', "/D=$install" -WindowStyle Hidden -Wait -PassThru
@@ -127,6 +134,9 @@ try {
         Start-Sleep -Milliseconds 500
     } while ([DateTime]::UtcNow -lt $deadline)
     if ($installed -ne $Target) { throw "The test binary still reports version $installed." }
+    if (@($binaryPaths | Where-Object { Test-Path -LiteralPath $_ }).Count -ne 1) {
+        throw 'The upgrade must leave exactly one main executable.'
+    }
     Confirm-TestArchitecture
 
     $deadline = [DateTime]::UtcNow.AddSeconds(12)
@@ -142,7 +152,7 @@ try {
     & $Node (Join-Path $PSScriptRoot 'ota.mjs') verify $port $Baseline $Target $marker
     if ($LASTEXITCODE) { throw 'The upgraded application failed runtime verification.' }
 } finally {
-    foreach ($policyPath in $createdPolicies) { Remove-ItemProperty -LiteralPath $policyPath -Name $policyName }
+    foreach ($policy in $createdPolicies) { Remove-ItemProperty -LiteralPath $policy.Path -Name $policy.Name }
     Close-TestProcess
     $uninstaller = Join-Path $install 'uninstall.exe'
     if (Test-Path -LiteralPath $uninstaller) {

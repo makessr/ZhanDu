@@ -12,7 +12,7 @@ import {
   credentialReferenceId,
   type CredentialProbeResult,
 } from "./credential-registry";
-import type { HostRecord, ProxyRecord, QuickCommandRecord, SshKeyRecord } from "./models";
+import type { HostRecord, ProxyRecord, QuickCommandRecord, SftpLocationRecord, SshKeyRecord } from "./models";
 import {
   commandErrorMessage,
   emitProtocolEventTo,
@@ -33,6 +33,7 @@ interface HostSyncConfiguration {
   proxies: ProxyRecord[];
   quickCommands: QuickCommandRecord[];
   quickCommandGroups: string[];
+  sftpBookmarks: Pick<SftpLocationRecord, "hostId" | "bookmarks">[];
 }
 
 interface AppliedConfiguration extends HostSyncConfiguration {
@@ -65,6 +66,7 @@ export interface SyncOptions {
   resolution?: { snapshot: string; choices: Record<string, boolean> };
   recover?: boolean;
   manual?: boolean;
+  requestId?: string;
 }
 
 interface SyncInspection {
@@ -138,7 +140,7 @@ export async function relinkHostSyncKey(issue: BlockedSyncRecord, path: string) 
 }
 
 export interface HostSyncStatus {
-  state: "working" | "success" | "failed";
+  state: "queued" | "working" | "success" | "failed";
   time?: string;
   message?: string;
   conflicts?: HostSyncConflict[];
@@ -233,6 +235,7 @@ export function requestHostSync(options: SyncOptions = {}) {
 }
 
 function project(config: FineShellConfiguration): HostSyncConfiguration {
+  const hostIds = new Set(config.hosts.map((host) => host.id));
   const keys = new Set(config.hosts.map((host) => host.sshKeyId));
   const proxies = new Set(config.hosts.map((host) => host.proxyId));
   return {
@@ -241,6 +244,9 @@ function project(config: FineShellConfiguration): HostSyncConfiguration {
     proxies: config.proxies.filter((proxy) => proxies.has(proxy.id)),
     quickCommands: config.quickCommands,
     quickCommandGroups: config.quickCommandGroups,
+    sftpBookmarks: config.sftpLocations
+      .filter(({ hostId, bookmarks }) => hostIds.has(hostId) && bookmarks.length > 0)
+      .map(({ hostId, bookmarks }) => ({ hostId, bookmarks })),
   };
 }
 
@@ -268,8 +274,13 @@ function mergeOrder<T extends { id: string }>(existing: T[], incoming: T[], keep
   return [...merged, ...byId.values()];
 }
 
-function writeStatus(status: HostSyncStatus) {
+function notifyStatus(status: HostSyncStatus, requestId?: string) {
+  void emitProtocolEventTo("settings", "host-sync:status", { status, requestId }).catch(() => undefined);
+}
+
+function writeStatus(status: HostSyncStatus, requestId?: string) {
   localStorage.setItem(statusKey, JSON.stringify(status));
+  notifyStatus(status, requestId);
 }
 
 interface SyncCache {
@@ -343,6 +354,17 @@ async function synchronize(
       .filter((host) => !receivedIds.has(host.id))
       .map((host) => createDeletedHostRecord(host));
     const deletedIds = new Set(deleted.map(({ host }) => host.id));
+    const bookmarksByHost = new Map(received.sftpBookmarks.map(({ hostId, bookmarks }) => [hostId, bookmarks]));
+    const sftpLocations = latest.sftpLocations.map((location) => ({
+      ...location,
+      bookmarks: retained.has(location.hostId)
+        ? location.bookmarks
+        : bookmarksByHost.get(location.hostId) ?? (local.has(location.hostId) ? [] : location.bookmarks),
+    }));
+    const existingLocationIds = new Set(sftpLocations.map(({ hostId }) => hostId));
+    for (const [hostId, bookmarks] of bookmarksByHost) {
+      if (!existingLocationIds.has(hostId)) sftpLocations.push({ hostId, bookmarks, history: [] });
+    }
     const labels = new Map(
       [...received.hosts, ...received.proxies, ...received.keys].map(({ id, name }) => [id, name]),
     );
@@ -363,6 +385,7 @@ async function synchronize(
       proxies: mergeOrder(latest.proxies, received.proxies, true),
       quickCommands: mergeOrder(latest.quickCommands, received.quickCommands, false),
       quickCommandGroups: received.quickCommandGroups,
+      sftpLocations: sftpLocations.filter(({ bookmarks, history }) => bookmarks.length || history.length),
       credentialReferences: [...references.values()],
       trash: [
         ...deleted,
@@ -393,22 +416,33 @@ export function startHostSync() {
   let changeTimer: number | undefined;
 
   async function run(options: SyncOptions = {}, fromChange = false) {
-    if (!hostSyncIsBound() || (!options.manual && Date.now() < retryAfter)) return;
+    if (!options.manual && (!hostSyncIsBound() || Date.now() < retryAfter)) return;
     if (running) {
-      if (options.manual) queued = options;
-      else if (fromChange) queued ??= options;
+      if (options.manual) {
+        if (queued?.requestId && !options.requestId) return;
+        queued = options;
+        notifyStatus({ state: "queued" }, options.requestId);
+      } else if (fromChange) queued ??= options;
       return;
     }
     running = true;
     try {
+      if (options.manual) writeStatus({ state: "working" }, options.requestId);
       const account = await hostSyncAccount();
-      if (!account) return;
+      if (!account) {
+        if (options.manual) throw new Error("同步账号会话已失效，请重新登录");
+        return;
+      }
+      const boundAccount = localStorage.getItem(bindingKey);
+      if (boundAccount && boundAccount !== account.accountId) {
+        throw new Error("本机配置已关联其他同步账号，请重新登录原账号");
+      }
+      if (!boundAccount) localStorage.setItem(bindingKey, account.accountId);
       const status = readHostSyncStatus();
       if (!options.manual && status?.conflicts?.length) return;
-      if (options.manual) writeStatus({ state: "working" });
       const { status: result, cache: nextCache } = await synchronize(account, options, cache);
       cache = nextCache;
-      writeStatus(result);
+      writeStatus(result, options.requestId);
       retries = 0;
       retryAfter = 0;
       if (result.state === "success" && (deviceAccount !== account.accountId || Date.now() - lastDeviceUpdate >= 60_000)) {
@@ -427,7 +461,7 @@ export function startHostSync() {
         message,
         recoverable: message.startsWith("云端快照落后"),
         signInRequired: message.includes("重新登录"),
-      });
+      }, options.requestId);
     } finally {
       running = false;
       if (queued) {

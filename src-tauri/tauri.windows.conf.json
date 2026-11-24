@@ -1,5 +1,25 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
+  "productName": "栈渡",
+  "mainBinaryName": "ZhanDu",
+  "bundle": {
+    "publisher": "ZhanDu",
+    "windows": {
+      "nsis": {
+        "installMode": "both",
+        "languages": ["SimpChinese"],
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico",
+        "sidebarImage": "windows/sidebar.bmp",
+        "template": "windows/installer.nsi"
+      },
+      "wix": {
+        "language": "zh-CN",
+        "upgradeCode": "8ecb576d-3fea-54f9-8b41-f1b1b254cf70",
+        "template": "windows/main.wxs"
+      }
+    }
+  },
   "app": {
     "windows": [
       {

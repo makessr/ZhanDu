@@ -284,22 +284,21 @@ export function updateHostSortMode(hostSort: HostSortMode) {
   return updateConfiguration((current) => ({ ...current, hostSort }));
 }
 
-export function upsertSftpLocation(location: SftpLocationRecord) {
-  const sanitized = sanitizeSftpLocation(location);
-  if (!sanitized) return Promise.reject(new Error("SFTP 位置记录无效"));
-  return updateConfiguration((current) => ({
-    ...current,
-    sftpLocations:
-      sanitized.bookmarks.length || sanitized.history.length
-        ? current.sftpLocations.some((item) => item.hostId === sanitized.hostId)
-          ? current.sftpLocations.map((item) =>
-              item.hostId === sanitized.hostId ? sanitized : item,
-            )
-          : [...current.sftpLocations, sanitized]
-        : current.sftpLocations.filter(
-            (item) => item.hostId !== sanitized.hostId,
-          ),
-  }));
+export function updateSftpLocation(
+  hostId: string,
+  update: (location: SftpLocationRecord) => SftpLocationRecord,
+) {
+  return updateConfiguration((current) => {
+    const location = current.sftpLocations.find((entry) => entry.hostId === hostId);
+    const next = sanitizeSftpLocation(update(location ?? { hostId, bookmarks: [], history: [] }));
+    if (!next || next.hostId !== hostId) throw new Error("SFTP 位置记录无效");
+    const sftpLocations = next.bookmarks.length || next.history.length
+      ? location
+        ? current.sftpLocations.map((entry) => entry.hostId === hostId ? next : entry)
+        : [...current.sftpLocations, next]
+      : current.sftpLocations.filter((entry) => entry.hostId !== hostId);
+    return { ...current, sftpLocations };
+  });
 }
 
 export function upsertProxy(proxy: ProxyRecord) {

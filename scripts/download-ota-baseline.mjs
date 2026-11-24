@@ -12,17 +12,17 @@ const last = target.split(".").map(BigInt);
 const change = last.findIndex((part, index) => part !== first[index]);
 assert.ok(change >= 0 && last[change] > first[change], "Target must be newer than baseline");
 
-const prefix = "FineShell_" + baseline;
-const names = {
-  "windows-x64": prefix + "_windows_x64-setup.exe",
-  "windows-arm64": prefix + "_windows_arm64-setup.exe",
-  "macos-x86_64": prefix + "_darwin_x64.dmg",
-  "macos-arm64": prefix + "_darwin_aarch64.dmg",
-  "linux-amd64": prefix + "_linux_amd64.deb",
-  "linux-arm64": prefix + "_linux_arm64.deb",
+const suffixes = {
+  "windows-x64": "windows_x64-setup.exe",
+  "windows-arm64": "windows_arm64-setup.exe",
+  "macos-x86_64": "darwin_x64.dmg",
+  "macos-arm64": "darwin_aarch64.dmg",
+  "linux-amd64": "linux_amd64.deb",
+  "linux-arm64": "linux_arm64.deb",
 };
-assert.ok(Object.hasOwn(names, platform) && output, "Unknown platform or missing output path");
-const assetName = names[platform];
+assert.ok(Object.hasOwn(suffixes, platform) && output, "Unknown platform or missing output path");
+const prefixes = platform.startsWith("windows-") ? ["FineShell", "ZhanDu"] : ["FineShell"];
+const assetNames = prefixes.map((prefix) => [prefix, baseline, suffixes[platform]].join("_"));
 
 function gh(...args) {
   return execFileSync("gh", args, { encoding: "utf8" });
@@ -42,7 +42,10 @@ assert.ok(entries.length > 0 && entries.every(({ url, signature }) =>
 const release = JSON.parse(gh("release", "view", "v" + baseline, "-R", repository,
   "--json", "isDraft,isPrerelease,assets"));
 assert.ok(!release.isDraft && !release.isPrerelease, "Baseline must be publicly released");
-const asset = release.assets.find(({ name }) => name === assetName);
+const matches = release.assets.filter(({ name }) => assetNames.includes(name));
+assert.equal(matches.length, 1, "Expected exactly one baseline installer");
+const [asset] = matches;
+const assetName = asset.name;
 assert.match(asset?.digest ?? "", /^sha256:[0-9a-f]{64}$/i, "Baseline installer has no verified SHA-256");
 gh("release", "download", "v" + baseline, "-R", repository, "--pattern", assetName, "--output", output);
 const sha = createHash("sha256");

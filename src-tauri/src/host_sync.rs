@@ -103,12 +103,21 @@ struct Records {
     proxies: BTreeMap<String, Record>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     command_library: Option<CommandLibrary>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    sftp_bookmarks: Option<BTreeMap<String, Record>>,
 }
 
 #[derive(Clone, Deserialize, Serialize, Default, PartialEq, Eq)]
 struct CommandLibrary {
     commands: BTreeMap<String, Record>,
     groups: BTreeMap<String, Record>,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SftpBookmarks {
+    host_id: String,
+    bookmarks: Vec<String>,
 }
 
 #[derive(Clone, Default, Deserialize, Serialize)]
@@ -121,6 +130,8 @@ pub(crate) struct Configuration {
     quick_commands: Vec<Value>,
     #[serde(default)]
     quick_command_groups: Vec<String>,
+    #[serde(default)]
+    sftp_bookmarks: Vec<SftpBookmarks>,
 }
 
 #[derive(Serialize)]
@@ -291,8 +302,10 @@ async fn request<T: DeserializeOwned>(
 
 fn seal(device: &Device, revision: u64, records: &Records) -> Result<Vault, String> {
     // Bind the encrypted content to this protocol and account.
-    // Older clients reject the new encrypted format instead of overwriting its command library.
-    let format = if records.command_library.is_some() {
+    // Older clients reject unfamiliar encrypted formats instead of dropping their records.
+    let format = if records.sftp_bookmarks.is_some() {
+        "fineshell-host-sync-v3"
+    } else if records.command_library.is_some() {
         "fineshell-host-sync-v2"
     } else {
         "fineshell-host-sync-v1"
@@ -330,8 +343,10 @@ fn open_with_key(device: &Device, key: &[u8; 32], vault: &Vault) -> Result<(u64,
     if account != device.account_id {
         return Err("同步数据账号不匹配".into());
     }
-    match (format.as_str(), records.command_library.is_some()) {
-        ("fineshell-host-sync-v1", false) | ("fineshell-host-sync-v2", true) => Ok((revision, records)),
+    match (format.as_str(), records.command_library.is_some(), records.sftp_bookmarks.is_some()) {
+        ("fineshell-host-sync-v1", false, false)
+        | ("fineshell-host-sync-v2", true, false)
+        | ("fineshell-host-sync-v3", _, true) => Ok((revision, records)),
         _ => Err("同步数据格式不受支持，请更新栈渡客户端".into()),
     }
 }
@@ -452,7 +467,15 @@ fn capture(configuration: Configuration, blocked: &mut Vec<BlockedRecord>) -> Re
         .collect::<BTreeMap<_, _>>();
     let command_library = (!commands.is_empty() || !groups.is_empty())
         .then_some(CommandLibrary { commands, groups });
-    Ok(Records { hosts, keys, proxies, command_library })
+    let bookmarks: BTreeMap<_, _> = configuration.sftp_bookmarks.into_iter()
+        .filter(|entry| hosts.contains_key(&entry.host_id) && !entry.bookmarks.is_empty())
+        .map(|entry| {
+            let id = entry.host_id.clone();
+            (id, Record { metadata: json!(entry), secret: None, private_key: None })
+        })
+        .collect();
+    let sftp_bookmarks = (!bookmarks.is_empty()).then_some(bookmarks);
+    Ok(Records { hosts, keys, proxies, command_library, sftp_bookmarks })
 }
 
 fn prepare_capture(
@@ -627,6 +650,19 @@ fn apply_records(
     if let Some(library) = records.command_library {
         result.quick_commands = library.commands.into_values().map(|record| record.metadata).collect();
         result.quick_command_groups = library.groups.into_keys().collect();
+    }
+    if let Some(bookmarks) = records.sftp_bookmarks.take() {
+        result.sftp_bookmarks = bookmarks.into_iter()
+            .filter(|(id, _)| records.hosts.contains_key(id))
+            .map(|(id, record)| {
+                let entry = serde_json::from_value::<SftpBookmarks>(record.metadata)
+                    .map_err(|_| "同步快速目录记录无效")?;
+                if entry.host_id != id {
+                    return Err("同步快速目录主机不匹配");
+                }
+                Ok(entry)
+            })
+            .collect::<Result<_, _>>()?;
     }
 
     // Install key files before changing any keyring entries.
@@ -1113,13 +1149,29 @@ pub(crate) async fn host_sync_exchange(
                 });
             }
         }
-        let Records { hosts, keys, proxies, command_library } = local;
+        let Records { hosts, keys, proxies, command_library, sftp_bookmarks } = local;
         let mut conflicts = Vec::new();
+        let hosts = merge_map(&previous.hosts, hosts, &cloud.hosts, "hosts", choices, &mut conflicts);
+        let bookmarks_active = previous.sftp_bookmarks.is_some() || cloud.sftp_bookmarks.is_some();
+        let bookmarks = if bookmarks_active || sftp_bookmarks.is_some() {
+            let empty = BTreeMap::new();
+            let mut bookmarks = merge_map(
+                previous.sftp_bookmarks.as_ref().unwrap_or(&empty),
+                sftp_bookmarks.unwrap_or_default(),
+                cloud.sftp_bookmarks.as_ref().unwrap_or(&empty),
+                "sftpBookmarks", choices, &mut conflicts,
+            );
+            bookmarks.retain(|id, _| hosts.contains_key(id));
+            (bookmarks_active || !bookmarks.is_empty()).then_some(bookmarks)
+        } else {
+            None
+        };
         let combined = Records {
-            hosts: merge_map(&previous.hosts, hosts, &cloud.hosts, "hosts", choices, &mut conflicts),
+            hosts,
             keys: merge_map(&previous.keys, keys, &cloud.keys, "keys", choices, &mut conflicts),
             proxies: merge_map(&previous.proxies, proxies, &cloud.proxies, "proxies", choices, &mut conflicts),
             command_library: merge_command_library(previous.command_library.as_ref(), command_library, cloud.command_library.as_ref(), choices, &mut conflicts),
+            sftp_bookmarks: bookmarks,
         };
         if !conflicts.is_empty() {
             return Ok(SyncResult {
@@ -1173,6 +1225,24 @@ mod tests {
             secret: None,
             private_key: None,
         })
+    }
+
+    #[test]
+    fn captures_and_restores_bookmarks_only_for_saved_hosts() {
+        let configuration = Configuration {
+            hosts: vec![json!({ "id": "saved-host", "authMethod": "agent" })],
+            sftp_bookmarks: vec![
+                SftpBookmarks { host_id: "saved-host".into(), bookmarks: vec!["/var/www".into()] },
+                SftpBookmarks { host_id: "missing-host".into(), bookmarks: vec!["/opt".into()] },
+            ],
+            ..Configuration::default()
+        };
+        let captured = capture(configuration.clone(), &mut Vec::new()).unwrap();
+        let bookmarks = captured.sftp_bookmarks.as_ref().unwrap();
+        assert_eq!(bookmarks.len(), 1);
+        let applied = apply_records(captured, configuration, &[], &[]).unwrap();
+        assert_eq!(applied.configuration.sftp_bookmarks[0].host_id, "saved-host");
+        assert_eq!(applied.configuration.sftp_bookmarks[0].bookmarks, ["/var/www"]);
     }
 
     #[test]
@@ -1304,6 +1374,16 @@ mod tests {
         let (format, _, _, _): (String, String, u64, Value) = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(format, "fineshell-host-sync-v2");
         assert!(open(&device, &library_vault).unwrap().1 == library);
+        let bookmarks = Records {
+            sftp_bookmarks: Some(BTreeMap::new()),
+            ..library
+        };
+        let bookmarks_vault = seal(&device, 19, &bookmarks).unwrap();
+        assert_eq!(bookmarks_vault.version, 1);
+        let bytes = decrypt_payload(&device.key, &bookmarks_vault.nonce, &bookmarks_vault.ciphertext).unwrap();
+        let (format, _, _, _): (String, String, u64, Value) = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(format, "fineshell-host-sync-v3");
+        assert!(open(&device, &bookmarks_vault).unwrap().1 == bookmarks);
         device.previous_key = Some(device.key);
         device.key = random_master_key();
         assert!(open(&device, &vault).is_err());

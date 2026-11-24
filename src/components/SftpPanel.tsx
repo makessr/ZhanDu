@@ -63,6 +63,7 @@ import {
   type ExternalEditPayload,
 } from "../tauri-protocol";
 import { externalEditStatusMeta } from "./TransferActivityList";
+import { useResizableColumns } from "./ResizableTableColumns";
 import {
   ArchiveDialog,
   CreateEntryDialog,
@@ -743,12 +744,13 @@ function SftpPanel({
 
   function toggleCurrentPathBookmark() {
     if (!session || !browser?.path) return;
+    const add = !currentLocation.bookmarks.includes(browser.path);
     commitLocation(session.host.id, (current) => ({
       ...current,
       bookmarks: setRemotePathBookmark(
         current.bookmarks,
         browser.path,
-        !current.bookmarks.includes(browser.path),
+        add,
         MAX_SFTP_BOOKMARKS,
       ),
     }));
@@ -798,6 +800,7 @@ function SftpPanel({
       {
         title: "名称",
         dataIndex: "name",
+        width: 300,
         sorter: (left, right) => sftpNameCollator.compare(left.name, right.name),
         render: (_, entry) => {
           const externalEdit = Object.values(externalEdits).find(
@@ -831,6 +834,7 @@ function SftpPanel({
           entry.kind === "directory" ? "-" : formatFileSize(entry.size),
       },
       {
+        key: "owner",
         title: "用户 / 用户组",
         width: 140,
         render: (_, entry) =>
@@ -866,6 +870,8 @@ function SftpPanel({
       visibleEntries,
     ],
   );
+
+  const fileTable = useResizableColumns(columns);
 
   function confirmBatchOverwrite(title: string, content: string) {
     return new Promise<boolean>((resolve) => {
@@ -1231,7 +1237,7 @@ function SftpPanel({
               <Table
                 border={false}
                 className="sftp-table"
-                columns={columns}
+                columns={fileTable.columns}
                 data={displayedEntries}
                 loading={Boolean(connected && busy && !showingPreview)}
                 noDataElement={
@@ -1281,7 +1287,7 @@ function SftpPanel({
                     : undefined
                 }
                 size="small"
-                scroll={virtualized ? { y: virtualBodyHeight } : undefined}
+                scroll={{ x: fileTable.tableWidth + (ready ? 42 : 0), y: virtualized ? virtualBodyHeight : undefined }}
                 virtualized={virtualized}
               />
               {remoteDragPreview && (

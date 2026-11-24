@@ -1,4 +1,5 @@
 import { WorkspaceToolSurface } from "./WorkspaceToolPanel";
+import { useResizableColumns } from "./ResizableTableColumns";
 import { useMemo, useState } from "react";
 import {
   Button,
@@ -150,6 +151,7 @@ function PortForwardDrawer({
     {
       dataIndex: "name",
       title: "名称",
+      width: 210,
       render: (name: string) => (
         <Typography.Text ellipsis={{ showTooltip: true }}>
           {name}
@@ -157,6 +159,7 @@ function PortForwardDrawer({
       ),
     },
     {
+      key: "bind",
       title:
         activeKind === "remote"
           ? "远程监听"
@@ -170,6 +173,7 @@ function PortForwardDrawer({
       ? []
       : [
           {
+            key: "target",
             title: activeKind === "local" ? "远端目标" : "本地目标",
             width: 160,
             render: (_: unknown, rule: RuntimeForwardRule) =>
@@ -179,6 +183,7 @@ function PortForwardDrawer({
           },
         ]),
     {
+      key: "status",
       title: "状态",
       width: 96,
       render: (_, rule) => {
@@ -201,6 +206,7 @@ function PortForwardDrawer({
       },
     },
     {
+      key: "actions",
       title: "操作",
       width: 64,
       render: (_, rule) => {
@@ -222,6 +228,7 @@ function PortForwardDrawer({
       },
     },
   ];
+  const tunnelTable = useResizableColumns(columns);
 
   return (
     <WorkspaceToolSurface
@@ -245,7 +252,7 @@ function PortForwardDrawer({
       </Tabs>
       <Table
         border={false}
-        columns={columns}
+        columns={tunnelTable.columns}
         data={rules}
         noDataElement={
           <Empty
@@ -260,6 +267,7 @@ function PortForwardDrawer({
         }
         pagination={false}
         rowKey={(rule) => statusKey(rule.kind, rule.id)}
+        scroll={{ x: tunnelTable.tableWidth }}
         size="small"
       />
     </WorkspaceToolSurface>

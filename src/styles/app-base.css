@@ -889,6 +889,33 @@ body[arco-theme="dark"] .monitor-resource-fill {
   white-space: nowrap;
 }
 
+.network-connection-value {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.table-column-grip {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.table-column-grip::after {
+  position: absolute;
+  inset-block: 20%;
+  inset-inline-end: 1px;
+  border-inline-start: 1px solid var(--color-border-3);
+  content: "";
+}
+
+.table-column-grip:is(:hover, :active, :focus-visible)::after {
+  border-color: rgb(var(--primary-6));
+}
+
 .network-trace-timeline {
   margin-top: 4px;
 }

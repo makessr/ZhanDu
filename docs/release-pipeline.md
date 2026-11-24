@@ -109,6 +109,10 @@ v0.6.3 已在栈渡独立渠道公开。公开更新清单与签名草稿的 SHA
 
 ## Windows 桌面验收
 
+中文版 Windows 安装包在 Release 中使用 `ZhanDu_` 前缀。验收时分别检查 NSIS 安装和卸载向导、MSI 安装向导及 Windows 已安装应用的名称。覆盖安装测试应从旧版同格式的安装包开始，并检查自选安装目录、原有配置与凭据、快捷方式和卸载记录。Windows 自定义模板保留了历史安装注册表路径和 MSI UpgradeCode，升级 Tauri CLI 时应对照上游模板检查这些兼容逻辑。
+
+首次全局安装默认使用 `C:\Program Files\栈渡`。OTA 脚本显式传入临时安装目录，以兼容旧版 `fineshell.exe` 和新版 `ZhanDu.exe` 的升级测试。
+
 在安装了 WebView2、Node.js 26、Bun、Rust MSVC 工具链和 Windows 原生 Perl（如 Strawberry Perl）的测试机上运行。Perl 用于编译随 Windows 客户端构建的 OpenSSL。先在仓库安装 Bun 前端依赖和 `sync-server` 的 npm 依赖。为 SSH 测试另装 `ssh2`，传入其入口文件，测试会使用本地回环地址和合成凭据。
 
 ```powershell

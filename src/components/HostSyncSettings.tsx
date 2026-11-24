@@ -4,7 +4,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { APP_DISPLAY_NAME } from "../application-brand";
 import { requestPasswordRecovery } from "../host-sync-auth";
-import { commandErrorMessage } from "../tauri-protocol";
+import { commandErrorMessage, listenProtocolEvent } from "../tauri-protocol";
 import {
   hostSyncAccount,
   hostSyncDevices,
@@ -33,6 +33,8 @@ function validMasterPassword(value: string) {
 export default function HostSyncSettings() {
   const [account, setAccount] = useState<HostSyncAccount | null>(null);
   const [status, setStatus] = useState(readHostSyncStatus);
+  const [syncPending, setSyncPending] = useState(false);
+  const activeSync = useRef<{ id: string; timer: number } | null>(null);
   const [loading, setLoading] = useState(isTauri);
   const [busy, setBusy] = useState(false);
   const [register, setRegister] = useState(false);
@@ -87,9 +89,27 @@ export default function HostSyncSettings() {
       }
     }
     window.addEventListener("storage", refresh);
+    const statusListener = listenProtocolEvent("host-sync:status", ({ payload }) => {
+      if (!mounted) return;
+      setStatus(payload.status);
+      setChoices({});
+      const pending = activeSync.current;
+      if (!pending || pending.id !== payload.requestId) return;
+      window.clearTimeout(pending.timer);
+      if (payload.status.state === "success" || payload.status.state === "failed") {
+        activeSync.current = null;
+        setSyncPending(false);
+      }
+    });
+    void statusListener.catch((error) => {
+      if (mounted) Message.error(commandErrorMessage(error));
+    });
     return () => {
       mounted = false;
       window.removeEventListener("storage", refresh);
+      void statusListener.then((unlisten) => unlisten()).catch(() => undefined);
+      if (activeSync.current) window.clearTimeout(activeSync.current.timer);
+      activeSync.current = null;
     };
   }, []);
 
@@ -303,25 +323,44 @@ export default function HostSyncSettings() {
   }
 
   function sync(options: SyncOptions = {}) {
-    void requestHostSync({ ...options, manual: true }).catch((error) => Message.error(commandErrorMessage(error)));
+    if (activeSync.current) return;
+    const id = crypto.randomUUID();
+    function fail(message: string) {
+      const pending = activeSync.current;
+      if (pending?.id !== id) return;
+      window.clearTimeout(pending.timer);
+      activeSync.current = null;
+      setSyncPending(false);
+      setStatus({ state: "failed", message });
+    }
+    const timer = window.setTimeout(() => fail("同步请求未收到主窗口响应，请重试。"), 10_000);
+    activeSync.current = { id, timer };
+    setStatus(null);
+    setSyncPending(true);
+    void requestHostSync({ ...options, manual: true, requestId: id })
+      .catch((error) => fail(commandErrorMessage(error)));
   }
 
   if (!isTauri()) return <Alert content={`请在${APP_DISPLAY_NAME}桌面应用中使用主机同步。`} />;
   if (loading) return <Typography.Text>正在读取同步账号…</Typography.Text>;
 
   if (account && !status?.signInRequired && !migrateActive && !recovering) {
+    const lastSyncAt = status?.time ?? devices.find((device) => device.current)?.lastSyncAt;
     return (
       <Space direction="vertical" size="large">
         <Typography.Text>{account.email}</Typography.Text>
         {status?.message && <Alert type="error" content={status.message} />}
+        {syncPending && !status && <Typography.Text>正在请求同步…</Typography.Text>}
+        {status?.state === "queued" && <Typography.Text>正在等待当前同步结束…</Typography.Text>}
         {status?.state === "working" && <Typography.Text>正在同步主机…</Typography.Text>}
-        {status?.time && (
+        {lastSyncAt && (
           <Typography.Text type="secondary">
-            最近同步 {new Date(status.time).toLocaleString()}
+            {status?.state === "success" && "同步完成 · "}
+            最近同步 {new Date(lastSyncAt).toLocaleString()}
           </Typography.Text>
         )}
         <Space wrap>
-          <Button type="primary" onClick={() => sync()}>立即同步</Button>
+          <Button type="primary" loading={syncPending} onClick={() => sync()}>立即同步</Button>
           <Button disabled={busy || changingPassword} onClick={() => void signOut()}>退出登录</Button>
           {!changingPassword && <Button disabled={busy} onClick={() => setChangingPassword(true)}>设置或更换主密码</Button>}
           {opaqueEnabled && !account.opaque && <Button disabled={busy || changingPassword}
@@ -375,7 +414,9 @@ export default function HostSyncSettings() {
               <fieldset key={conflict.id}>
                 <legend>
                   {conflict.id.startsWith("quickCommands/") ? "快捷命令 · " : ""}
-                  {String(conflict.local?.name ?? conflict.cloud?.name ?? conflict.id)}
+                  {conflict.id.startsWith("sftpBookmarks/")
+                    ? "快速目录"
+                    : String(conflict.local?.name ?? conflict.cloud?.name ?? conflict.id)}
                 </legend>
                 {conflict.credentialChanged && <Typography.Text>两端凭据有差异</Typography.Text>}
                 {(["local", "cloud"] as const).map((side) => (
@@ -387,7 +428,11 @@ export default function HostSyncSettings() {
                       />
                       {side === "local" ? "保留本机版本" : "保留云端版本"}
                     </label>
-                    {describe(conflict[side], conflict[side === "local" ? "cloud" : "local"])}
+                    {conflict.id.startsWith("sftpBookmarks/")
+                      ? <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+                          {Array.isArray(conflict[side]?.bookmarks) ? conflict[side].bookmarks.join("\n") : "没有收藏目录"}
+                        </div>
+                      : describe(conflict[side], conflict[side === "local" ? "cloud" : "local"])}
                   </div>
                 ))}
               </fieldset>

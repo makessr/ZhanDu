@@ -1,4 +1,5 @@
 import { createPortal } from "react-dom";
+import { useResizableColumns } from "./ResizableTableColumns";
 import { WorkspaceToolSurface, type WorkspaceTool } from "./WorkspaceToolPanel";
 import {
   lazy,
@@ -492,14 +493,15 @@ function ServerMonitorPanel({
     }
     return connections;
   }, [connectionFilter, connectionsResult, networkQuery]);
-  const connectionColumns = useMemo<TableColumnProps<NetworkConnection>[]>(
-    () => [
+  const connectionColumns = useMemo<TableColumnProps<NetworkConnection>[]>(() => [
       {
+        key: "protocol",
         dataIndex: "protocol",
         title: "协议",
         width: 68,
       },
       {
+        key: "state",
         dataIndex: "state",
         title: "状态",
         width: 96,
@@ -510,45 +512,50 @@ function ServerMonitorPanel({
         ),
       },
       {
+        key: "local",
         title: "本地地址",
+        width: 176,
         render: (_, connection) => (
-          <Typography.Text ellipsis={{ showTooltip: true }}>
+          <span className="network-connection-value">
             {formatNetworkEndpoint(
               connection.localAddress,
               connection.localPort,
             )}
-          </Typography.Text>
+          </span>
         ),
       },
       {
+        key: "remote",
         title: "远端地址",
+        width: 176,
         render: (_, connection) => (
-          <Typography.Text ellipsis={{ showTooltip: true }}>
+          <span className="network-connection-value">
             {formatNetworkEndpoint(
               connection.remoteAddress,
               connection.remotePort,
             )}
-          </Typography.Text>
+          </span>
         ),
       },
       ...(ipRegionEnabled ? [{
+        key: "region" as const,
         title: "远端 IP 归属地",
         width: 190,
-        render: (_: unknown, row: NetworkConnection) => <Typography.Text ellipsis={{ showTooltip: true }}>{ipRegions[row.remoteAddress] || "—"}</Typography.Text>,
+        render: (_: unknown, row: NetworkConnection) => <span className="network-connection-value">{ipRegions[row.remoteAddress] || "—"}</span>,
       }] : []),
       {
+        key: "process",
         dataIndex: "process",
         title: "进程",
-        width: 150,
+        width: 300,
         render: (process?: string) => (
-          <Typography.Text ellipsis={{ showTooltip: true }}>
+          <span className="network-connection-value">
             {process || "-"}
-          </Typography.Text>
+          </span>
         ),
       },
-    ],
-    [ipRegionEnabled, ipRegions],
-  );
+    ], [ipRegionEnabled, ipRegions]);
+  const networkTable = useResizableColumns(connectionColumns);
 
   const reconnecting = session?.status === "reconnecting";
   const suspect = session?.status === "suspect";
@@ -679,13 +686,13 @@ function ServerMonitorPanel({
           )}
           <Table
             border={false}
-            columns={connectionColumns}
+            columns={networkTable.columns}
             data={filteredConnections}
             loading={connectionsLoading}
             noDataElement={<Empty description="暂无网络连接" />}
             pagination={false}
             rowKey="id"
-            scroll={{ y: 320 }}
+            scroll={{ x: networkTable.tableWidth, y: 320 }}
             size="small"
           />
         </section>
