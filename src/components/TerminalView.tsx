@@ -1,3 +1,4 @@
+import { randomIdSuffix } from "../random-id";
 import {
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -259,7 +260,7 @@ function TerminalView({
           directory: settings.terminalLogDirectory,
           format: settings.terminalLogFormat,
           hostName: session.host.name,
-          logId: `${session.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          logId: `${session.id}-${Date.now()}-${randomIdSuffix()}`,
           maxFileSizeMb: settings.terminalLogMaxFileSizeMb,
           sessionId: session.id,
           startedAt: session.openedAt,

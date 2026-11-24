@@ -1,3 +1,4 @@
+import { randomIdSuffix } from "../../random-id";
 import { Message } from "@arco-design/web-react";
 import { join } from "@tauri-apps/api/path";
 import { open, save } from "@tauri-apps/plugin-dialog";
@@ -41,7 +42,7 @@ interface SftpFileTransfersOptions {
 }
 
 function createUploadBatchId() {
-  return `upload-batch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `upload-batch-${Date.now()}-${randomIdSuffix()}`;
 }
 
 export default function useSftpFileTransfers({

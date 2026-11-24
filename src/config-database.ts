@@ -1,3 +1,4 @@
+import { randomIdSuffix } from "./random-id";
 import { withHostDefaults } from "./host-storage";
 import { DEFAULT_APP_SETTINGS, sanitizeAppSettings, type AppSettings } from "./app-settings";
 import type {
@@ -597,7 +598,7 @@ export function createBackup(
   now = new Date().toISOString(),
 ): ConfigurationBackup {
   return {
-    id: `backup-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    id: `backup-${Date.now()}-${randomIdSuffix()}`,
     createdAt: now,
     reason,
     hosts: configuration.hosts,

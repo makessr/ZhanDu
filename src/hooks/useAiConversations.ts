@@ -1,3 +1,4 @@
+import { randomIdSuffix } from "../random-id";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AiCommandProposal, AiCommandRecord } from "../ai-command-proposals";
 import {
@@ -62,7 +63,7 @@ function createId(prefix: string) {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return `${prefix}-${crypto.randomUUID()}`;
   }
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `${prefix}-${Date.now()}-${randomIdSuffix()}`;
 }
 
 export function createAiConversation(hostId: string, hostName: string): AiConversation {

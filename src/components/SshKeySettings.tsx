@@ -1,3 +1,4 @@
+import { randomIdSuffix } from "../random-id";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Button,
@@ -101,7 +102,7 @@ function readKeyIdentity(reference: string) {
 }
 
 function createSshKeyId() {
-  return `ssh-key-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `ssh-key-${Date.now()}-${randomIdSuffix()}`;
 }
 
 async function choosePrivateKeyPath() {

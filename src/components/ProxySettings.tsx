@@ -1,3 +1,4 @@
+import { randomIdSuffix } from "../random-id";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Button,
@@ -29,7 +30,7 @@ import type { ProxyFormValues, ProxyRecord, ProxyType } from "../models";
 import { emitProtocolEventTo, listenProtocolEvent } from "../tauri-protocol";
 
 function createProxyId() {
-  return `proxy-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `proxy-${Date.now()}-${randomIdSuffix()}`;
 }
 
 async function storeProxyPassword(proxyId: string, password: string) {

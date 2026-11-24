@@ -1,3 +1,4 @@
+import { randomIdSuffix } from "../../random-id";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Message } from "@arco-design/web-react";
 import { isTauri } from "@tauri-apps/api/core";
@@ -44,7 +45,7 @@ interface SftpTransfersOptions {
 }
 
 function createTransferId() {
-  return `transfer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `transfer-${Date.now()}-${randomIdSuffix()}`;
 }
 
 export default function useSftpTransfers({

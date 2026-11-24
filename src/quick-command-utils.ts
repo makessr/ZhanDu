@@ -1,3 +1,4 @@
+import { randomIdSuffix } from "./random-id";
 import type { QuickCommandFormValues, QuickCommandRecord } from "./models";
 
 export interface QuickCommandParameter {
@@ -44,7 +45,7 @@ export function filterQuickCommands(commands: QuickCommandRecord[], query: strin
 
 export function quickCommandFromForm(
   values: QuickCommandFormValues,
-  id = `command-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  id = `command-${Date.now()}-${randomIdSuffix()}`,
 ): QuickCommandRecord {
   return {
     id,

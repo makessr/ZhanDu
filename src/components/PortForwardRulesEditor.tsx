@@ -1,3 +1,4 @@
+import { randomIdSuffix } from "../random-id";
 import { useState } from "react";
 import {
   Button,
@@ -43,7 +44,7 @@ interface EditingRule {
 }
 
 function createRuleId(kind: ForwardKind) {
-  return `${kind}-forward-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `${kind}-forward-${Date.now()}-${randomIdSuffix()}`;
 }
 
 function endpoint(address: string, port: number) {

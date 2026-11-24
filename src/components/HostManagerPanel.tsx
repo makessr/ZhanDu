@@ -1,3 +1,4 @@
+import { randomIdSuffix } from "../random-id";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import {
@@ -60,7 +61,7 @@ import { applyConnectionHistoryPolicy } from "../connection-history";
 import { connectionTargetKey, createCredentialReference } from "../credential-registry";
 
 function createId(prefix: string) {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `${prefix}-${Date.now()}-${randomIdSuffix()}`;
 }
 
 function OpenSshImportPreview({

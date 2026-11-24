@@ -1,3 +1,4 @@
+import { randomIdSuffix } from "../random-id";
 import { isTauri } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
@@ -20,7 +21,7 @@ interface UseTerminalSessionsOptions {
 }
 
 function createSessionId() {
-  return `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `session-${Date.now()}-${randomIdSuffix()}`;
 }
 
 export function useTerminalSessions({ onSessionsClosed }: UseTerminalSessionsOptions = {}) {
