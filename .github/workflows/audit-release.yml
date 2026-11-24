@@ -93,17 +93,14 @@ jobs:
           endpoint="repos/$GITHUB_REPOSITORY/releases/$release_id"
           gh api "$endpoint" > "$RUNNER_TEMP/release.json"
           gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/assets"
-          windows_prefix=FineShell
-          if git show "$RELEASE_COMMIT:src-tauri/tauri.windows.conf.json" | jq -e '.productName == "栈渡"' >/dev/null; then
-            windows_prefix=ZhanDu
-          fi
           node scripts/verify-release-assets.mjs "$RUNNER_TEMP/assets" "$RUNNER_TEMP/release.json" \
             "$RUNNER_TEMP/signer.json" "$RUNNER_TEMP/verifier/debug/verify-release-signature" \
-            "$GITHUB_REPOSITORY" "$RELEASE_TAG" "$RELEASE_COMMIT" "$RELEASE_PLATFORMS" "$RELEASE_VISIBILITY" "$windows_prefix"
+            "$GITHUB_REPOSITORY" "$RELEASE_TAG" "$RELEASE_COMMIT" "$RELEASE_PLATFORMS" "$RELEASE_VISIBILITY"
 
           if [[ "$RELEASE_PLATFORMS" == all ]]; then
             for arch in amd64 arm64; do
-              package="$RUNNER_TEMP/assets/FineShell_${RELEASE_TAG#v}_linux_$arch.deb"
+              name="$(node --input-type=module -e 'import { releaseAssetName } from "./scripts/release-assets.mjs"; console.log(releaseAssetName(process.argv[1], process.argv[2]))' "$RELEASE_TAG" "linux_$arch.deb")"
+              package="$RUNNER_TEMP/assets/$name"
               test "$(dpkg-deb -f "$package" Architecture)" = "$arch"
               test "$(dpkg-deb -f "$package" Version)" = "${RELEASE_TAG#v}"
               dpkg-deb -f "$package" Depends | tr ',' '\n' | grep -E '^ *ca-certificates *$'

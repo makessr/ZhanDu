@@ -21,6 +21,8 @@
 
 如果你还在使用 FineShell v0.5.1 或栈渡 v0.6.0，可以在应用内直接升级到 v0.6.1。重启后再次检查更新，后续版本由栈渡独立渠道提供。 [更新渠道迁移说明](docs/release-pipeline.md#从-fineshell-过渡到栈渡)
 
+从 v0.11.0 起，Windows、macOS 和 Linux 的正式下载文件统一使用 `ZhanDu_` 前缀。
+
 | 发布目标 | 安装包 |
 | --- | --- |
 | Windows x64 | `.exe`（NSIS）、`.msi` |
@@ -50,7 +52,7 @@ Apple Silicon 下载文件名带 `darwin_aarch64` 的 DMG，Intel 下载带 `dar
 
 ```bash
 sudo apt update
-sudo apt install ./FineShell_0.6.3_linux_arm64.deb
+sudo apt install ./ZhanDu_0.11.0_linux_arm64.deb
 ```
 
 请根据实际下载的文件名调整命令。不要直接使用 `dpkg -i`，因为 `dpkg` 不会自动下载缺失的依赖。

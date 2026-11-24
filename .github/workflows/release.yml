@@ -222,7 +222,7 @@ jobs:
           generateReleaseNotes: false
           prerelease: ${{ contains(needs.validate.outputs.release_tag, '-') }}
           releaseId: ${{ needs.prepare.outputs.release_id }}
-          releaseAssetNamePattern: "${{ runner.os == 'Windows' && 'ZhanDu' || '[name]' }}_[version]_[platform]_[arch][setup][ext]"
+          releaseAssetNamePattern: "ZhanDu_[version]_[platform]_[arch][setup][ext]"
           releaseBody: ${{ steps.release_notes.outputs.body }}
           releaseDraft: true
           releaseName: 栈渡 ${{ needs.validate.outputs.release_tag }}

@@ -27,15 +27,18 @@ describe("release version parsing", () => {
 });
 
 describe("release asset naming", () => {
-  test("prefixes Windows assets with the configured product name", () => {
-    expect(releaseAssetName("v1.2.3", "windows_x64-setup.exe")).toBe(
-      "FineShell_1.2.3_windows_x64-setup.exe",
+  test("uses the project brand on every platform from v0.11.0", () => {
+    expect(releaseAssetName("v0.10.0", "windows_x64-setup.exe")).toBe(
+      "FineShell_0.10.0_windows_x64-setup.exe",
     );
-    expect(releaseAssetName("v1.2.3", "windows_x64-setup.exe", "ZhanDu")).toBe(
-      "ZhanDu_1.2.3_windows_x64-setup.exe",
+    expect(releaseAssetName("v0.11.0", "windows_x64-setup.exe")).toBe(
+      "ZhanDu_0.11.0_windows_x64-setup.exe",
     );
-    expect(releaseAssetName("v1.2.3", "darwin_aarch64.dmg", "ZhanDu")).toBe(
-      "FineShell_1.2.3_darwin_aarch64.dmg",
+    expect(releaseAssetName("v0.11.0", "darwin_aarch64.dmg")).toBe(
+      "ZhanDu_0.11.0_darwin_aarch64.dmg",
+    );
+    expect(releaseAssetName("v0.11.0-beta.1", "linux_arm64.deb")).toBe(
+      "ZhanDu_0.11.0-beta.1_linux_arm64.deb",
     );
   });
 
@@ -48,7 +51,7 @@ describe("release asset naming", () => {
       "windows-aarch64",
     ]);
     expect(expectedPlatforms("all")).toHaveLength(13);
-    expect(signedPackageNames("v1.2.3", "windows", "ZhanDu")).toEqual([
+    expect(signedPackageNames("v1.2.3", "windows")).toEqual([
       "ZhanDu_1.2.3_windows_x64-setup.exe",
       "ZhanDu_1.2.3_windows_x64.msi",
       "ZhanDu_1.2.3_windows_arm64-setup.exe",
@@ -56,14 +59,14 @@ describe("release asset naming", () => {
   });
 
   test("windows scope omits disk images while the full scope includes them", () => {
-    const windows = expectedAssetNames("v1.2.3", "windows", "ZhanDu");
+    const windows = expectedAssetNames("v1.2.3", "windows");
     expect(windows).toContain("latest.json");
     expect(windows.some((name) => name.endsWith(".dmg"))).toBe(false);
     expect(windows).toContain("ZhanDu_1.2.3_windows_x64-setup.exe.sig");
 
     const all = expectedAssetNames("v1.2.3", "all");
-    expect(all).toContain("FineShell_1.2.3_darwin_aarch64.dmg");
-    expect(all).toContain("FineShell_1.2.3_darwin_x64.dmg");
+    expect(all).toContain("ZhanDu_1.2.3_darwin_aarch64.dmg");
+    expect(all).toContain("ZhanDu_1.2.3_darwin_x64.dmg");
     expect(all.filter((name) => name.endsWith(".sig"))).toHaveLength(7);
   });
 
@@ -139,22 +142,18 @@ describe("updater manifest validation", () => {
     version: "1.2.3",
     platforms: {
       "windows-x86_64": {
-        url: manifestAssetUrl("makessr/ZhanDu", "v1.2.3", "FineShell_1.2.3_windows_x64-setup.exe"),
+        url: manifestAssetUrl("makessr/ZhanDu", "v1.2.3", "ZhanDu_1.2.3_windows_x64-setup.exe"),
         signature: "windows-sig",
       },
       "darwin-aarch64": {
-        url: manifestAssetUrl(
-          "makessr/ZhanDu",
-          "v1.2.3",
-          "FineShell_1.2.3_darwin_aarch64.app.tar.gz",
-        ),
+        url: manifestAssetUrl("makessr/ZhanDu", "v1.2.3", "ZhanDu_1.2.3_darwin_aarch64.app.tar.gz"),
         signature: "mac-sig",
       },
     },
   };
   const signatures = {
-    "FineShell_1.2.3_windows_x64-setup.exe": "windows-sig\n",
-    "FineShell_1.2.3_darwin_aarch64.app.tar.gz": "mac-sig\n",
+    "ZhanDu_1.2.3_windows_x64-setup.exe": "windows-sig\n",
+    "ZhanDu_1.2.3_darwin_aarch64.app.tar.gz": "mac-sig\n",
   };
 
   test("accepts a manifest whose URLs and signatures match the release", () => {
