@@ -75,6 +75,7 @@ import {
   verifyProtocolVersion,
 } from "./tauri-protocol";
 import { openAuxiliaryWindow, promptStartupApplicationUpdate } from "./app-window-actions";
+import { finishWorkspaceStartup } from "./workspace-startup";
 import { useTerminalSessions } from "./hooks/useTerminalSessions";
 const QuickCommandSettings = lazy(() => import("./components/QuickCommandSettings"));
 const ServerMonitorPanel = lazy(() => import("./components/ServerMonitorPanel"));
@@ -307,31 +308,31 @@ function App() {
         } else {
           Message.warning("设置读取失败，已使用默认值");
         }
-      })
-      .finally(() => {
-        window.requestAnimationFrame(() => {
-          window.requestAnimationFrame(() => {
-            if (!disposed) {
-              window.dispatchEvent(new Event("fineshell:workspace-ready"));
-              void restoreApplicationFocusAfterUpdateRelaunch()
-                .then((focused) => {
-                  if (focused) {
-                    recordDiagnostic("info", "application.update", "更新重启后主窗口已恢复前台");
-                  }
-                })
-                .catch((error) => {
-                  recordDiagnostic("warn", "application.update", "更新重启后主窗口聚焦失败", {
-                    error: commandErrorMessage(error),
-                  });
-                });
-            }
-          });
-        });
       });
     return () => {
       disposed = true;
     };
   }, [applyCommandLibrary, configurationLoadAttempt]);
+
+  useEffect(() => {
+    if (localDataState === "checking") return;
+    let disposed = false;
+    void finishWorkspaceStartup()
+      .then(() => !disposed && restoreApplicationFocusAfterUpdateRelaunch())
+      .then((focused) => {
+        if (focused) {
+          recordDiagnostic("info", "application.update", "更新重启后主窗口已恢复前台");
+        }
+      })
+      .catch((error) => {
+        recordDiagnostic("warn", "application.update", "更新重启后主窗口聚焦失败", {
+          error: commandErrorMessage(error),
+        });
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [localDataState]);
 
   useEffect(() => () => document.body.classList.remove("ai-sidebar-resizing"), []);
 

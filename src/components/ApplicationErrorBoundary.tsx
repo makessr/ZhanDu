@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { recordDiagnostic } from "../diagnostics";
+import { finishWorkspaceStartup } from "../workspace-startup";
 
 interface ApplicationErrorBoundaryProps {
   children: ReactNode;
@@ -20,6 +21,9 @@ class ApplicationErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    if (document.documentElement.classList.contains("main-window")) {
+      void finishWorkspaceStartup();
+    }
     recordDiagnostic("error", "frontend.render", "界面渲染失败", {
       componentStack: info.componentStack,
       error: error.message,

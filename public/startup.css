@@ -38,6 +38,17 @@ html[data-appearance="dark"] body {
 
 .startup-loader-content {
   width: min(280px, calc(100vw - 48px));
+  text-align: center;
+}
+
+.startup-loader-content button {
+  margin-top: 8px;
+  padding: 4px 10px;
+  color: inherit;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  cursor: pointer;
 }
 
 .startup-loader-track {

@@ -72,6 +72,18 @@ pub fn run() {
         managed_keys::initialize(app.handle()).map_err(std::io::Error::other)?;
         agent::initialize(app.handle()).map_err(std::io::Error::other)?;
         diagnostics::record_startup(app.handle());
+        #[cfg(target_os = "windows")]
+        {
+            use tauri::Manager;
+            if let Some(main) = app.get_webview_window("main") {
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_secs(8)).await;
+                    if matches!(main.is_visible(), Ok(false)) {
+                        let _ = main.show();
+                    }
+                });
+            }
+        }
         Ok(())
     });
 
