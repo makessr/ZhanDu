@@ -15,7 +15,7 @@
 
 ## 下载与安装
 
-**仓库版本** v0.11.0。各版本变动见 [更新日志](CHANGELOG.md)。
+**仓库版本** v0.11.1。各版本变动见 [更新日志](CHANGELOG.md)。
 
 栈渡在独立仓库维护和发布。首次安装请从正式发布页下载最新版。已安装栈渡 v0.6.2 或更新版本的用户可直接在应用内检查更新。 [栈渡安装包](https://github.com/makessr/ZhanDu/releases/latest) · [旧渠道 v0.6.1 切换版](https://github.com/makessr/FineShell/releases/tag/v0.6.1)
 
