@@ -53,7 +53,17 @@
           loader.classList.add("is-leaving");
           window.setTimeout(() => loader.remove(), 180);
         };
-        const fallbackTimer = window.setTimeout(finish, 8000);
+        const fallbackTimer = window.setTimeout(() => {
+          if (!loader) return;
+          loader.querySelector(".startup-loader-track").hidden = true;
+          loader.querySelector(".startup-loader-label").textContent =
+            "工作区加载时间较长，可以继续等待或重新加载。";
+          const retry = document.createElement("button");
+          retry.type = "button";
+          retry.textContent = "重新加载";
+          retry.addEventListener("click", () => window.location.reload());
+          loader.querySelector(".startup-loader-content").append(retry);
+        }, 8000);
         window.addEventListener("fineshell:workspace-ready", finish, {
           once: true,
         });

@@ -10,8 +10,10 @@ import { installSelectAllShortcuts } from "./select-all-shortcut";
 import { windowViewFromContext } from "./window-view";
 import { initializeAppearance } from "./appearance";
 import { startHostSync } from "./host-sync";
+import { showMainWindowEarly } from "./workspace-startup";
 
 initializeAppearance();
+void showMainWindowEarly();
 installGlobalDiagnostics();
 installSelectAllShortcuts();
 
